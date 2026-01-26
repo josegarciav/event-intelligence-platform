@@ -25,13 +25,16 @@ jobs:
         # --frozen ensures the lockfile is up to date and isn't modified
         run: uv sync --frozen
 
-      - name: Run ruff (linting)
+      - name: Run ruff (linting check)
         run: uv run ruff check .
 
-      - name: Run pydocstyle (docstrings)
+      - name: Run black (formatting check)
+        run: uv run black --check .
+
+      - name: Run pydocstyle (docstrings check)
         run: uv run pydocstyle .
 
-      - name: Run mypy (type hints)
+      - name: Run mypy (type hints check)
         run: uv run mypy .
 
       - name: Run pytest with coverage
