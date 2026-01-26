@@ -2,7 +2,6 @@ name: PR Quality Checks
 
 on:
   pull_request:
-    branches: [main]
 
 jobs:
   quality:
@@ -51,11 +50,9 @@ jobs:
           pattern: "^(feat|fix|docs|style|refactor|perf|test|chore)(\(.+\))?: [a-z0-9 ]{1,150}$"
           ignore-case: true
 
-
       - name: Verify dependencies pinned
         run: |
           uv check
-
 
       - name: Run Bandit (security scan)
         run: |
@@ -72,4 +69,3 @@ jobs:
           source pulsecity/bin/activate
           detect-secrets scan > .secrets.baseline
           detect-secrets audit .secrets.baseline
-
