@@ -1,0 +1,75 @@
+name: PR Quality Checks
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install uv
+          uv sync --venv pulsecity
+          source pulsecity/bin/activate
+          pip install pytest pytest-cov ruff mypy pydocstyle bandit vulture detect-secrets
+
+      - name: Run ruff (linting)
+        run: |
+          source pulsecity/bin/activate
+          ruff check .
+
+      - name: Run pydocstyle (docstrings)
+        run: |
+          source pulsecity/bin/activate
+          pydocstyle .
+
+      - name: Run mypy (type hints)
+        run: |
+          source pulsecity/bin/activate
+          mypy .
+
+      - name: Run pytest with coverage
+        run: |
+          source pulsecity/bin/activate
+          pytest --cov=. --cov-fail-under=80
+
+      - name: Validate commit messages
+        uses: amitsingh-007/validate-commit-message@v2
+        with:
+          pattern: "^(feat|fix|docs|style|refactor|perf|test|chore)(\(.+\))?: [a-z0-9 ]{1,150}$"
+          ignore-case: true
+
+
+      - name: Verify dependencies pinned
+        run: |
+          uv check
+
+
+      - name: Run Bandit (security scan)
+        run: |
+          source pulsecity/bin/activate
+          bandit -r . -lll -ll
+
+      - name: Dead code detection (Vulture, to flag unused code)
+        run: |
+          source pulsecity/bin/activate
+          vulture . --min-confidence 70
+
+      - name: Detect secrets (scan for secrets in code)
+        run: |
+          source pulsecity/bin/activate
+          detect-secrets scan > .secrets.baseline
+          detect-secrets audit .secrets.baseline
+
