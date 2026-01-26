@@ -1,7 +1,7 @@
 
 # Pulsecity
 
-## Event intelligence platform
+## Event Intelligence Platform
 
 A scalable data platform for ingesting, normalizing, and analyzing event data from multiple heterogeneous sources.  
 The system transforms raw event signals into a canonical, city-aware dataset designed for analytics, experimentation, and machine-learning-driven discovery.  
@@ -9,7 +9,7 @@ Built with extensibility in mind, the platform supports rapid onboarding of new 
 At its core, events are treated as data products, not just listings.
 
 
-## Repo structure
+## Repo Structure
 
 A modular event intelligence platform that separates data ingestion, core intelligence, and application logic, with experimentation treated as a first-class, admin-driven system.
 
@@ -50,6 +50,10 @@ event-intelligence-platform/
 │   └── run_pipeline.py
 │
 ├── tests/
+│   ├── integration/
+│   ├── unit/
+│
+├── docs/
 │
 ├── pyproject.toml
 ├── uv.lock
