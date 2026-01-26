@@ -2,7 +2,7 @@
 name = "event-intelligence-platform"
 version = "0.1.0"
 description = "Multi-source event intelligence and experimentation platform"
-requires-python = ">=3.11"
+requires-python = ">=3.11, <3.13"
 
 dependencies = [
     "pandas>=2.1",
@@ -13,10 +13,20 @@ dependencies = [
     "pyyaml>=6.0",
 ]
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
+    # Testing
     "pytest>=7.4",
+    "pytest-cov>=4.1",
+
+    # Linting / formatting
     "ruff>=0.2",
+    "pydocstyle>=6.3",
+    "black>=24.1",
+
+    # Typing
     "mypy>=1.8",
+
+    # Dev tooling
     "pre-commit>=3.6",
 ]

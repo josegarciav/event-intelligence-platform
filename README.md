@@ -142,18 +142,30 @@ This project uses **uv** for fast, deterministic Python dependency management.
 
 ### Prerequisites
 - Python 3.11+
-- uv installed (https://github.com/astral-sh/uv)
-
-
-### Setup
-Clone the repository, create a virtual environment named `pulsecity`, and install all dependencies:
-
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) (Fast Python package manager)
 
 ```bash
-uv venv pulsecity
-uv sync --venv pulsecity
+# Uv installation guidelines
+curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+uv --version
+```
 
-source pulsecity/bin/activate
+Should output `uv 0.9.26`.
+
+### Setup
+This project is pinned to **Python 3.11**. Run the following to set up your local environment:
+
+```bash
+# Force uv to use Python 3.11 and create the .venv
+uv venv --python 3.11
+
+# Activate it
+source .venv/bin/activate
+
+# Sync your dependencies
+uv sync
+uv lock
 ```
 
 ## Contribution Guidelines
@@ -169,4 +181,55 @@ Examples:
 Documentation: https://www.conventionalcommits.org/
 
 
+## Scaling Toward Mobile + Web
 
+1. API-first design
+    - Make all backend functionality accessible via REST or GraphQL
+    - Version your API from day 1
+
+2. Modular packaging
+    - Keep backend logic in modules that are independent of the frontend
+    - This makes it reusable for web, mobile, or even other clients (IoT, partners)
+
+3. CI/CD branching
+    - You can create separate workflows for backend, web frontend, mobile frontend
+    - Your current PR quality checks form the core for backend reliability
+
+
+## Python-Native Architecture & Design Patterns
+
+This project is structured with clear separation of concerns and Python-first design, enabling future web and mobile clients without touching backend logic.
+
+### Layers
+
+**Backend / Ingestion & Normalization**  
+- FastAPI + SQLAlchemy + Pydantic  
+- Handles data ingestion from multiple sources, normalization, enrichment, and storage.  
+
+**Analytics / ML Layer**  
+- FastAPI endpoints, Celery or Prefect pipelines, Jupyter dashboards  
+- Exposes analytics, recommendation, and experimentation services.  
+
+**Application Layer**  
+- Web app → Django, Flask + Jinja, or FastAPI + HTMX  
+- Mobile app → REST/GraphQL endpoints consumed by native SDKs or Flutter/Dart  
+- Frontend is fully decoupled, consuming the same API-first backend.  
+
+### Design Patterns
+
+**Adapter Pattern**  
+- Used at the **pipeline-source level** to standardize diverse event sources (Meetup, Facebook, Ticketing APIs) into a **canonical event schema**.  
+- Each source implements a common interface, allowing the ingestion layer to treat all sources uniformly.
+
+**Other To-Be-Used Patterns**  
+- **Factory Pattern** → dynamically create ingestion pipelines or ML model objects depending on event type or client requirements.  
+- **Observer / Pub-Sub** → track event updates and trigger downstream analytics or experimentation pipelines asynchronously.  
+- **Strategy Pattern** → enable dynamic pricing or recommendation strategies in the analytics layer without changing the core logic.  
+- **Singleton Pattern** → for global configuration, logging, or experiment registry within the system.
+
+### Best Practices
+
+- **FastAPI** for API-first design ensures all clients (web, mobile, CLI) can consume the backend consistently.  
+- **Pydantic models** enforce schema consistency across layers.  
+- **Docker** containerization ensures reproducible environments for backend and CI/CD.  
+- **Adapters at source-level** keep the system flexible to add/remove event sources without impacting the pipeline logic.
