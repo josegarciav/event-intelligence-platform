@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, Type
 from datetime import datetime
 import logging
 from dataclasses import dataclass
+from ingestion.deduplication import EventDeduplicator, FuzzyMatchDeduplicator
 
 from ingestion.base_pipeline import (
     BasePipeline,
@@ -16,6 +17,7 @@ from ingestion.base_pipeline import (
     PipelineExecutionResult,
     PipelineStatus,
 )
+from normalization.event_schema import EventSchema
 
 
 @dataclass
@@ -45,7 +47,7 @@ class PipelineOrchestrator:
     - Coordinate storage of ingested events
     """
 
-    def __init__(self):
+    def __init__(self, deduplicator: EventDeduplicator = None):
         """Initialize the orchestrator."""
         self.logger = logging.getLogger("orchestrator")
         self.logger.setLevel(logging.INFO)
@@ -53,6 +55,7 @@ class PipelineOrchestrator:
         self.pipelines: Dict[str, BasePipeline] = {}
         self.scheduled_pipelines: Dict[str, ScheduledPipeline] = {}
         self.execution_history: List[PipelineExecutionResult] = []
+        self.deduplicator = deduplicator or FuzzyMatchDeduplicator()
 
     # ========================================================================
     # PIPELINE MANAGEMENT
@@ -91,6 +94,13 @@ class PipelineOrchestrator:
         List all registered pipelines.
         """
         return list(self.pipelines.keys())
+
+    def deduplicate_results(self, results: Dict) -> List[EventSchema]:
+        """
+        Deduplicate events from multiple pipeline results.
+        """
+        all_events = [e for r in results.values() for e in r.events]
+        return self.deduplicator.deduplicate(all_events)
 
     # ========================================================================
     # EXECUTION
@@ -304,8 +314,8 @@ def create_orchestrator_from_config(config_dict: Dict) -> PipelineOrchestrator:
         config = yaml.safe_load(open('configs/ingestion.yaml'))
         orchestrator = create_orchestrator_from_config(config)
     """
-    from ingestion.sources.ra_co import RaCoEventPipeline
-    from ingestion.sources.meetup import MeetupEventPipeline
+    from ingestion.pipelines.apis.ra_co import RaCoEventPipeline
+    from ingestion.pipelines.meetup import MeetupEventPipeline
 
     # from ingestion.sources.ticketmaster import TicketmasterEventPipeline
 
@@ -345,5 +355,7 @@ def create_orchestrator_from_config(config_dict: Dict) -> PipelineOrchestrator:
             schedule_config = source_config.get("schedule")
             if schedule_config:
                 orchestrator.schedule_pipeline(source_name, schedule_config)
+
+    # orchestrator = DeduplicationManager().initialize()
 
     return orchestrator

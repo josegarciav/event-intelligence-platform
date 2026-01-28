@@ -9,7 +9,7 @@ Each source implements the BasePipeline interface to handle:
 - Normalizing to the canonical EventSchema
 """
 
-from ingestion.sources.ra_co import RaCoEventPipeline
+from ingestion.pipelines.apis.ra_co import RaCoEventPipeline
 
 __all__ = [
     "RaCoEventPipeline",

@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from ingestion.sources.ra_co import RaCoEventPipeline
+from ingestion.pipelines.apis.ra_co import RaCoEventPipeline
 from ingestion.base_pipeline import PipelineConfig
 
 # Create config

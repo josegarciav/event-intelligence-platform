@@ -18,7 +18,7 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
-from ingestion.sources.ra_co import RaCoEventPipeline
+from ingestion.pipelines.apis.ra_co import RaCoEventPipeline
 from ingestion.base_pipeline import PipelineConfig
 
 
