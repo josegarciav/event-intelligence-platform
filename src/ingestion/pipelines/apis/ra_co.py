@@ -15,8 +15,8 @@ from datetime import datetime
 import requests
 from decimal import Decimal
 
-from ingestion.base_pipeline import BasePipeline, PipelineConfig
-from normalization.event_schema import (
+from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
+from src.normalization.event_schema import (
     EventSchema,
     EventType,
     LocationInfo,
@@ -364,7 +364,7 @@ class RaCoEventPipeline(BasePipeline):
         is_free = cost_str.lower() in ["free", "complimentary", ""]
 
         price = PriceInfo(
-            currency="USD",  # Ra.co is UK-focused
+            currency="USD",  # Ra.co is UK-focused?
             is_free=is_free,
             minimum_price=Decimal("0") if is_free else None,
             maximum_price=None,

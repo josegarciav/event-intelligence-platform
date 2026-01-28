@@ -5,7 +5,7 @@ Module for event deduplication strategies.
 
 from abc import ABC, abstractmethod
 from typing import List
-from normalization.event_schema import EventSchema
+from src.normalization.event_schema import EventSchema
 
 
 class EventDeduplicator(ABC):

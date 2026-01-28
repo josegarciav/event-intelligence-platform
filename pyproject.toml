@@ -18,6 +18,7 @@ dev = [
     # Testing
     "pytest>=7.4",
     "pytest-cov>=4.1",
+    "ipykernel>=6.29.0",
 
     # Linting / formatting
     "ruff>=0.2",
