@@ -47,7 +47,6 @@ event-intelligence-platform/
 │   └── settings.yaml
 │
 ├── scripts/
-│   └── run_pipeline.py
 │
 ├── tests/
 │   ├── integration/
@@ -145,7 +144,7 @@ This project uses **uv** for fast, deterministic Python dependency management.
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) (Fast Python package manager)
 
 ```bash
-# Uv installation guidelines
+# uv installation guidelines
 curl -LsSf https://astral.sh/uv/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 uv --version
