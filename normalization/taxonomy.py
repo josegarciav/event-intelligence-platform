@@ -19,6 +19,7 @@ def load_taxonomy() -> dict:
     with open(TAXONOMY_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
 
+
 def build_taxonomy_index() -> Dict[str, Set[str]]:
     """
     Builds a mapping:
@@ -29,8 +30,6 @@ def build_taxonomy_index() -> Dict[str, Set[str]]:
 
     for cat in taxonomy["categories"]:
         primary = cat["category"].lower().replace(" & ", "_").replace(" ", "_")
-        index[primary] = {
-            sub["id"] for sub in cat.get("subcategories", [])
-        }
+        index[primary] = {sub["id"] for sub in cat.get("subcategories", [])}
 
     return index

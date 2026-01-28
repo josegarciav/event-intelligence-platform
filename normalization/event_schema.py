@@ -15,17 +15,18 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from decimal import Decimal
 from normalization.taxonomy import build_taxonomy_index
 
-
 # ============================================================================
 # ENUMS: Human Experience Taxonomy Dimensions
 # ============================================================================
 
 _TAXONOMY_INDEX = build_taxonomy_index()
 
+
 class PrimaryCategory(str, Enum):
     """
     Primary experience categories from Human Experience Taxonomy:
     """
+
     PLAY_AND_FUN = "play_and_fun"
     EXPLORATION_AND_ADVENTURE = "exploration_and_adventure"
     CREATION_AND_EXPRESSION = "creation_and_expression"
@@ -43,13 +44,14 @@ class SubcategoryExamples(str, Enum):
     ILLUSTRATIVE - TO BE DEFINED DYNAMICALLY:
     Subcategories from the taxonomy (examples; can be dynamically extended).
     """
+
     # Play & Pure Fun
     GAMES_AND_PLAY = "games_and_play_systems"
     HUMOR_AND_LAUGHTER = "humor_and_laughter"
     SENSORY_STIMULATION = "sensory_stimulation_and_novelty"
     MUSIC_AND_RHYTHM = "music_and_rhythm_play"
     SOCIAL_FUN = "social_fun_and_playful_interaction"
-    
+
     # Exploration & Adventure
     MICRO_EXPLORATION = "micro_exploration"
     NATURE_EXPLORATION = "nature_exploration"
@@ -59,7 +61,7 @@ class SubcategoryExamples(str, Enum):
     WATER_ADVENTURES = "water_adventures"
     ALTITUDE_AND_SKY = "altitude_and_sky_thrills"
     URBAN_ADVENTURE = "urban_adventure_and_night_exploration"
-    
+
     # Creation & Expression
     VISUAL_ART = "visual_art_2d"
     CRAFTS_AND_HANDMADE = "crafts_and_handmade"
@@ -71,7 +73,7 @@ class SubcategoryExamples(str, Enum):
     DIGITAL_CREATION = "digital_creation"
     COOKING_CREATIVE = "cooking_as_creative_expression"
     PERSONAL_STYLE = "personal_style_and_aesthetic_creation"
-    
+
     # Learning & Intellectual Pleasure
     READING_FOR_PLEASURE = "reading_for_curiosity_and_pleasure"
     LEARNING_NEW_SKILLS = "learning_new_skills_intellectual"
@@ -79,7 +81,7 @@ class SubcategoryExamples(str, Enum):
     RESEARCH_AND_DEEP_DIVES = "research_and_deep_dives"
     THINKING_AND_REASONING = "thinking_reasoning_and_mental_play"
     KNOWLEDGE_CONSUMPTION = "knowledge_consumption_audio_visual"
-    
+
     # Social Connection & Belonging
     CASUAL_SOCIALIZING = "casual_socializing"
     DEEP_CONVERSATIONS = "deep_conversations_and_emotional_bonding"
@@ -89,7 +91,7 @@ class SubcategoryExamples(str, Enum):
     COMMUNITY_AND_GROUP = "community_and_group_belonging"
     SHARED_ACTIVITIES = "shared_activities_and_co_experience"
     ONLINE_SOCIAL = "online_social_interaction"
-    
+
     # Body & Movement
     EVERYDAY_MOVEMENT = "everyday_movement_and_light_activity"
     FITNESS_AND_STRENGTH = "fitness_and_strength_training"
@@ -99,7 +101,7 @@ class SubcategoryExamples(str, Enum):
     SPORTS_AND_COMPETITIVE = "sports_and_competitive_physical_play"
     OUTDOOR_PHYSICAL = "outdoor_physical_experience"
     BODY_CARE_AND_RECOVERY = "body_care_recovery_and_sensory_regulation"
-    
+
     # Challenge & Achievement
     MENTAL_CHALLENGES = "mental_challenges_and_problem_solving"
     SKILL_MASTERY = "skill_mastery_and_deliberate_practice"
@@ -107,7 +109,7 @@ class SubcategoryExamples(str, Enum):
     COMPETITIVE_ACTIVITIES = "competitive_activities"
     GOAL_SETTING = "goal_setting_and_achievement_systems"
     PERFORMANCE_UNDER_PRESSURE = "performance_under_pressure"
-    
+
     # Relaxation & Escapism
     PASSIVE_RELAXATION = "passive_relaxation"
     MENTAL_ESCAPE = "mental_escape_and_immersion"
@@ -115,14 +117,14 @@ class SubcategoryExamples(str, Enum):
     SENSORY_COMFORT = "sensory_comfort_and_soothing"
     NATURE_BASED_RELAXATION = "nature_based_relaxation"
     DIGITAL_ESCAPISM = "digital_escapism_and_light_distraction"
-    
+
     # Identity & Meaning
     SELF_REFLECTION = "self_reflection_and_inner_inquiry"
     VALUES_CLARIFICATION = "values_and_belief_clarification"
     SPIRITUALITY = "spirituality_and_transcendence"
     IDENTITY_EXPRESSION = "identity_expression_and_authenticity"
     LIFE_DESIGN = "life_design_and_direction"
-    
+
     # Contribution & Impact
     HELPING_INDIVIDUALS = "helping_individuals_directly"
     EDUCATION_AND_SHARING = "education_and_knowledge_sharing"
@@ -136,13 +138,12 @@ class Subcategory(BaseModel):
     """
     Reference to a subcategory defined in the Human Experience Taxonomy.
     """
-    
+
     id: str = Field(
         description="Subcategory ID from the Human Experience Taxonomy (e.g., '1.1')"
     )
     name: Optional[str] = Field(
-        default=None,
-        description="Optional human-readable name (for debugging / UI)"
+        default=None, description="Optional human-readable name (for debugging / UI)"
     )
 
     @field_validator("id")
@@ -163,6 +164,7 @@ class EventFormat(str, Enum):
     """
     Format/medium of the event.
     """
+
     IN_PERSON = "in_person"
     VIRTUAL = "virtual"
     HYBRID = "hybrid"
@@ -173,6 +175,7 @@ class DayOfWeek(str, Enum):
     """
     Days of the week.
     """
+
     MONDAY = "monday"
     TUESDAY = "tuesday"
     WEDNESDAY = "wednesday"
@@ -186,6 +189,7 @@ class EventType(str, Enum):
     """
     High-level event type.
     """
+
     CONCERT = "concert"
     FESTIVAL = "festival"
     WORKSHOP = "workshop"
@@ -206,10 +210,12 @@ class EventType(str, Enum):
 # VALUE DIMENSIONS (from Taxonomy)
 # ============================================================================
 
+
 class TaxonomyDimension(BaseModel):
     """
     Represents a value dimension from the Human Experience Taxonomy.
     """
+
     primary_category: PrimaryCategory
     subcategory: Optional[Subcategory] = None
     values: List[str] = Field(default_factory=list)
@@ -220,23 +226,25 @@ class TaxonomyDimension(BaseModel):
 # LOCATION & GEOGRAPHIC DATA
 # ============================================================================
 
+
 class Coordinates(BaseModel):
     """
     Geographic coordinates.
     """
+
     latitude: float
     longitude: float
-    
-    @field_validator('latitude')
+
+    @field_validator("latitude")
     def validate_latitude(cls, v):
         if not -90 <= v <= 90:
-            raise ValueError('Latitude must be between -90 and 90')
+            raise ValueError("Latitude must be between -90 and 90")
         return v
-    
-    @field_validator('longitude')
+
+    @field_validator("longitude")
     def validate_longitude(cls, v):
         if not -180 <= v <= 180:
-            raise ValueError('Longitude must be between -180 and 180')
+            raise ValueError("Longitude must be between -180 and 180")
         return v
 
 
@@ -244,15 +252,18 @@ class LocationInfo(BaseModel):
     """
     Normalized location information.
     """
+
     venue_name: Optional[str] = None
     street_address: Optional[str] = None
     city: str
     state_or_region: Optional[str] = None
     postal_code: Optional[str] = None
-    country_code: str = Field(default="US", description="ISO 3166-1 alpha-2 country code")
+    country_code: str = Field(
+        default="US", description="ISO 3166-1 alpha-2 country code"
+    )
     coordinates: Optional[Coordinates] = None
     timezone: Optional[str] = None  # e.g., 'America/New_York'
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -263,7 +274,7 @@ class LocationInfo(BaseModel):
                 "postal_code": "10069",
                 "country_code": "US",
                 "coordinates": {"latitude": 40.7695, "longitude": -73.9965},
-                "timezone": "America/New_York"
+                "timezone": "America/New_York",
             }
         }
 
@@ -271,6 +282,7 @@ class LocationInfo(BaseModel):
 # ============================================================================
 # PRICING INFORMATION
 # ============================================================================
+
 
 class PriceInfo(BaseModel):
     """
@@ -287,8 +299,7 @@ class PriceInfo(BaseModel):
     vip_price: Optional[Decimal] = Field(None, ge=0)
 
     price_raw_text: Optional[str] = Field(
-        None,
-        description="Original price text from source (for debugging/validation)"
+        None, description="Original price text from source (for debugging/validation)"
     )
 
     @model_validator(mode="after")
@@ -298,9 +309,7 @@ class PriceInfo(BaseModel):
             and self.maximum_price is not None
             and self.maximum_price < self.minimum_price
         ):
-            raise ValueError(
-                "maximum_price cannot be less than minimum_price"
-            )
+            raise ValueError("maximum_price cannot be less than minimum_price")
         return self
 
 
@@ -308,6 +317,7 @@ class TicketInfo(BaseModel):
     """
     Ticket availability and link information.
     """
+
     url: Optional[str] = None
     is_sold_out: bool = False
     ticket_count_available: Optional[int] = None
@@ -318,10 +328,12 @@ class TicketInfo(BaseModel):
 # ORGANIZER & SOURCE INFORMATION
 # ============================================================================
 
+
 class OrganizerInfo(BaseModel):
     """
     Information about the event organizer.
     """
+
     name: str
     url: Optional[str] = None
     email: Optional[str] = None
@@ -335,19 +347,15 @@ class SourceInfo(BaseModel):
     """
     Metadata about where the event came from.
     """
+
     source_name: str = Field(
         description="Name of the source (e.g., 'ra_co', 'meetup', 'ticketmaster')"
     )
-    source_event_id: str = Field(
-        description="Event ID from the original source"
-    )
-    source_url: str = Field(
-        description="Direct URL to event on source platform"
-    )
+    source_event_id: str = Field(description="Event ID from the original source")
+    source_url: str = Field(description="Direct URL to event on source platform")
     last_updated_from_source: datetime
     ingestion_timestamp: datetime = Field(
-        default_factory=datetime.utcnow,
-        description="When we ingested this event"
+        default_factory=datetime.utcnow, description="When we ingested this event"
     )
     data_freshness_hours: Optional[int] = None
 
@@ -356,10 +364,12 @@ class SourceInfo(BaseModel):
 # MEDIA & ENGAGEMENT
 # ============================================================================
 
+
 class MediaAsset(BaseModel):
     """
     Media asset associated with the event.
     """
+
     type: str = Field(description="Type of media (image, video, flyer, etc.)")
     url: str
     title: Optional[str] = None
@@ -372,6 +382,7 @@ class EngagementMetrics(BaseModel):
     """
     Engagement metrics from the source.
     """
+
     going_count: Optional[int] = None
     interested_count: Optional[int] = None
     views_count: Optional[int] = None
@@ -385,15 +396,16 @@ class EngagementMetrics(BaseModel):
 # MAIN EVENT SCHEMA
 # ============================================================================
 
+
 class EventSchema(BaseModel):
     """
     Canonical Event Schema for the Event Intelligence Platform.
-    
+
     This is the unified, normalized representation of events from all sources.
     It captures the multi-dimensional nature of human experiences through the
     Human Experience Taxonomy while accommodating source-specific metadata.
     """
-    
+
     # ---- CORE EVENT INFORMATION ----
     event_id: str = Field(
         description="Platform-wide unique event identifier (generated from source_event_id)"
@@ -401,14 +413,14 @@ class EventSchema(BaseModel):
     title: str
     description: Optional[str] = None
     long_description: Optional[str] = None
-    
+
     # ---- TAXONOMY & EXPERIENCE DIMENSIONS ----
     primary_category: PrimaryCategory
     taxonomy_dimensions: List[TaxonomyDimension] = Field(
         default_factory=list,
-        description="Multi-dimensional taxonomy mappings for this event"
+        description="Multi-dimensional taxonomy mappings for this event",
     )
-    
+
     # ---- TIMING ----
     start_datetime: datetime
     end_datetime: Optional[datetime] = None
@@ -416,56 +428,56 @@ class EventSchema(BaseModel):
     is_all_day: bool = False
     is_recurring: bool = False
     recurrence_pattern: Optional[str] = None  # e.g., 'weekly', 'monthly'
-    
+
     # ---- LOCATION ----
     location: LocationInfo
-    
+
     # ---- EVENT DETAILS ----
     event_type: EventType = EventType.OTHER
     format: EventFormat
     capacity: Optional[int] = None
     age_restriction: Optional[str] = None
-    
+
     # ---- PRICING & TICKETS ----
     price: PriceInfo = Field(default_factory=PriceInfo)
     ticket_info: Optional[TicketInfo] = None
-    
+
     # ---- ORGANIZER ----
     organizer: OrganizerInfo
-    
+
     # ---- MEDIA & VISUAL ----
     image_url: Optional[str] = None
     media_assets: List[MediaAsset] = Field(default_factory=list)
-    
+
     # ---- SOURCE METADATA ----
     source: SourceInfo
-    
+
     # ---- ENGAGEMENT & POPULARITY ----
     engagement: Optional[EngagementMetrics] = None
-    
+
     # ---- QUALITY & NORMALIZATION ----
     data_quality_score: float = Field(
         default=0.0,
         ge=0.0,
         le=1.0,
-        description="Quality assessment of normalized data (0.0-1.0)"
+        description="Quality assessment of normalized data (0.0-1.0)",
     )
     normalization_errors: List[str] = Field(
         default_factory=list,
-        description="Warnings/errors encountered during normalization"
+        description="Warnings/errors encountered during normalization",
     )
-    
+
     # ---- ADDITIONAL METADATA ----
     tags: List[str] = Field(default_factory=list)
     custom_fields: Dict[str, Any] = Field(
         default_factory=dict,
-        description="Source-specific fields that don't fit standard schema"
+        description="Source-specific fields that don't fit standard schema",
     )
-    
+
     # ---- PLATFORM TIMESTAMPS ----
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    
+
     class Config:
         json_encoders = {
             datetime: lambda v: v.isoformat(),
@@ -483,14 +495,14 @@ class EventSchema(BaseModel):
                         "primary_category": "play_and_fun",
                         "subcategory": "music_and_rhythm_play",
                         "values": ["expression", "energy", "flow"],
-                        "confidence": 0.95
+                        "confidence": 0.95,
                     },
                     {
                         "primary_category": "social_connection",
                         "subcategory": "shared_activities",
                         "values": ["belonging", "shared joy"],
-                        "confidence": 0.8
-                    }
+                        "confidence": 0.8,
+                    },
                 ],
                 "start_datetime": "2026-03-15T23:00:00Z",
                 "end_datetime": "2026-03-16T06:00:00Z",
@@ -499,18 +511,22 @@ class EventSchema(BaseModel):
                     "city": "London",
                     "country_code": "GB",
                     "coordinates": {"latitude": 51.5074, "longitude": -0.0759},
-                    "timezone": "Europe/London"
+                    "timezone": "Europe/London",
                 },
                 "event_type": "concert",
                 "format": "in_person",
-                "price": {"currency": "GBP", "minimum_price": 35.0, "maximum_price": 50.0},
+                "price": {
+                    "currency": "GBP",
+                    "minimum_price": 35.0,
+                    "maximum_price": 50.0,
+                },
                 "organizer": {"name": "Printworks Events"},
                 "source": {
                     "source_name": "ra_co",
                     "source_event_id": "12345",
                     "source_url": "https://ra.co/events/12345",
-                    "last_updated_from_source": "2026-01-27T10:00:00Z"
-                }
+                    "last_updated_from_source": "2026-01-27T10:00:00Z",
+                },
             }
         }
 
@@ -519,10 +535,12 @@ class EventSchema(BaseModel):
 # EVENT BATCH (for bulk operations)
 # ============================================================================
 
+
 class EventBatch(BaseModel):
     """
     Container for batch operations on multiple events.
     """
+
     source_name: str
     batch_id: str = Field(description="Unique identifier for this batch")
     events: List[EventSchema]
