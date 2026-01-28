@@ -8,9 +8,3 @@ Each source implements the BasePipeline interface to handle:
 - Mapping to the Human Experience Taxonomy
 - Normalizing to the canonical EventSchema
 """
-
-from ingestion.pipelines.apis.ra_co import RaCoEventPipeline
-
-__all__ = [
-    "RaCoEventPipeline",
-]

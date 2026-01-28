@@ -8,7 +8,9 @@ from pathlib import Path
 from typing import Dict, Set
 from functools import lru_cache
 
-TAXONOMY_PATH = Path("normalization/human_experience_taxonomy_master.json")
+from src.configs.config import Config
+
+TAXONOMY_PATH = Config.get_taxonomy_path()
 
 
 @lru_cache

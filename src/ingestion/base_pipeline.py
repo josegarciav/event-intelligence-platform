@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 import logging
 
-from normalization.event_schema import EventSchema, EventBatch
+from src.normalization.event_schema import EventSchema, EventBatch
 
 # ============================================================================
 # ENUMS & DATA CLASSES

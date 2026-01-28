@@ -71,7 +71,7 @@ sources:
   # MEETUP - Community Events Platform
   # =========================================================================
   meetup:
-    enabled: true
+    enabled: false
     base_url: "https://api.meetup.com"
     api_key: "${MEETUP_API_KEY}"
     

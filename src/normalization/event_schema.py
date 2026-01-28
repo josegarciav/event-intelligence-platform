@@ -13,7 +13,7 @@ from typing import Optional, List, Dict, Any
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, model_validator
 from decimal import Decimal
-from normalization.taxonomy import build_taxonomy_index
+from src.normalization.taxonomy import build_taxonomy_index
 
 # ============================================================================
 # ENUMS: Human Experience Taxonomy Dimensions
@@ -349,7 +349,7 @@ class SourceInfo(BaseModel):
     """
 
     source_name: str = Field(
-        description="Name of the source (e.g., 'ra_co', 'meetup', 'ticketmaster')"
+        description="Name of the source (e.g., 'fever', 'meetup', 'ticketmaster')"
     )
     source_event_id: str = Field(description="Event ID from the original source")
     source_url: str = Field(description="Direct URL to event on source platform")
