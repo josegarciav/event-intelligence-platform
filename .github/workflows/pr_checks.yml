@@ -1,6 +1,8 @@
 name: PR Quality Checks
 
-on: pull_request
+on:
+  pull_request:
+    types: [opened, reopened]
 
 jobs:
   quality:
@@ -43,7 +45,7 @@ jobs:
       - name: Validate commit messages
         uses: amitsingh-007/validate-commit-message@v2
         with:
-          pattern: "^(feat|fix|docs|style|refactor|perf|test|chore)(\(.+\))?: [a-z0-9 ]{1,150}$"
+          pattern: '^(feat|fix|docs|style|refactor|perf|test|chore)(\(.+\))?: [a-z0-9 ]{1,150}$'
           ignore-case: true
 
       - name: Verify lockfile is in sync
