@@ -21,7 +21,6 @@ A **complete, production-ready event ingestion pipeline architecture** consistin
 - PIPELINE_ARCHITECTURE.md - Detailed UML diagrams and design
 - VISUAL_REFERENCE.md - ASCII diagrams and flowcharts
 - IMPLEMENTATION_SUMMARY.md - What was created and why
-- FILE_MANIFEST.md - Complete file listing and reference
 
 ---
 
@@ -116,7 +115,6 @@ Each event gets a quality score (0.0-1.0) based on:
 | Config | `configs/ingestion.yaml` |
 | Architecture | `docs/PIPELINE_ARCHITECTURE.md` |
 | Diagrams | `docs/VISUAL_REFERENCE.md` |
-| File Map | `docs/FILE_MANIFEST.md` |
 
 ---
 
@@ -136,9 +134,6 @@ Each event gets a quality score (0.0-1.0) based on:
 
 **I want diagrams:**
 → `docs/VISUAL_REFERENCE.md` + `docs/PIPELINE_ARCHITECTURE.md`
-
-**I want everything at a glance:**
-→ `docs/IMPLEMENTATION_SUMMARY.md` + `docs/FILE_MANIFEST.md`
 
 ---
 
@@ -244,13 +239,6 @@ All with clean code, comprehensive documentation, and extensible design.
 | Enrichment | 🔧 Needs implementation |
 | Monitoring | 🔧 Needs implementation |
 
-
-Run the following for quick script testing:
-
-```bash
-python -m scripts.test_pipeline
-python -m scripts.show_all_events
-```
 
 ---
 
