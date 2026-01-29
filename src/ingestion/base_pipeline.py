@@ -195,14 +195,16 @@ class BasePipeline(ABC):
 
         Returns:
             Tuple of (primary_category, taxonomy_dimensions)
-            - primary_category: str (enum value)
-            - taxonomy_dimensions: List of dicts with category, subcategory, values, confidence
+            - primary_category: str (PrimaryCategory enum value)
+            - taxonomy_dimensions: List of dicts with primary_category, subcategory, values, confidence.
+              subcategory must be a taxonomy subcategory id (e.g. "1.4", "5.7") from
+              Subcategory.all_ids() / the taxonomy JSON.
 
         Example (for ra.co DJ set):
             - Primary: "play_and_fun"
             - Dimensions: [
-                {"primary": "play_and_fun", "sub": "music_rhythm", "values": [...], "confidence": 0.95},
-                {"primary": "social_connection", "sub": "shared_activities", "values": [...], "confidence": 0.8}
+                {"primary_category": "play_and_fun", "subcategory": "1.4", "values": [...], "confidence": 0.95},
+                {"primary_category": "social_connection", "subcategory": "5.7", "values": [...], "confidence": 0.8}
               ]
         """
         pass

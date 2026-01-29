@@ -13,7 +13,11 @@ from typing import Optional, List, Dict, Any
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, model_validator
 from decimal import Decimal
-from src.normalization.taxonomy import build_taxonomy_index
+from src.normalization.taxonomy import (
+    build_taxonomy_index,
+    get_all_subcategory_options,
+    get_all_subcategory_ids,
+)
 
 # ============================================================================
 # ENUMS: Human Experience Taxonomy Dimensions
@@ -134,30 +138,37 @@ class SubcategoryExamples(str, Enum):
     ENVIRONMENTAL_IMPACT = "environmental_and_sustainability_impact"
 
 
-class Subcategory(BaseModel):
+class Subcategory:
     """
-    Reference to a subcategory defined in the Human Experience Taxonomy.
+    Helper for subcategories defined in the Human Experience Taxonomy (JSON).
+
+    Reads dynamically from the taxonomy file. Use `Subcategory.all_options()` for
+    the full list of {id, name, primary_category}; use `Subcategory.all_ids()` to
+    validate that a subcategory id is one of the available options; use
+    `Subcategory.ids_for_primary(primary_key)` to map category -> subcategory ids.
     """
 
-    id: str = Field(
-        description="Subcategory ID from the Human Experience Taxonomy (e.g., '1.1')"
-    )
-    name: Optional[str] = Field(
-        default=None, description="Optional human-readable name (for debugging / UI)"
-    )
+    _ALL_OPTIONS: Optional[List[Dict[str, Any]]] = None
+    _ALL_IDS: Optional[set] = None
 
-    @field_validator("id")
-    def validate_subcategory_exists(cls, v, info):
-        primary = info.data.get("primary_category")
-        if not primary:
-            return v  # validated later
+    @classmethod
+    def all_options(cls) -> List[Dict[str, Any]]:
+        """List of all subcategory options: {id, name, primary_category}."""
+        if cls._ALL_OPTIONS is None:
+            cls._ALL_OPTIONS = get_all_subcategory_options()
+        return cls._ALL_OPTIONS
 
-        allowed = _TAXONOMY_INDEX.get(primary)
-        if not allowed or v not in allowed:
-            raise ValueError(
-                f"Subcategory '{v}' not valid for primary category '{primary}'"
-            )
-        return v
+    @classmethod
+    def all_ids(cls) -> set:
+        """Set of all valid subcategory ids (all available options)."""
+        if cls._ALL_IDS is None:
+            cls._ALL_IDS = get_all_subcategory_ids()
+        return cls._ALL_IDS
+
+    @classmethod
+    def ids_for_primary(cls, primary_key: str) -> set:
+        """Set of subcategory ids valid for the given taxonomy primary key."""
+        return _TAXONOMY_INDEX.get(primary_key, set())
 
 
 class EventFormat(str, Enum):
@@ -217,9 +228,25 @@ class TaxonomyDimension(BaseModel):
     """
 
     primary_category: PrimaryCategory
-    subcategory: Optional[Subcategory] = None
+    subcategory: Optional[str] = Field(
+        default=None,
+        description="Subcategory id from the taxonomy (e.g. '1.4'). Must be one of Subcategory.all_ids().",
+    )
     values: List[str] = Field(default_factory=list)
     confidence: float = Field(0.5, ge=0.0, le=1.0)
+
+    @field_validator("subcategory")
+    @classmethod
+    def validate_subcategory_id(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        allowed = Subcategory.all_ids()
+        if v not in allowed:
+            raise ValueError(
+                f"Subcategory '{v}' is not a valid taxonomy id. "
+                f"Use Subcategory.all_options() or Subcategory.all_ids() for available options."
+            )
+        return v
 
 
 # ============================================================================
@@ -493,13 +520,13 @@ class EventSchema(BaseModel):
                 "taxonomy_dimensions": [
                     {
                         "primary_category": "play_and_fun",
-                        "subcategory": "music_and_rhythm_play",
+                        "subcategory": "1.4",
                         "values": ["expression", "energy", "flow"],
                         "confidence": 0.95,
                     },
                     {
                         "primary_category": "social_connection",
-                        "subcategory": "shared_activities",
+                        "subcategory": "5.7",
                         "values": ["belonging", "shared joy"],
                         "confidence": 0.8,
                     },

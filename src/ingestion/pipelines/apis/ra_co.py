@@ -29,7 +29,6 @@ from src.normalization.event_schema import (
     EngagementMetrics,
     TaxonomyDimension,
     PrimaryCategory,
-    Subcategory,
     EventFormat,
 )
 
@@ -278,16 +277,19 @@ class RaCoEventPipeline(BasePipeline):
 
         primary_category = PrimaryCategory.PLAY_AND_FUN.value
 
+        # Taxonomy subcategory ids from Human Experience Taxonomy JSON:
+        # 1.4 = Music & Rhythm Play, 5.7 = Shared Activities & Co-Experience,
+        # 2.4 = Cultural Discovery, 4.2 = Learning New Skills (Intellectual)
         taxonomy_dimensions = [
             {
                 "primary_category": PrimaryCategory.PLAY_AND_FUN.value,
-                "subcategory": Subcategory.MUSIC_AND_RHYTHM.value,
+                "subcategory": "1.4",
                 "values": ["expression", "energy", "flow", "rhythm"],
                 "confidence": 0.95,  # Very high confidence for music events
             },
             {
                 "primary_category": PrimaryCategory.SOCIAL_CONNECTION.value,
-                "subcategory": Subcategory.SHARED_ACTIVITIES.value,
+                "subcategory": "5.7",
                 "values": ["connection", "belonging", "shared joy"],
                 "confidence": 0.8,
             },
@@ -298,7 +300,7 @@ class RaCoEventPipeline(BasePipeline):
             taxonomy_dimensions.append(
                 {
                     "primary_category": PrimaryCategory.EXPLORATION_AND_ADVENTURE.value,
-                    "subcategory": Subcategory.CULTURAL_DISCOVERY.value,
+                    "subcategory": "2.4",
                     "values": ["curiosity", "perspective shift"],
                     "confidence": 0.65,
                 }
@@ -308,7 +310,7 @@ class RaCoEventPipeline(BasePipeline):
             taxonomy_dimensions.append(
                 {
                     "primary_category": PrimaryCategory.LEARNING_AND_INTELLECTUAL.value,
-                    "subcategory": Subcategory.LEARNING_NEW_SKILLS.value,
+                    "subcategory": "4.2",
                     "values": ["growth", "mastery"],
                     "confidence": 0.7,
                 }
