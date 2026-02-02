@@ -1,0 +1,421 @@
+"""
+Ra.co Event Pipeline.
+
+API-based pipeline for ingesting events from ra.co using their GraphQL API.
+"""
+
+from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime, timedelta
+from decimal import Decimal
+import logging
+
+from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
+from src.ingestion.adapters import APIAdapter, SourceType
+from src.ingestion.adapters.api_adapter import APIAdapterConfig
+from src.normalization.event_schema import (
+    EventSchema,
+    EventType,
+    EventFormat,
+    LocationInfo,
+    PriceInfo,
+    OrganizerInfo,
+    SourceInfo,
+    TaxonomyDimension,
+    PrimaryCategory,
+)
+from src.normalization.currency import CurrencyParser
+
+
+logger = logging.getLogger(__name__)
+
+
+# GraphQL query for fetching events
+EVENTS_QUERY = """
+query GetEvents($filters: FilterInputDtoInput, $pageSize: Int) {
+  eventListings(filters: $filters, pageSize: $pageSize) {
+    data {
+      id
+      event {
+        id
+        title
+        date
+        startTime
+        endTime
+        venue {
+          name
+          address
+          area {
+            name
+            country {
+              name
+              urlCode
+            }
+          }
+        }
+        artists {
+          name
+        }
+        images {
+          filename
+        }
+        cost
+        contentUrl
+      }
+    }
+    totalResults
+  }
+}
+"""
+
+
+class RaCoAdapter(APIAdapter):
+    """
+    Custom adapter for ra.co GraphQL API.
+
+    Handles query building and response parsing specific to ra.co.
+    """
+
+    def __init__(self, config: APIAdapterConfig):
+        super().__init__(
+            config,
+            query_builder=self._build_query,
+            response_parser=self._parse_response,
+        )
+
+    def _build_query(
+        self,
+        area_id: int = 20,
+        page_size: int = 50,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Build GraphQL query for ra.co events."""
+        if date_from is None:
+            date_from = datetime.now().strftime("%Y-%m-%d")
+        if date_to is None:
+            date_to = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
+
+        return {
+            "query": EVENTS_QUERY,
+            "variables": {
+                "filters": {
+                    "areas": {"eq": area_id},
+                    "listingDate": {
+                        "gte": date_from,
+                        "lte": date_to,
+                    }
+                },
+                "pageSize": page_size,
+            }
+        }
+
+    def _parse_response(self, response: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Parse ra.co GraphQL response to event list."""
+        if "errors" in response:
+            logger.error(f"GraphQL errors: {response['errors']}")
+            return []
+
+        try:
+            listings = response.get("data", {}).get("eventListings", {})
+            data = listings.get("data", [])
+
+            events = []
+            for listing in data:
+                event = listing.get("event", {})
+                if event:
+                    event["_listing_id"] = listing.get("id")
+                    events.append(event)
+
+            logger.info(f"Parsed {len(events)} events from response")
+            return events
+
+        except Exception as e:
+            logger.error(f"Failed to parse response: {e}")
+            return []
+
+
+class RaCoPipeline(BasePipeline):
+    """
+    Pipeline for ra.co events.
+
+    Uses GraphQL API to fetch electronic music events.
+    """
+
+    def __init__(self, config: PipelineConfig, adapter: RaCoAdapter):
+        super().__init__(config, adapter)
+
+    def parse_raw_event(self, raw_event: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse raw GraphQL event to intermediate format."""
+        venue = raw_event.get("venue", {}) or {}
+        area = venue.get("area", {}) or {}
+        country = area.get("country", {}) or {}
+
+        artists = raw_event.get("artists", []) or []
+        artist_names = [a.get("name") for a in artists if a.get("name")]
+
+        images = raw_event.get("images", []) or []
+        image_url = None
+        if images:
+            filename = images[0].get("filename")
+            if filename:
+                image_url = f"https://ra.co/images/events/flyer/{filename}"
+
+        return {
+            "source_event_id": raw_event.get("id"),
+            "title": raw_event.get("title"),
+            "date": raw_event.get("date"),
+            "start_time": raw_event.get("startTime"),
+            "end_time": raw_event.get("endTime"),
+            "venue_name": venue.get("name"),
+            "venue_address": venue.get("address"),
+            "city": area.get("name"),
+            "country_name": country.get("name"),
+            "country_code": country.get("urlCode"),
+            "artists": artist_names,
+            "cost": raw_event.get("cost"),
+            "content_url": raw_event.get("contentUrl"),
+            "image_url": image_url,
+        }
+
+    def map_to_taxonomy(
+        self, parsed_event: Dict[str, Any]
+    ) -> Tuple[str, List[Dict[str, Any]]]:
+        """
+        Map ra.co event to Human Experience Taxonomy.
+
+        Ra.co events are electronic music events, mapping to:
+        - PLAY_AND_FUN -> Music & Rhythm Play (1.4)
+        - SOCIAL_CONNECTION -> Shared Activities (5.7)
+        """
+        title_lower = (parsed_event.get("title") or "").lower()
+
+        primary_category = PrimaryCategory.PLAY_AND_FUN.value
+
+        taxonomy_dimensions = [
+            {
+                "primary_category": PrimaryCategory.PLAY_AND_FUN.value,
+                "subcategory": "1.4",  # Music & Rhythm Play
+                "values": ["expression", "energy", "flow", "rhythm"],
+                "confidence": 0.95,
+            },
+            {
+                "primary_category": PrimaryCategory.SOCIAL_CONNECTION.value,
+                "subcategory": "5.7",  # Shared Activities
+                "values": ["connection", "belonging", "shared joy"],
+                "confidence": 0.8,
+            },
+        ]
+
+        # Add exploration dimension for festivals
+        if any(word in title_lower for word in ["festival", "carnival", "outdoor"]):
+            taxonomy_dimensions.append({
+                "primary_category": PrimaryCategory.EXPLORATION_AND_ADVENTURE.value,
+                "subcategory": "2.4",
+                "values": ["curiosity", "discovery"],
+                "confidence": 0.65,
+            })
+
+        # Add learning dimension for workshops
+        if any(word in title_lower for word in ["workshop", "masterclass", "talk"]):
+            taxonomy_dimensions.append({
+                "primary_category": PrimaryCategory.LEARNING_AND_INTELLECTUAL.value,
+                "subcategory": "4.2",
+                "values": ["growth", "mastery"],
+                "confidence": 0.7,
+            })
+
+        return primary_category, taxonomy_dimensions
+
+    def normalize_to_schema(
+        self,
+        parsed_event: Dict[str, Any],
+        primary_cat: str,
+        taxonomy_dims: List[Dict[str, Any]],
+    ) -> EventSchema:
+        """Normalize parsed event to EventSchema."""
+        source_event_id = parsed_event.get("source_event_id", "")
+        event_id = f"ra_co_{source_event_id}"
+
+        # Parse dates
+        start_dt = self._parse_datetime(parsed_event.get("start_time") or parsed_event.get("date"))
+        end_dt = self._parse_datetime(parsed_event.get("end_time"))
+
+        # Location
+        location = LocationInfo(
+            venue_name=parsed_event.get("venue_name"),
+            street_address=parsed_event.get("venue_address"),
+            city=parsed_event.get("city", "Barcelona"),
+            country_code=parsed_event.get("country_code", "ES"),
+            coordinates=None,
+        )
+
+        # Price
+        price_str = parsed_event.get("cost") or ""
+        min_price, max_price, currency = CurrencyParser.parse_price_string(str(price_str))
+
+        is_free = (
+            min_price is None and max_price is None
+        ) or str(price_str).lower() in ["free", "0", "gratis"]
+
+        price = PriceInfo(
+            currency=currency or "EUR",
+            is_free=is_free,
+            minimum_price=min_price,
+            maximum_price=max_price,
+            price_raw_text=str(price_str),
+        )
+
+        # Organizer
+        organizer = OrganizerInfo(
+            name=parsed_event.get("venue_name") or "Unknown Venue",
+        )
+
+        # Source
+        content_url = parsed_event.get("content_url", "")
+        source = SourceInfo(
+            source_name="ra_co",
+            source_event_id=source_event_id,
+            source_url=f"https://ra.co{content_url}" if content_url else "",
+            last_updated_from_source=datetime.utcnow(),
+        )
+
+        # Taxonomy dimensions
+        taxonomy_objs = [
+            TaxonomyDimension(
+                primary_category=dim["primary_category"],
+                subcategory=dim.get("subcategory"),
+                values=dim.get("values", []),
+                confidence=dim.get("confidence", 0.5),
+            )
+            for dim in taxonomy_dims
+        ]
+
+        # Event type
+        title_lower = (parsed_event.get("title") or "").lower()
+        if "festival" in title_lower:
+            event_type = EventType.FESTIVAL
+        elif "party" in title_lower:
+            event_type = EventType.PARTY
+        elif "live" in title_lower:
+            event_type = EventType.CONCERT
+        else:
+            event_type = EventType.NIGHTLIFE
+
+        return EventSchema(
+            event_id=event_id,
+            title=parsed_event.get("title", "Untitled Event"),
+            description=None,
+            primary_category=primary_cat,
+            taxonomy_dimensions=taxonomy_objs,
+            start_datetime=start_dt,
+            end_datetime=end_dt,
+            location=location,
+            event_type=event_type,
+            format=EventFormat.IN_PERSON,
+            price=price,
+            organizer=organizer,
+            image_url=parsed_event.get("image_url"),
+            source=source,
+            tags=[],
+            custom_fields={
+                "artists": parsed_event.get("artists", []),
+            },
+        )
+
+    def _parse_datetime(self, dt_value: Any) -> datetime:
+        """Parse datetime from various formats."""
+        if not dt_value:
+            return datetime.utcnow()
+
+        if isinstance(dt_value, datetime):
+            return dt_value
+
+        if isinstance(dt_value, str):
+            # Handle ISO format with T separator
+            try:
+                if "T" in dt_value:
+                    # Remove milliseconds and timezone
+                    clean = dt_value.split(".")[0]
+                    return datetime.fromisoformat(clean)
+                return datetime.fromisoformat(dt_value)
+            except ValueError:
+                pass
+
+            # Try common formats
+            for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"]:
+                try:
+                    return datetime.strptime(dt_value, fmt)
+                except ValueError:
+                    continue
+
+        logger.warning(f"Could not parse datetime: {dt_value}")
+        return datetime.utcnow()
+
+    def validate_event(self, event: EventSchema) -> Tuple[bool, List[str]]:
+        """Validate ra.co event."""
+        errors = []
+
+        if not event.title or event.title == "Untitled Event":
+            errors.append("Title is required")
+
+        if not event.location.city:
+            errors.append("City is required")
+
+        if event.start_datetime < datetime.utcnow():
+            errors.append("Warning: Event start time is in the past")
+
+        if event.price.minimum_price and event.price.minimum_price < 0:
+            errors.append("Minimum price cannot be negative")
+
+        is_valid = not any("Error:" in e for e in errors)
+        return is_valid, errors
+
+    def enrich_event(self, event: EventSchema) -> EventSchema:
+        """Enrich event with additional data."""
+        # Calculate duration
+        if event.end_datetime and event.start_datetime:
+            duration = (event.end_datetime - event.start_datetime).total_seconds() / 60
+            event.duration_minutes = int(duration)
+
+        # Set timezone based on city
+        city_timezones = {
+            "barcelona": "Europe/Madrid",
+            "madrid": "Europe/Madrid",
+            "london": "Europe/London",
+            "berlin": "Europe/Berlin",
+            "amsterdam": "Europe/Amsterdam",
+            "paris": "Europe/Paris",
+        }
+        city_lower = (event.location.city or "").lower()
+        if city_lower in city_timezones:
+            event.location.timezone = city_timezones[city_lower]
+
+        return event
+
+
+def create_ra_co_pipeline(
+    pipeline_config: PipelineConfig,
+    source_config: Dict[str, Any]
+) -> RaCoPipeline:
+    """
+    Factory function to create a configured ra.co pipeline.
+
+    Args:
+        pipeline_config: Pipeline configuration
+        source_config: Source-specific configuration from YAML
+
+    Returns:
+        Configured RaCoPipeline instance
+    """
+    adapter_config = APIAdapterConfig(
+        source_id="ra_co",
+        source_type=SourceType.API,
+        request_timeout=source_config.get("request_timeout", 30),
+        max_retries=source_config.get("max_retries", 3),
+        rate_limit_per_second=source_config.get("rate_limit_per_second", 1.0),
+        graphql_endpoint=source_config.get("graphql_endpoint", "https://ra.co/graphql"),
+    )
+
+    adapter = RaCoAdapter(adapter_config)
+    return RaCoPipeline(pipeline_config, adapter)

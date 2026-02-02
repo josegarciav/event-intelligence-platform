@@ -1,23 +1,28 @@
 # Configuration for Ingestion Pipelines
-# This file defines which sources are enabled, their API credentials,
-# scheduling, and source-specific settings.
+# This file defines which sources are enabled, their settings,
+# scheduling, and source-specific configuration.
 
 sources:
-  
-  
-  # =========================================================================
-  # RA.CO SCRAPER - Web scraping-based ingestion
-  # =========================================================================
-  ra_co_scraper:
-    enabled: true
-    type: "scraper"
-    scraper_config: "scrapping/configs/sources/ra_co.json"
 
-    # HTTP Settings
+  # =========================================================================
+  # RA.CO - GraphQL API-based ingestion
+  # =========================================================================
+  ra_co:
+    enabled: true
+    type: "api"
+
+    # API Settings
+    graphql_endpoint: "https://ra.co/graphql"
     request_timeout: 30
     max_retries: 3
     batch_size: 50
-    rate_limit_per_second: 0.5
+    rate_limit_per_second: 1.0
+
+    # Default filters
+    defaults:
+      area_id: 20  # Barcelona
+      page_size: 50
+      days_ahead: 30
 
     # Scheduling
     schedule:
@@ -45,37 +50,37 @@ global:
     url: "${DATABASE_URL}"
     pool_size: 10
     max_overflow: 20
-  
+
   # Logging
   logging:
     level: "INFO"
-    format: "json"  # or "text"
+    format: "json"
     file: "logs/ingestion.log"
-  
+
   # Data quality
   quality_thresholds:
-    minimum_quality_score: 0.3      # Skip events below this quality
-    timezone_confidence: 0.7        # Confidence threshold for timezone inference
-  
+    minimum_quality_score: 0.3
+    timezone_confidence: 0.7
+
   # Enrichment services (optional)
   enrichment_services:
     geocoding:
-      provider: "google"            # or "nominatim", "mapbox"
+      provider: "google"
       api_key: "${GEOCODING_API_KEY}"
-      cache_ttl_hours: 720          # Cache geocoding results for 30 days
-    
+      cache_ttl_hours: 720
+
     image_validation:
-      timeout: 5                    # Seconds to wait for image response
+      timeout: 5
       check_accessibility: true
-  
+
   # Monitoring & alerts
   monitoring:
     sentry_enabled: false
     sentry_dsn: "${SENTRY_DSN}"
-    
+
     slack_enabled: false
     slack_webhook: "${SLACK_WEBHOOK}"
-    
+
     alert_on:
       - "pipeline_failure"
       - "low_quality_score"

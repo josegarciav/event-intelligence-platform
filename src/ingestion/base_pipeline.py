@@ -1,12 +1,16 @@
 """
-Base Pipeline Class Architecture.
+Base Pipeline Architecture.
 
-This module defines the abstract base class and interfaces that all source-specific
-pipelines must implement. It enforces a consistent pattern for data ingestion,
-validation, normalization, and storage across all sources.
+This module defines the abstract base class for all event ingestion pipelines.
+Pipelines handle the complete workflow from raw data fetching to normalized
+EventSchema output, using source adapters for data retrieval.
 
-Any new data source (ra.co, Meetup, Ticketmaster, etc.) must inherit from
-BasePipeline and implement the required abstract methods.
+Architecture:
+    SourceAdapter (API/Scraper) → BasePipeline → EventSchema
+
+Any new data source must:
+1. Create an adapter (or use existing API/Scraper adapter)
+2. Inherit from BasePipeline and implement abstract methods
 """
 
 from abc import ABC, abstractmethod
@@ -15,19 +19,14 @@ from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 import logging
+import uuid
 
-from src.normalization.event_schema import EventSchema, EventBatch
-
-# ============================================================================
-# ENUMS & DATA CLASSES
-# ============================================================================
+from src.normalization.event_schema import EventSchema
+from src.ingestion.adapters import BaseSourceAdapter, SourceType, FetchResult
 
 
 class PipelineStatus(str, Enum):
-    """
-    Status of a pipeline execution.
-    """
-
+    """Status of a pipeline execution."""
     PENDING = "pending"
     RUNNING = "running"
     SUCCESS = "success"
@@ -39,11 +38,11 @@ class PipelineStatus(str, Enum):
 class PipelineConfig:
     """
     Configuration for a pipeline instance.
-    """
 
+    This is pipeline-level config, separate from adapter-level config.
+    """
     source_name: str
-    base_url: Optional[str] = None
-    api_key: Optional[str] = None
+    source_type: SourceType = SourceType.API
     request_timeout: int = 30
     max_retries: int = 3
     batch_size: int = 100
@@ -53,12 +52,10 @@ class PipelineConfig:
 
 @dataclass
 class PipelineExecutionResult:
-    """
-    Result of a pipeline execution.
-    """
-
+    """Result of a pipeline execution."""
     status: PipelineStatus
     source_name: str
+    source_type: SourceType
     execution_id: str
     started_at: datetime
     ended_at: datetime
@@ -71,111 +68,73 @@ class PipelineExecutionResult:
 
     @property
     def duration_seconds(self) -> float:
-        """
-        Calculate execution duration in seconds.
-        """
+        """Calculate execution duration."""
         return (self.ended_at - self.started_at).total_seconds()
 
     @property
     def success_rate(self) -> float:
-        """
-        Calculate success rate as percentage.
-        """
+        """Calculate success rate percentage."""
         if self.total_events_processed == 0:
             return 0.0
         return (self.successful_events / self.total_events_processed) * 100
-
-
-# ============================================================================
-# BASE PIPELINE CLASS
-# ============================================================================
 
 
 class BasePipeline(ABC):
     """
     Abstract base class for all event ingestion pipelines.
 
-    This class enforces a standardized workflow:
-    1. Fetch raw data from the source
-    2. Parse and extract structured data
-    3. Normalize to canonical schema
-    4. Validate and assess data quality
-    5. Store results
+    Pipelines implement a standardized workflow:
+    1. Fetch raw data (via adapter)
+    2. Parse raw data to intermediate format
+    3. Map to taxonomy categories
+    4. Normalize to EventSchema
+    5. Validate events
+    6. Enrich with additional data
 
-    Each source-specific pipeline must inherit from this class and implement
-    the abstract methods according to that source's API/scraping requirements.
+    Subclasses must:
+    - Provide an adapter in __init__
+    - Implement all abstract methods for source-specific logic
     """
 
-    def __init__(self, config: PipelineConfig):
+    def __init__(self, config: PipelineConfig, adapter: BaseSourceAdapter):
         """
         Initialize the pipeline.
 
         Args:
-            config: PipelineConfig instance with source-specific settings
+            config: PipelineConfig with pipeline settings
+            adapter: Source adapter for data fetching
         """
         self.config = config
+        self.adapter = adapter
         self.logger = self._setup_logger()
         self.execution_id: Optional[str] = None
         self.execution_start_time: Optional[datetime] = None
 
     def _setup_logger(self) -> logging.Logger:
-        """
-        Setup source-specific logger.
-        """
+        """Setup source-specific logger."""
         logger = logging.getLogger(f"pipeline.{self.config.source_name}")
         logger.setLevel(logging.INFO)
         return logger
+
+    @property
+    def source_type(self) -> SourceType:
+        """Get the source type from adapter."""
+        return self.adapter.source_type
 
     # ========================================================================
     # ABSTRACT METHODS - Must be implemented by subclasses
     # ========================================================================
 
     @abstractmethod
-    def fetch_raw_data(self, **kwargs) -> List[Dict[str, Any]]:
-        """
-        Fetch raw event data from the source.
-
-        This is the first step in the pipeline. Implement source-specific
-        API calls, web scraping, or file parsing logic here.
-
-        Args:
-            **kwargs: Source-specific parameters (e.g., city, date range, limit)
-
-        Returns:
-            List of raw event data dictionaries
-
-        Raises:
-            Exception: Connection errors, API failures, etc.
-
-        Example (for ra.co):
-            - Call ra.co API with pagination
-            - Handle rate limiting
-            - Return raw JSON response as list of dicts
-        """
-        pass
-
-    @abstractmethod
     def parse_raw_event(self, raw_event: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Parse raw event data into an intermediate structured format.
-
-        This method extracts and cleans the raw data from the source into
-        a consistent intermediate format before normalization to the
-        canonical schema.
+        Parse raw event data into intermediate structured format.
 
         Args:
-            raw_event: Single raw event from source
+            raw_event: Single raw event from adapter
 
         Returns:
             Parsed event with standardized intermediate keys
-
-        Raises:
-            ValueError: If critical fields are missing or malformed
-
-        Example (for ra.co):
-            Extract 'title', 'date', 'venue', 'artists', 'url', etc.
-            Handle various date/time formats
-            Normalize venue information
         """
         pass
 
@@ -184,28 +143,13 @@ class BasePipeline(ABC):
         self, parsed_event: Dict[str, Any]
     ) -> Tuple[str, List[Dict[str, Any]]]:
         """
-        Map parsed event to Human Experience Taxonomy categories.
-
-        This method determines which primary category and subcategories
-        (from the Human Experience Taxonomy) this event belongs to,
-        along with confidence scores.
+        Map parsed event to Human Experience Taxonomy.
 
         Args:
             parsed_event: Parsed event dictionary
 
         Returns:
             Tuple of (primary_category, taxonomy_dimensions)
-            - primary_category: str (PrimaryCategory enum value)
-            - taxonomy_dimensions: List of dicts with primary_category, subcategory, values, confidence.
-              subcategory must be a taxonomy subcategory id (e.g. "1.4", "5.7") from
-              Subcategory.all_ids() / the taxonomy JSON.
-
-        Example (for ra.co DJ set):
-            - Primary: "play_and_fun"
-            - Dimensions: [
-                {"primary_category": "play_and_fun", "subcategory": "1.4", "values": [...], "confidence": 0.95},
-                {"primary_category": "social_connection", "subcategory": "5.7", "values": [...], "confidence": 0.8}
-              ]
         """
         pass
 
@@ -217,102 +161,54 @@ class BasePipeline(ABC):
         taxonomy_dims: List[Dict[str, Any]],
     ) -> EventSchema:
         """
-        Normalize parsed event to the canonical EventSchema.
-
-        This is the core normalization step. Transform all parsed event data
-        into the canonical EventSchema, mapping source fields to schema fields,
-        handling data type conversions, validations, and enrichments.
+        Normalize parsed event to canonical EventSchema.
 
         Args:
             parsed_event: Parsed event dictionary
             primary_cat: Primary taxonomy category
-            taxonomy_dims: Taxonomy dimensions from map_to_taxonomy()
+            taxonomy_dims: Taxonomy dimensions
 
         Returns:
-            EventSchema instance (fully validated)
-
-        Raises:
-            ValueError: If required fields cannot be mapped or validated
-
-        Example (for ra.co):
-            - Map 'title' -> EventSchema.title
-            - Map 'date' -> EventSchema.start_datetime (handle timezone)
-            - Map 'venue' -> EventSchema.location
-            - Map 'min_entry' -> EventSchema.price.minimum_price
-            - Generate event_id from source_event_id
-            - Set source metadata
+            EventSchema instance
         """
         pass
 
     @abstractmethod
     def validate_event(self, event: EventSchema) -> Tuple[bool, List[str]]:
         """
-        Validate a normalized event and assess data quality.
-
-        This method performs additional validation beyond schema validation,
-        including business logic checks, data quality assessment, and
-        enrichment opportunity identification.
+        Validate a normalized event.
 
         Args:
             event: Normalized EventSchema instance
 
         Returns:
-            Tuple of (is_valid, errors_and_warnings)
-            - is_valid: bool (True if event passes validation, False otherwise)
-            - errors_and_warnings: List of validation messages
-
-        Example checks:
-            - Location exists and is valid
-            - Start time is in the future (or within acceptable range)
-            - Price is reasonable for event type/location (not 0 for paid events)
-            - Organizer name is not empty
-            - Image URL is accessible
+            Tuple of (is_valid, validation_messages)
         """
         pass
 
     @abstractmethod
     def enrich_event(self, event: EventSchema) -> EventSchema:
         """
-        Enrich the event with additional data and inferred information.
-
-        This method adds value to the event data by performing enrichments:
-        - Geocoding locations to get missing coordinates
-        - Inferring timezone from location
-        - Calculating duration from start/end times
-        - Fetching organizer social metrics
-        - Predicting event popularity based on historical patterns
+        Enrich event with additional data.
 
         Args:
-            event: EventSchema instance to enrich
+            event: EventSchema to enrich
 
         Returns:
-            Enriched EventSchema instance
-
-        Note:
-            Enrichment failures should NOT prevent event storage.
-            Use event.normalization_errors to track issues.
+            Enriched EventSchema
         """
         pass
 
     # ========================================================================
-    # CONCRETE METHODS - Pipeline orchestration
+    # CONCRETE METHODS - Pipeline execution
     # ========================================================================
 
     def execute(self, **kwargs) -> PipelineExecutionResult:
         """
         Execute the full pipeline workflow.
 
-        This is the main entry point. It orchestrates all steps:
-        1. Fetch raw data
-        2. Parse each event
-        3. Map to taxonomy
-        4. Normalize to schema
-        5. Validate
-        6. Enrich
-        7. Store results
-
         Args:
-            **kwargs: Parameters passed to fetch_raw_data()
+            **kwargs: Parameters passed to the adapter's fetch method
 
         Returns:
             PipelineExecutionResult with summary and events
@@ -321,175 +217,210 @@ class BasePipeline(ABC):
         self.execution_start_time = datetime.utcnow()
 
         self.logger.info(f"Starting pipeline execution: {self.execution_id}")
+        self.logger.info(f"Source type: {self.source_type.value}")
 
         try:
-            raw_events = self.fetch_raw_data(**kwargs)
-            self.logger.info(f"Fetched {len(raw_events)} raw events")
+            # Step 1: Fetch raw data via adapter
+            fetch_result = self.adapter.fetch(**kwargs)
 
-            normalized_events = self._process_events_batch(raw_events)
+            if not fetch_result.success:
+                self.logger.error(f"Fetch failed: {fetch_result.errors}")
+                return PipelineExecutionResult(
+                    status=PipelineStatus.FAILED,
+                    source_name=self.config.source_name,
+                    source_type=self.source_type,
+                    execution_id=self.execution_id,
+                    started_at=self.execution_start_time,
+                    ended_at=datetime.utcnow(),
+                    errors=[{"error": e, "stage": "fetch"} for e in fetch_result.errors],
+                    metadata=fetch_result.metadata,
+                )
+
+            self.logger.info(f"Fetched {fetch_result.total_fetched} raw events")
+
+            # Step 2-6: Process events through pipeline
+            normalized_events = self._process_events_batch(fetch_result.raw_data)
+
+            status = PipelineStatus.SUCCESS if normalized_events else PipelineStatus.FAILED
+            if normalized_events and len(normalized_events) < len(fetch_result.raw_data):
+                status = PipelineStatus.PARTIAL_SUCCESS
 
             result = PipelineExecutionResult(
-                status=(
-                    PipelineStatus.SUCCESS
-                    if normalized_events
-                    else PipelineStatus.FAILED
-                ),
+                status=status,
                 source_name=self.config.source_name,
+                source_type=self.source_type,
                 execution_id=self.execution_id,
                 started_at=self.execution_start_time,
                 ended_at=datetime.utcnow(),
-                total_events_processed=len(raw_events),
+                total_events_processed=len(fetch_result.raw_data),
                 successful_events=len(normalized_events),
+                failed_events=len(fetch_result.raw_data) - len(normalized_events),
                 events=normalized_events,
+                metadata={
+                    **fetch_result.metadata,
+                    "fetch_duration_s": fetch_result.duration_seconds,
+                },
             )
 
             self.logger.info(
-                f"Pipeline execution completed: {result.successful_events}/{result.total_events_processed} successful"
+                f"Pipeline completed: {result.successful_events}/{result.total_events_processed} successful"
             )
             return result
 
         except Exception as e:
-            self.logger.error(f"Pipeline execution failed: {str(e)}", exc_info=True)
+            self.logger.error(f"Pipeline execution failed: {e}", exc_info=True)
             return PipelineExecutionResult(
                 status=PipelineStatus.FAILED,
                 source_name=self.config.source_name,
+                source_type=self.source_type,
                 execution_id=self.execution_id,
                 started_at=self.execution_start_time,
                 ended_at=datetime.utcnow(),
-                errors=[{"error": str(e), "timestamp": datetime.utcnow().isoformat()}],
+                errors=[{"error": str(e), "stage": "execution"}],
             )
 
     def _process_events_batch(
         self, raw_events: List[Dict[str, Any]]
     ) -> List[EventSchema]:
-        """
-        Process a batch of raw events through the normalization pipeline.
-        """
+        """Process a batch of raw events through the pipeline."""
         normalized_events = []
 
         for idx, raw_event in enumerate(raw_events):
             try:
-                # Step 1: Parse
+                # Step 2: Parse
                 parsed_event = self.parse_raw_event(raw_event)
-                self.logger.debug(f"Parsed event {idx+1}/{len(raw_events)}")
 
-                # Step 2: Taxonomy mapping
+                # Step 3: Taxonomy mapping
                 primary_cat, taxonomy_dims = self.map_to_taxonomy(parsed_event)
 
-                # Step 3: Normalize
-                event = self.normalize_to_schema(
-                    parsed_event, primary_cat, taxonomy_dims
-                )
+                # Step 4: Normalize
+                event = self.normalize_to_schema(parsed_event, primary_cat, taxonomy_dims)
 
-                # Step 4: Validate
+                # Step 5: Validate
                 is_valid, validation_messages = self.validate_event(event)
                 event.normalization_errors.extend(validation_messages)
 
                 if not is_valid:
-                    self.logger.warning(
-                        f"Event validation warnings: {validation_messages}"
-                    )
+                    self.logger.warning(f"Validation warnings for event {idx}: {validation_messages}")
 
-                # Step 5: Enrich
+                # Step 6: Enrich
                 event = self.enrich_event(event)
 
-                # Step 6: Calculate quality score
+                # Calculate quality score
                 event.data_quality_score = self._calculate_quality_score(event)
 
                 normalized_events.append(event)
 
             except Exception as e:
-                self.logger.error(
-                    f"Failed to process event {idx+1}: {str(e)}", exc_info=True
-                )
-                # Continue processing remaining events
+                self.logger.error(f"Failed to process event {idx}: {e}", exc_info=True)
                 continue
 
         return normalized_events
 
     def _calculate_quality_score(self, event: EventSchema) -> float:
-        """
-        Calculate data quality score (0.0-1.0) for an event.
-        TO IMPLEMENT a basic heuristic based on several factors.
-
-        Factors:
-        - Presence of key fields (title, location, start_datetime)
-        - Presence of optional enrichment fields (image, coordinates, price)
-        - Validation errors/warnings
-        - Taxonomy confidence scores
-        """
+        """Calculate data quality score (0.0-1.0)."""
         score = 0.0
 
-        # Key fields: worth 40%
-        key_fields_present = all(
-            [
-                event.title,
-                event.location.city,
-                event.start_datetime,
-            ]
-        )
+        # Key fields (40%)
+        key_fields_present = all([
+            event.title,
+            event.location.city,
+            event.start_datetime,
+        ])
         score += 0.4 if key_fields_present else 0.0
 
-        # Enrichment fields: worth 30%
+        # Enrichment fields (30%)
         enrichment_bonus = 0.0
         enrichment_bonus += 0.05 if event.image_url else 0.0
         enrichment_bonus += 0.05 if event.location.coordinates else 0.0
-        enrichment_bonus += 0.05 if not event.price.is_free else 0.0
-        enrichment_bonus += 0.05 if event.organizer.name else 0.0
+        enrichment_bonus += 0.05 if event.price and not event.price.is_free else 0.0
+        enrichment_bonus += 0.05 if event.organizer and event.organizer.name else 0.0
         enrichment_bonus += 0.05 if event.end_datetime else 0.0
-        enrichment_bonus += 0.05 if event.media_assets else 0.0
+        enrichment_bonus += 0.05 if event.description else 0.0
         score += min(enrichment_bonus, 0.3)
 
-        # Taxonomy confidence: worth 20%
+        # Taxonomy confidence (20%)
         if event.taxonomy_dimensions:
             avg_confidence = sum(
                 dim.confidence for dim in event.taxonomy_dimensions
             ) / len(event.taxonomy_dimensions)
             score += avg_confidence * 0.2
 
-        # Penalize validation errors: up to -10%
+        # Penalize validation errors (up to -10%)
         error_penalty = min(len(event.normalization_errors) * 0.02, 0.1)
         score -= error_penalty
 
         return max(0.0, min(score, 1.0))
 
     def _generate_execution_id(self) -> str:
-        """
-        Generate unique execution identifier.
-        """
-        import uuid
-
+        """Generate unique execution identifier."""
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         unique_id = str(uuid.uuid4())[:8]
         return f"{self.config.source_name}_{timestamp}_{unique_id}"
 
     # ========================================================================
-    # HELPER METHODS - Utilities for subclasses
+    # HELPER METHODS
     # ========================================================================
 
-    def handle_api_error(self, error: Exception, retry_count: int) -> bool:
-        """
-        Handle API errors with retry logic.
+    def to_dataframe(self, events: List[EventSchema]):
+        """Convert events to pandas DataFrame."""
+        import pandas as pd
+        import json
 
-        Args:
-            error: The exception that occurred
-            retry_count: Current retry attempt number
+        rows = []
+        for event in events:
+            artists_list = event.custom_fields.get("artists", [])
+            artists_str = ", ".join(
+                a.get("name", "") if isinstance(a, dict) else str(a)
+                for a in artists_list
+            )
 
-        Returns:
-            True if should retry, False if should give up
-        """
-        if retry_count >= self.config.max_retries:
-            self.logger.error(f"Max retries exceeded: {error}")
-            return False
+            taxonomy_json = json.dumps([
+                {
+                    "primary_category": dim.primary_category,
+                    "subcategory": dim.subcategory,
+                    "confidence": dim.confidence,
+                }
+                for dim in event.taxonomy_dimensions
+            ])
 
-        self.logger.warning(f"API error (attempt {retry_count + 1}): {error}")
-        return True
+            # Handle event_type which could be Enum or string
+            event_type_val = None
+            if event.event_type:
+                event_type_val = event.event_type.value if hasattr(event.event_type, 'value') else str(event.event_type)
 
-    def rate_limit_delay(self) -> None:
-        """
-        Apply rate limiting delay if configured.
-        """
-        import time
+            format_val = None
+            if event.format:
+                format_val = event.format.value if hasattr(event.format, 'value') else str(event.format)
 
-        delay = 1.0 / self.config.rate_limit_per_second
-        time.sleep(delay)
+            row = {
+                "event_id": event.event_id,
+                "title": event.title,
+                "description": event.description[:200] if event.description else None,
+                "start_datetime": event.start_datetime,
+                "end_datetime": event.end_datetime,
+                "city": event.location.city,
+                "country_code": event.location.country_code,
+                "venue_name": event.location.venue_name,
+                "artists": artists_str,
+                "primary_category": event.primary_category,
+                "taxonomy": taxonomy_json,
+                "event_type": event_type_val,
+                "format": format_val,
+                "is_free": event.price.is_free if event.price else None,
+                "min_price": float(event.price.minimum_price) if event.price and event.price.minimum_price else None,
+                "max_price": float(event.price.maximum_price) if event.price and event.price.maximum_price else None,
+                "currency_code": event.price.currency if event.price else None,
+                "organizer": event.organizer.name if event.organizer else None,
+                "source_url": event.source.source_url if event.source else None,
+                "image_url": event.image_url,
+                "data_quality_score": event.data_quality_score,
+            }
+            rows.append(row)
+
+        return pd.DataFrame(rows)
+
+    def close(self) -> None:
+        """Release adapter resources."""
+        if self.adapter:
+            self.adapter.close()

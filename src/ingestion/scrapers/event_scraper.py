@@ -100,25 +100,64 @@ class EventScraper:
             self._playwright = None
 
     def _fetch_page(self, url: str) -> FetchResult:
-        """Fetch a single page."""
+        """Fetch a single page with stealth settings."""
         self._ensure_browser()
 
         start_time = time.time()
         try:
+            # Create context with realistic browser fingerprint
             context = self._browser.new_context(
-                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+                user_agent=(
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                ),
+                viewport={"width": 1920, "height": 1080},
+                locale="en-US",
+                timezone_id="Europe/Madrid",
+                geolocation={"latitude": 41.3851, "longitude": 2.1734},
+                permissions=["geolocation"],
             )
+
             page = context.new_page()
             page.set_default_timeout(self.config.timeout_s * 1000)
 
-            response = page.goto(url, wait_until="domcontentloaded")
+            # Add stealth scripts to avoid detection
+            page.add_init_script("""
+                // Override webdriver property
+                Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
 
-            # Wait a bit for dynamic content
-            page.wait_for_timeout(2000)
+                // Override plugins
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [1, 2, 3, 4, 5]
+                });
+
+                // Override languages
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['en-US', 'en', 'es']
+                });
+
+                // Override platform
+                Object.defineProperty(navigator, 'platform', {
+                    get: () => 'MacIntel'
+                });
+            """)
+
+            response = page.goto(url, wait_until="networkidle")
+
+            # Wait longer for JS-heavy pages
+            page.wait_for_timeout(3000)
+
+            # Check if we hit a captcha page
+            html = page.content()
+            if "captcha" in html.lower() or "datadome" in html.lower():
+                logger.warning(f"Captcha detected on {url}, waiting longer...")
+                page.wait_for_timeout(5000)
+                html = page.content()
 
             # Scroll to load lazy content
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(1500)
 
             html = page.content()
             status_code = response.status if response else None
@@ -129,12 +168,16 @@ class EventScraper:
 
             elapsed = time.time() - start_time
 
+            # Check if still blocked
+            is_blocked = "captcha" in html.lower() or status_code == 403
+
             return FetchResult(
-                ok=status_code is None or (200 <= status_code < 400),
+                ok=not is_blocked and (status_code is None or (200 <= status_code < 400)),
                 url=url,
                 final_url=final_url,
                 status_code=status_code,
-                html=html,
+                html=html if not is_blocked else None,
+                error="Blocked by anti-bot protection" if is_blocked else None,
                 elapsed_s=elapsed,
             )
 

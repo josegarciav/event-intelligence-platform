@@ -2,30 +2,33 @@
 Pipeline Orchestrator.
 
 Coordinates execution, scheduling, and management of all event ingestion pipelines.
-Handles pipeline registration, execution, scheduling, error handling, and result storage.
+Supports both API and scraper-based sources through the adapter pattern.
 """
 
-from typing import Dict, List, Optional, Type
+from typing import Dict, List, Optional, Type, Callable
 from datetime import datetime
 import logging
 from dataclasses import dataclass
-from ingestion.deduplication import EventDeduplicator, FuzzyMatchDeduplicator
+import yaml
+from pathlib import Path
 
-from ingestion.base_pipeline import (
+from src.ingestion.adapters import SourceType
+from src.ingestion.deduplication import EventDeduplicator, ExactMatchDeduplicator
+from src.ingestion.base_pipeline import (
     BasePipeline,
     PipelineConfig,
     PipelineExecutionResult,
     PipelineStatus,
 )
-from normalization.event_schema import EventSchema
+from src.normalization.event_schema import EventSchema
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
 class ScheduledPipeline:
-    """
-    Configuration for a scheduled pipeline execution.
-    """
-
+    """Configuration for a scheduled pipeline execution."""
     pipeline_name: str
     schedule_type: str  # 'interval', 'cron', 'once'
     interval_hours: Optional[int] = None
@@ -33,6 +36,26 @@ class ScheduledPipeline:
     enabled: bool = True
     last_execution: Optional[datetime] = None
     next_execution: Optional[datetime] = None
+
+
+# Pipeline registry - maps source names to pipeline factory functions
+PipelineFactory = Callable[[PipelineConfig], BasePipeline]
+PIPELINE_REGISTRY: Dict[str, PipelineFactory] = {}
+
+
+def register_pipeline(source_name: str):
+    """
+    Decorator to register a pipeline factory.
+
+    Usage:
+        @register_pipeline("ra_co")
+        def create_ra_co_pipeline(config: PipelineConfig) -> RaCoPipeline:
+            return RaCoPipeline(config)
+    """
+    def decorator(factory: PipelineFactory) -> PipelineFactory:
+        PIPELINE_REGISTRY[source_name] = factory
+        return factory
+    return decorator
 
 
 class PipelineOrchestrator:
@@ -44,18 +67,16 @@ class PipelineOrchestrator:
     - Execute pipelines on demand or on schedule
     - Track execution history and results
     - Handle errors and retries
-    - Coordinate storage of ingested events
+    - Coordinate deduplication across sources
     """
 
-    def __init__(self, deduplicator: EventDeduplicator = None):
+    def __init__(self, deduplicator: Optional[EventDeduplicator] = None):
         """Initialize the orchestrator."""
         self.logger = logging.getLogger("orchestrator")
-        self.logger.setLevel(logging.INFO)
-
         self.pipelines: Dict[str, BasePipeline] = {}
         self.scheduled_pipelines: Dict[str, ScheduledPipeline] = {}
         self.execution_history: List[PipelineExecutionResult] = []
-        self.deduplicator = deduplicator or FuzzyMatchDeduplicator()
+        self.deduplicator = deduplicator or ExactMatchDeduplicator()
 
     # ========================================================================
     # PIPELINE MANAGEMENT
@@ -64,58 +85,58 @@ class PipelineOrchestrator:
     def register_pipeline(
         self,
         source_name: str,
-        pipeline_class: Type[BasePipeline],
-        config: PipelineConfig,
+        pipeline: BasePipeline,
     ) -> None:
         """
         Register a pipeline instance.
 
         Args:
-            source_name: Unique identifier for the source (e.g., 'ra_co', 'meetup')
-            pipeline_class: The BasePipeline subclass
-            config: PipelineConfig instance for this source
+            source_name: Unique identifier for the source
+            pipeline: Configured BasePipeline instance
         """
-        try:
-            pipeline_instance = pipeline_class(config)
-            self.pipelines[source_name] = pipeline_instance
-            self.logger.info(f"Registered pipeline: {source_name}")
-        except Exception as e:
-            self.logger.error(f"Failed to register pipeline {source_name}: {e}")
-            raise
+        self.pipelines[source_name] = pipeline
+        self.logger.info(
+            f"Registered pipeline: {source_name} (type: {pipeline.source_type.value})"
+        )
 
     def get_pipeline(self, source_name: str) -> Optional[BasePipeline]:
-        """
-        Get a registered pipeline by name.
-        """
+        """Get a registered pipeline by name."""
         return self.pipelines.get(source_name)
 
-    def list_pipelines(self) -> List[str]:
-        """
-        List all registered pipelines.
-        """
-        return list(self.pipelines.keys())
+    def list_pipelines(self) -> List[Dict[str, str]]:
+        """List all registered pipelines with their types."""
+        return [
+            {"name": name, "type": p.source_type.value}
+            for name, p in self.pipelines.items()
+        ]
 
-    def deduplicate_results(self, results: Dict) -> List[EventSchema]:
-        """
-        Deduplicate events from multiple pipeline results.
-        """
-        all_events = [e for r in results.values() for e in r.events]
+    def deduplicate_results(
+        self, results: Dict[str, PipelineExecutionResult]
+    ) -> List[EventSchema]:
+        """Deduplicate events from multiple pipeline results."""
+        all_events = []
+        for result in results.values():
+            all_events.extend(result.events)
         return self.deduplicator.deduplicate(all_events)
 
     # ========================================================================
     # EXECUTION
     # ========================================================================
 
-    def execute_pipeline(self, source_name: str, **kwargs) -> PipelineExecutionResult:
+    def execute_pipeline(
+        self,
+        source_name: str,
+        **kwargs
+    ) -> PipelineExecutionResult:
         """
-        Execute a single pipeline on demand.
+        Execute a single pipeline.
 
         Args:
             source_name: Name of the pipeline to execute
-            **kwargs: Parameters to pass to the pipeline's execute() method
+            **kwargs: Parameters passed to pipeline.execute()
 
         Returns:
-            PipelineExecutionResult with summary and events
+            PipelineExecutionResult
         """
         pipeline = self.get_pipeline(source_name)
         if not pipeline:
@@ -126,62 +147,73 @@ class PipelineOrchestrator:
         try:
             result = pipeline.execute(**kwargs)
             self.execution_history.append(result)
-
-            # Store results (in real implementation, save to database)
             self._store_execution_result(result)
-
             return result
 
         except Exception as e:
-            self.logger.error(
-                f"Pipeline execution failed: {source_name}", exc_info=True
-            )
+            self.logger.error(f"Pipeline execution failed: {source_name}", exc_info=True)
             raise
 
     def execute_all_pipelines(self, **kwargs) -> Dict[str, PipelineExecutionResult]:
         """
         Execute all registered pipelines.
 
+        Returns:
+            Dictionary mapping source_name -> PipelineExecutionResult
+        """
+        results = {}
+
+        for source_name in self.pipelines:
+            try:
+                result = self.execute_pipeline(source_name, **kwargs)
+                results[source_name] = result
+            except Exception as e:
+                self.logger.error(f"Failed to execute {source_name}: {e}")
+
+        return results
+
+    def execute_by_type(
+        self,
+        source_type: SourceType,
+        **kwargs
+    ) -> Dict[str, PipelineExecutionResult]:
+        """
+        Execute all pipelines of a specific type (API or scraper).
+
         Args:
-            **kwargs: Parameters passed to all pipelines
+            source_type: SourceType.API or SourceType.SCRAPER
+            **kwargs: Parameters passed to pipelines
 
         Returns:
             Dictionary mapping source_name -> PipelineExecutionResult
         """
         results = {}
 
-        for source_name in self.list_pipelines():
-            try:
-                result = self.execute_pipeline(source_name, **kwargs)
-                results[source_name] = result
-            except Exception as e:
-                self.logger.error(f"Failed to execute {source_name}: {e}")
-                # Continue with other pipelines
+        for name, pipeline in self.pipelines.items():
+            if pipeline.source_type == source_type:
+                try:
+                    result = self.execute_pipeline(name, **kwargs)
+                    results[name] = result
+                except Exception as e:
+                    self.logger.error(f"Failed to execute {name}: {e}")
 
         return results
 
     # ========================================================================
-    # SCHEDULING (Skeleton - integrate with APScheduler for production)
+    # SCHEDULING
     # ========================================================================
 
     def schedule_pipeline(
-        self, source_name: str, schedule_config: Dict
+        self,
+        source_name: str,
+        schedule_config: Dict
     ) -> ScheduledPipeline:
         """
         Schedule a pipeline for recurring execution.
 
         Args:
             source_name: Pipeline to schedule
-            schedule_config: Dict with 'type' (interval/cron) and schedule parameters
-
-        Returns:
-            ScheduledPipeline configuration
-
-        Example:
-            orchestrator.schedule_pipeline('ra_co', {
-                'type': 'interval',
-                'interval_hours': 6
-            })
+            schedule_config: Dict with schedule parameters
         """
         pipeline = self.get_pipeline(source_name)
         if not pipeline:
@@ -189,7 +221,7 @@ class PipelineOrchestrator:
 
         scheduled = ScheduledPipeline(
             pipeline_name=source_name,
-            schedule_type=schedule_config.get("type"),
+            schedule_type=schedule_config.get("type", "interval"),
             interval_hours=schedule_config.get("interval_hours"),
             cron_expression=schedule_config.get("cron_expression"),
             enabled=schedule_config.get("enabled", True),
@@ -199,29 +231,18 @@ class PipelineOrchestrator:
         self.scheduled_pipelines[source_name] = scheduled
         self.logger.info(f"Scheduled pipeline: {source_name}")
 
-        # TODO: Integrate with APScheduler for actual scheduling
-        # from apscheduler.schedulers.background import BackgroundScheduler
-        # self.scheduler.add_job(...)
-
         return scheduled
 
     # ========================================================================
-    # HISTORY & RESULTS
+    # HISTORY & STATS
     # ========================================================================
 
     def get_execution_history(
-        self, source_name: Optional[str] = None, limit: int = 10
+        self,
+        source_name: Optional[str] = None,
+        limit: int = 10
     ) -> List[PipelineExecutionResult]:
-        """
-        Get execution history.
-
-        Args:
-            source_name: Filter by source (optional)
-            limit: Maximum number of results
-
-        Returns:
-            List of execution results
-        """
+        """Get execution history, optionally filtered by source."""
         results = self.execution_history
 
         if source_name:
@@ -229,23 +250,8 @@ class PipelineOrchestrator:
 
         return results[-limit:]
 
-    def get_latest_execution(
-        self, source_name: str
-    ) -> Optional[PipelineExecutionResult]:
-        """Get the latest execution result for a pipeline."""
-        history = self.get_execution_history(source_name, limit=1)
-        return history[0] if history else None
-
     def get_execution_stats(self, source_name: Optional[str] = None) -> Dict:
-        """
-        Get aggregate statistics about pipeline executions.
-
-        Args:
-            source_name: Optional filter by source
-
-        Returns:
-            Dictionary with stats (total runs, success rate, etc.)
-        """
+        """Get aggregate statistics about pipeline executions."""
         results = self.execution_history
         if source_name:
             results = [r for r in results if r.source_name == source_name]
@@ -264,98 +270,66 @@ class PipelineOrchestrator:
             "total_events_processed": total_events,
             "total_successful_events": total_successful,
             "average_events_per_run": total_events / len(results) if results else 0,
-            "average_success_rate": (
-                (total_successful / total_events * 100) if total_events > 0 else 0
-            ),
-            "latest_execution": results[-1].ended_at if results else None,
         }
 
-    # ========================================================================
-    # INTERNAL METHODS
-    # ========================================================================
-
     def _store_execution_result(self, result: PipelineExecutionResult) -> None:
-        """
-        Store execution result to database.
-
-        In a real implementation, this would:
-        - Save execution metadata to a 'pipeline_runs' table
-        - Save events to 'raw_events' table
-        - Update pipeline statistics
-        - Trigger downstream processing
-        """
+        """Store execution result (placeholder for database storage)."""
         self.logger.info(
-            f"Storing {result.successful_events} events from {result.source_name} "
-            f"(execution {result.execution_id})"
+            f"Storing {result.successful_events} events from {result.source_name}"
         )
 
-        # TODO: Implement actual storage
-        # db.session.add(PipelineRun(...))
-        # db.session.bulk_insert_mappings(Event, result.events)
-        # db.session.commit()
 
-
-# ============================================================================
-# FACTORY FUNCTION FOR EASY SETUP
-# ============================================================================
-
-
-def create_orchestrator_from_config(config_dict: Dict) -> PipelineOrchestrator:
+def load_orchestrator_from_config(config_path: str) -> PipelineOrchestrator:
     """
-    Factory function to create and configure an orchestrator from config dict.
+    Factory function to create orchestrator from YAML config.
 
     Args:
-        config_dict: Configuration dictionary (typically loaded from YAML)
+        config_path: Path to ingestion.yaml
 
     Returns:
-        Configured PipelineOrchestrator instance
-
-    Example:
-        config = yaml.safe_load(open('configs/ingestion.yaml'))
-        orchestrator = create_orchestrator_from_config(config)
+        Configured PipelineOrchestrator
     """
-    from ingestion.pipelines.apis.ra_co import RaCoEventPipeline
-    from ingestion.pipelines.meetup import MeetupEventPipeline
+    from src.ingestion.pipelines.apis.ra_co import create_ra_co_pipeline
 
-    # from ingestion.sources.ticketmaster import TicketmasterEventPipeline
+    config_file = Path(config_path)
+    if not config_file.exists():
+        raise FileNotFoundError(f"Config not found: {config_path}")
+
+    with open(config_file) as f:
+        config = yaml.safe_load(f)
 
     orchestrator = PipelineOrchestrator()
 
-    sources_config = config_dict.get("sources", {})
+    sources_config = config.get("sources", {})
 
     for source_name, source_config in sources_config.items():
         if not source_config.get("enabled", True):
             continue
 
-        # Create config
+        source_type_str = source_config.get("type", "api")
+        source_type = SourceType(source_type_str)
+
         pipeline_config = PipelineConfig(
             source_name=source_name,
-            base_url=source_config.get("base_url"),
-            api_key=source_config.get("api_key"),
+            source_type=source_type,
             request_timeout=source_config.get("request_timeout", 30),
             max_retries=source_config.get("max_retries", 3),
             batch_size=source_config.get("batch_size", 100),
             rate_limit_per_second=source_config.get("rate_limit_per_second", 1.0),
-            custom_config=source_config.get("custom", {}),
+            custom_config=source_config,
         )
 
-        # Register appropriate pipeline class
-        pipeline_class = None
+        # Create pipeline based on source name
+        pipeline = None
         if source_name == "ra_co":
-            pipeline_class = RaCoEventPipeline
-        elif source_name == "meetup":
-            pipeline_class = MeetupEventPipeline
-        # elif source_name == 'ticketmaster':
-        #     pipeline_class = TicketmasterEventPipeline
+            pipeline = create_ra_co_pipeline(pipeline_config, source_config)
 
-        if pipeline_class:
-            orchestrator.register_pipeline(source_name, pipeline_class, pipeline_config)
+        if pipeline:
+            orchestrator.register_pipeline(source_name, pipeline)
 
             # Schedule if configured
             schedule_config = source_config.get("schedule")
-            if schedule_config:
+            if schedule_config and schedule_config.get("enabled", True):
                 orchestrator.schedule_pipeline(source_name, schedule_config)
-
-    # orchestrator = DeduplicationManager().initialize()
 
     return orchestrator

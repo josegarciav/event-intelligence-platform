@@ -132,6 +132,11 @@ event-intelligence-platform/
 4. **Analytics** — Expose core metrics and instrument user interaction signals.  
 5. **Experimentation** — Prepare A/B testing framework and baseline recommendation logic.
 
+### Brainstorming
+
+- It'd be nice to be able to get the artist name (assuming musical artist) and fetch some popular music sample from their SoundCloud page, so that users can get a feel of what the artist feels like.
+
+
 
 ## Environment Setup
 
