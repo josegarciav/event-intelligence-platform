@@ -1,0 +1,106 @@
+{
+  "config_version": "1.0",
+  "source_id": "ra_co",
+  "enabled": true,
+  "kind": "events",
+  "owner": "event-intelligence-platform",
+  "tags": ["electronic", "music", "nightlife", "clubs"],
+
+  "engine": {
+    "type": "browser",
+    "browser": {"browser_name": "chromium", "headless": true},
+    "timeout_s": 30,
+    "verify_ssl": true,
+    "rate_limit_policy": {
+      "rps": 0.5,
+      "min_delay_s": 2.0,
+      "jitter_s": 1.0,
+      "burst": 1
+    },
+    "retry_policy": {
+      "max_retries": 3,
+      "backoff": "exp",
+      "retry_on_status": [429, 500, 502, 503, 504]
+    }
+  },
+
+  "entrypoints": [
+    {
+      "url": "https://ra.co/events/{country_code}/{city}",
+      "paging": {
+        "mode": "page",
+        "start": 0,
+        "end": 4,
+        "step": 1,
+        "page_param": "week"
+      },
+      "params": {
+        "country_code": "es",
+        "city": "barcelona"
+      }
+    }
+  ],
+
+  "actions": [
+    {
+      "type": "wait_for",
+      "selector": "[data-testid='event-listings'], .event-listing, article",
+      "timeout_s": 15
+    },
+    {
+      "type": "scroll",
+      "params": {
+        "mode": "random",
+        "repeat": 5,
+        "min_px": 300,
+        "max_px": 800,
+        "sleep_s": 0.5
+      }
+    }
+  ],
+
+  "discovery": {
+    "link_extract": {
+      "method": "regex",
+      "pattern": "/events/\\d+",
+      "identifier": "/events/"
+    },
+    "dedupe": {
+      "enabled": true,
+      "strategy": "url_hash"
+    }
+  },
+
+  "detail_page": {
+    "selectors": {
+      "title": "h1, [data-testid='event-title']",
+      "date": "[data-testid='event-date'], time, .date",
+      "time": "[data-testid='event-time'], .time",
+      "venue": "[data-testid='venue-name'], .venue a, .venue-name",
+      "venue_address": "[data-testid='venue-address'], .venue-address",
+      "price": "[data-testid='ticket-price'], .price, .cost",
+      "description": "[data-testid='event-description'], .event-description, article p",
+      "artists": "[data-testid='lineup'] a, .lineup a, .artist-name",
+      "image": "meta[property='og:image'], .event-image img, .flyer img"
+    }
+  },
+
+  "storage": {
+    "raw_pages": {
+      "enabled": true,
+      "format": "parquet",
+      "compression": "snappy"
+    },
+    "items": {
+      "enabled": true,
+      "format": "parquet"
+    }
+  },
+
+  "extensions": {
+    "source_base_url": "https://ra.co",
+    "default_currency": "EUR",
+    "default_country_code": "ES",
+    "event_types": ["DJ", "Live", "Festival", "Showcase", "Party"]
+  }
+}

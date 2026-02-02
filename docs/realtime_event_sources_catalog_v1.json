@@ -1,0 +1,1391 @@
+{
+  "catalog_id": "REALTIME_EVENT_SOURCES_CATALOG_V1",
+  "version": "0.1.0",
+  "generated_at": "2026-01-28T15:07:56Z",
+  "description": "Aggregated catalog of real-time event & experience data sources collected from internal research PDFs; includes metadata, integration hints, and qualitative metrics for prioritization.",
+  "source_count": 43,
+  "metrics_scale": {
+    "scores_1_to_5": "1=low/poor, 3=medium, 5=high/excellent",
+    "legal_risk": "1=low (official/open), 5=high (restricted/closed/login-heavy scraping)"
+  },
+  "sources": [
+    {
+      "source_id": "10times",
+      "name": "10times",
+      "domains": [
+        "10times.com"
+      ],
+      "category": "directory_aggregator",
+      "subcategory": "conferences_trade_shows",
+      "region_coverage": "global",
+      "integration": {
+        "access": "closed",
+        "methods": [
+          "web_scrape",
+          "partner"
+        ],
+        "api_public": false
+      },
+      "update_frequency": "regular",
+      "status": "active",
+      "notes": "Business/professional events; no open API per doc.",
+      "metrics": {
+        "metadata_richness": 3,
+        "update_frequency_score": 3,
+        "accessibility_score": 2,
+        "reliability_score": 3,
+        "dedupe_risk": 3,
+        "legal_risk": 3
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "active_com",
+      "name": "Active.com",
+      "domains": [
+        "active.com"
+      ],
+      "category": "sports_recreation",
+      "subcategory": "races_classes_outdoor",
+      "region_coverage": "global (strong US)",
+      "integration": {
+        "access": "api",
+        "methods": [
+          "rest_api"
+        ],
+        "api_public": true,
+        "auth": "api_key"
+      },
+      "update_frequency": "continuous",
+      "status": "active",
+      "notes": "Races, tournaments, fitness classes, camps.",
+      "metrics": {
+        "metadata_richness": 4,
+        "update_frequency_score": 4,
+        "accessibility_score": 4,
+        "reliability_score": 4,
+        "dedupe_risk": 2,
+        "legal_risk": 1
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "all_for_good_points_of_light",
+      "name": "All For Good (Points of Light)",
+      "domains": [
+        "pointsoflight.org"
+      ],
+      "category": "volunteering",
+      "subcategory": "volunteer_projects_days_of_service",
+      "region_coverage": "US (nationwide)",
+      "integration": {
+        "access": "merged_into_idealist",
+        "methods": [
+          "api_legacy"
+        ],
+        "api_public": "legacy"
+      },
+      "update_frequency": "n/a (merged)",
+      "status": "active",
+      "notes": "Historically aggregator; data largely merged into Idealist per doc.",
+      "metrics": {
+        "metadata_richness": 3,
+        "update_frequency_score": 0,
+        "accessibility_score": 1,
+        "reliability_score": 3,
+        "dedupe_risk": 3,
+        "legal_risk": 1
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "allevents_in",
+      "name": "AllEvents.in",
+      "domains": [
+        "allevents.in"
+      ],
+      "category": "aggregator",
+      "subcategory": "global_events_database",
+      "region_coverage": "global (40k+ cities)",
+      "integration": {
+        "access": "commercial_api",
+        "methods": [
+          "rest_api"
+        ],
+        "api_public": true,
+        "auth": "api_key"
+      },
+      "update_frequency": "high-frequency (regular refresh + dedupe per doc)",
+      "status": "active",
+      "notes": "Claims 200M+ events; aggregator + user submissions.",
+      "metrics": {
+        "event_volume_estimate": "200M+ events listed (claim in doc)",
+        "metadata_richness": 3,
+        "update_frequency_score": 4,
+        "accessibility_score": 3,
+        "reliability_score": 3,
+        "dedupe_risk": 5,
+        "legal_risk": 2
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "apple_maps_guides",
+      "name": "Apple Maps Guides",
+      "domains": [
+        "maps.apple.com"
+      ],
+      "category": "maps_curated",
+      "subcategory": "curated_guides_evergreen",
+      "region_coverage": "global",
+      "integration": {
+        "access": "limited",
+        "methods": [
+          "manual_ingest",
+          "shared_urls"
+        ],
+        "api_public": false
+      },
+      "update_frequency": "periodic",
+      "status": "active",
+      "notes": "Editorial guidebook-like lists; not real-time events.",
+      "metrics": {
+        "metadata_richness": 4,
+        "update_frequency_score": 2,
+        "accessibility_score": 1,
+        "reliability_score": 4,
+        "dedupe_risk": 2,
+        "legal_risk": 2
+      },
+      "doc_refs": [
+        "Real-Time Event & Experience Discovery Sources_ Mobile Apps & Alternative Platforms.pdf"
+      ]
+    },
+    {
+      "source_id": "around",
+      "name": "Around",
+      "domains": [
+        "aroundmytown.net"
+      ],
+      "category": "mobile_app",
+      "subcategory": "local_event_aggregator",
+      "region_coverage": "likely US-focused to start (community-level)",
+      "integration": {
+        "access": "unknown",
+        "methods": [
+          "rss",
+          "ical",
+          "web_scrape"
+        ],
+        "api_public": false
+      },
+      "update_frequency": "high (daily/hourly in concept)",
+      "status": "active",
+      "notes": "Surfaces nearby events; may pull from multiple sources or user submissions.",
+      "metrics": {
+        "metadata_richness": 3,
+        "update_frequency_score": 4,
+        "accessibility_score": 2,
+        "reliability_score": 3,
+        "dedupe_risk": 4,
+        "legal_risk": 3
+      },
+      "doc_refs": [
+        "Real-Time Event & Experience Discovery Sources_ Mobile Apps & Alternative Platforms.pdf"
+      ]
+    },
+    {
+      "source_id": "axs",
+      "name": "AXS",
+      "domains": [
+        "axs.com"
+      ],
+      "category": "ticketing_platform",
+      "subcategory": "concerts_sports",
+      "region_coverage": "US/UK",
+      "integration": {
+        "access": "closed",
+        "methods": [
+          "web_scrape",
+          "partner"
+        ],
+        "api_public": false
+      },
+      "update_frequency": "high",
+      "status": "active",
+      "notes": "Major ticketing provider; no open API per doc.",
+      "metrics": {
+        "metadata_richness": 4,
+        "update_frequency_score": 4,
+        "accessibility_score": 2,
+        "reliability_score": 4,
+        "dedupe_risk": 2,
+        "legal_risk": 3
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "bandsintown",
+      "name": "Bandsintown",
+      "domains": [
+        "bandsintown.com"
+      ],
+      "category": "music_events_db",
+      "subcategory": "artist_centric_concerts",
+      "region_coverage": "global",
+      "integration": {
+        "access": "api",
+        "methods": [
+          "rest_api"
+        ],
+        "api_public": true
+      },
+      "update_frequency": "continuous",
+      "status": "active",
+      "notes": "Free API; strong artist-published tour dates.",
+      "metrics": {
+        "metadata_richness": 4,
+        "update_frequency_score": 5,
+        "accessibility_score": 4,
+        "reliability_score": 4,
+        "dedupe_risk": 2,
+        "legal_risk": 1
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "bereal_realevents",
+      "name": "BeReal (RealEvents)",
+      "domains": [
+        "bere.al"
+      ],
+      "category": "social_app",
+      "subcategory": "live_event_timeline_signal",
+      "region_coverage": "global (feature at major events)",
+      "integration": {
+        "access": "closed",
+        "methods": [
+          "partnership",
+          "social_listening_indirect"
+        ],
+        "api_public": false
+      },
+      "update_frequency": "event-specific temporary timelines",
+      "status": "active",
+      "notes": "Crowdsourced real-time 'buzz' signal around major events.",
+      "metrics": {
+        "metadata_richness": 2,
+        "update_frequency_score": 4,
+        "accessibility_score": 1,
+        "reliability_score": 3,
+        "dedupe_risk": 2,
+        "legal_risk": 3
+      },
+      "doc_refs": [
+        "Real-Time Event & Experience Discovery Sources_ Mobile Apps & Alternative Platforms.pdf"
+      ]
+    },
+    {
+      "source_id": "conference_alert_sites",
+      "name": "Conference Alert Sites",
+      "domains": [],
+      "category": "directory_aggregator",
+      "subcategory": "academic_conference_announcements",
+      "region_coverage": "global",
+      "integration": {
+        "access": "varies",
+        "methods": [
+          "rss",
+          "email_digest",
+          "web_scrape"
+        ],
+        "api_public": "varies"
+      },
+      "update_frequency": "varies",
+      "status": "active",
+      "notes": "Many niche sites; reliability varies.",
+      "metrics": {
+        "metadata_richness": 2,
+        "update_frequency_score": 2,
+        "accessibility_score": 3,
+        "reliability_score": 2,
+        "dedupe_risk": 3,
+        "legal_risk": 2
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "coursehorse",
+      "name": "CourseHorse",
+      "domains": [
+        "coursehorse.com"
+      ],
+      "category": "classes_marketplace",
+      "subcategory": "local_classes_workshops",
+      "region_coverage": "US major cities",
+      "integration": {
+        "access": "closed",
+        "methods": [
+          "web_scrape"
+        ],
+        "api_public": false
+      },
+      "update_frequency": "regular",
+      "status": "active",
+      "notes": "Local classes marketplace; no public API per doc.",
+      "metrics": {
+        "metadata_richness": 4,
+        "update_frequency_score": 3,
+        "accessibility_score": 2,
+        "reliability_score": 3,
+        "dedupe_risk": 2,
+        "legal_risk": 3
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "dice",
+      "name": "DICE",
+      "domains": [
+        "dice.fm"
+      ],
+      "category": "mobile_app",
+      "subcategory": "ticketing_live_events",
+      "region_coverage": "global (origin UK; strong EU/NA)",
+      "integration": {
+        "access": "closed",
+        "methods": [
+          "partner_graphql",
+          "web_scrape"
+        ],
+        "api_public": false
+      },
+      "update_frequency": "continuous (real-time listings & ticket availability)",
+      "status": "active",
+      "notes": "Curated live music & cultural events; personalized recs (Spotify/Apple Music); acquired by Fever (per doc).",
+      "metrics": {
+        "metadata_richness": 5,
+        "update_frequency_score": 5,
+        "accessibility_score": 2,
+        "reliability_score": 4,
+        "dedupe_risk": 2,
+        "legal_risk": 3
+      },
+      "doc_refs": [
+        "Real-Time Event & Experience Discovery Sources_ Mobile Apps & Alternative Platforms.pdf"
+      ]
+    },
+    {
+      "source_id": "dostuff",
+      "name": "DoStuff",
+      "domains": [
+        "dostuffmedia.com"
+      ],
+      "category": "platform",
+      "subcategory": "local_city_event_guides",
+      "region_coverage": "20+ North American metros",
+      "integration": {
+        "access": "open-ish",
+        "methods": [
+          "json_feeds",
+          "api",
+          "web_scrape"
+        ],
+        "api_public": true
+      },
+      "update_frequency": "daily",
+      "status": "active",
+      "notes": "City-specific calendars (DoNYC/DoLA/etc.) with strong editorial signal.",
+      "metrics": {
+        "metadata_richness": 4,
+        "update_frequency_score": 4,
+        "accessibility_score": 4,
+        "reliability_score": 4,
+        "dedupe_risk": 3,
+        "legal_risk": 2
+      },
+      "doc_refs": [
+        "Real-Time Event & Experience Discovery Sources_ Mobile Apps & Alternative Platforms.pdf"
+      ]
+    },
+    {
+      "source_id": "evensi",
+      "name": "Evensi",
+      "domains": [
+        "evensi.com"
+      ],
+      "category": "aggregator",
+      "subcategory": "community_events_aggregated",
+      "region_coverage": "global",
+      "integration": {
+        "access": "api",
+        "methods": [
+          "rest_api"
+        ],
+        "api_public": true
+      },
+      "update_frequency": "frequent",
+      "status": "active",
+      "notes": "Aggregates multiple platforms; watch duplicates/quality.",
+      "metrics": {
+        "metadata_richness": 3,
+        "update_frequency_score": 4,
+        "accessibility_score": 3,
+        "reliability_score": 3,
+        "dedupe_risk": 5,
+        "legal_risk": 2
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "eventbrite",
+      "name": "Eventbrite",
+      "domains": [
+        "eventbrite.com"
+      ],
+      "category": "event_platform",
+      "subcategory": "ticketed_and_rsvp_events",
+      "region_coverage": "global (strong US/EU)",
+      "integration": {
+        "access": "api",
+        "methods": [
+          "rest_api"
+        ],
+        "api_public": true,
+        "auth": "oauth2",
+        "rate_limits": "~2000 calls/hour default (per doc)"
+      },
+      "update_frequency": "near_real-time (user-generated)",
+      "status": "active",
+      "notes": "Huge across niches incl free events; organizer-edited instantly.",
+      "metrics": {
+        "metadata_richness": 5,
+        "update_frequency_score": 5,
+        "accessibility_score": 4,
+        "reliability_score": 4,
+        "dedupe_risk": 3,
+        "legal_risk": 1
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "eventim",
+      "name": "Eventim",
+      "domains": [
+        "eventim.com"
+      ],
+      "category": "ticketing_platform",
+      "subcategory": "europe_ticketing",
+      "region_coverage": "Europe (esp. DE)",
+      "integration": {
+        "access": "closed",
+        "methods": [
+          "web_scrape",
+          "partner"
+        ],
+        "api_public": false
+      },
+      "update_frequency": "high",
+      "status": "active",
+      "notes": "Large European ticketing catalog; no public API per doc.",
+      "metrics": {
+        "metadata_richness": 4,
+        "update_frequency_score": 4,
+        "accessibility_score": 2,
+        "reliability_score": 4,
+        "dedupe_risk": 2,
+        "legal_risk": 3
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "facebook_events",
+      "name": "Facebook Events",
+      "domains": [
+        "facebook.com"
+      ],
+      "category": "social_events",
+      "subcategory": "public_pages_events",
+      "region_coverage": "global",
+      "integration": {
+        "access": "restricted",
+        "methods": [
+          "graph_api_limited",
+          "page_ical",
+          "web_scrape"
+        ],
+        "api_public": "limited"
+      },
+      "update_frequency": "continuous",
+      "status": "active",
+      "notes": "Huge local coverage; public search API restricted post-2018 per doc.",
+      "metrics": {
+        "metadata_richness": 3,
+        "update_frequency_score": 5,
+        "accessibility_score": 2,
+        "reliability_score": 3,
+        "dedupe_risk": 4,
+        "legal_risk": 4
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "fever",
+      "name": "Fever",
+      "domains": [
+        "feverup.com"
+      ],
+      "category": "marketplace",
+      "subcategory": "experience_discovery_ticketing",
+      "region_coverage": "global (200+ cities)",
+      "integration": {
+        "access": "closed",
+        "methods": [
+          "affiliate_program",
+          "partner_integration",
+          "web_scrape"
+        ],
+        "api_public": false
+      },
+      "update_frequency": "very_high (continuous; sellout/session updates)",
+      "status": "active",
+      "notes": "Curated trendy experiences (candlelight concerts, immersive exhibits) often exclusive.",
+      "metrics": {
+        "metadata_richness": 5,
+        "update_frequency_score": 5,
+        "accessibility_score": 2,
+        "reliability_score": 4,
+        "dedupe_risk": 2,
+        "legal_risk": 3
+      },
+      "doc_refs": [
+        "Real-Time Event & Experience Discovery Sources_ Mobile Apps & Alternative Platforms.pdf"
+      ]
+    },
+    {
+      "source_id": "google_search_events_widget",
+      "name": "Google Search Events Widget",
+      "domains": [
+        "google.com"
+      ],
+      "category": "search_aggregator",
+      "subcategory": "meta_aggregated_events",
+      "region_coverage": "global",
+      "integration": {
+        "access": "no_official_api",
+        "methods": [
+          "serp_scrape",
+          "schema_org_ingest"
+        ],
+        "api_public": false
+      },
+      "update_frequency": "near_real_time (index driven)",
+      "status": "active",
+      "notes": "Meta-source aggregating schema.org events from multiple sites; good for gap-filling/cross-check.",
+      "metrics": {
+        "metadata_richness": 4,
+        "update_frequency_score": 4,
+        "accessibility_score": 2,
+        "reliability_score": 4,
+        "dedupe_risk": 5,
+        "legal_risk": 4
+      },
+      "doc_refs": [
+        "Real-Time Event & Experience Discovery Sources_ Mobile Apps & Alternative Platforms.pdf"
+      ]
+    },
+    {
+      "source_id": "gravy",
+      "name": "Gravy",
+      "domains": [
+        "findgravy.com"
+      ],
+      "category": "app_platform",
+      "subcategory": "mood_based_event_discovery",
+      "region_coverage": "United States",
+      "integration": {
+        "access": "legacy/unclear",
+        "methods": [
+          "api_if_available",
+          "web_scrape"
+        ],
+        "api_public": "unclear"
+      },
+      "update_frequency": "very_high (in its prime per doc)",
+      "status": "active",
+      "notes": "Mood-tagged events; historic pioneer; current availability uncertain.",
+      "metrics": {
+        "metadata_richness": 4,
+        "update_frequency_score": 4,
+        "accessibility_score": 2,
+        "reliability_score": 3,
+        "dedupe_risk": 3,
+        "legal_risk": 3
+      },
+      "doc_refs": [
+        "Real-Time Event & Experience Discovery Sources_ Mobile Apps & Alternative Platforms.pdf"
+      ]
+    },
+    {
+      "source_id": "heylets",
+      "name": "HeyLets",
+      "domains": [],
+      "category": "app_platform",
+      "subcategory": "interest_based_social_recommendations",
+      "region_coverage": "global (90+ countries historically)",
+      "integration": {
+        "access": "unclear",
+        "methods": [
+          "web_scrape",
+          "ugc_ingest"
+        ],
+        "api_public": false
+      },
+      "update_frequency": "user-driven (lower volume)",
+      "status": "active",
+      "notes": "Positive-only recommendations; concept may have pivoted.",
+      "metrics": {
+        "metadata_richness": 3,
+        "update_frequency_score": 2,
+        "accessibility_score": 1,
+        "reliability_score": 2,
+        "dedupe_risk": 3,
+        "legal_risk": 3
+      },
+      "doc_refs": [
+        "Real-Time Event & Experience Discovery Sources_ Mobile Apps & Alternative Platforms.pdf"
+      ]
+    },
+    {
+      "source_id": "idealist_volunteermatch",
+      "name": "Idealist (VolunteerMatch)",
+      "domains": [
+        "idealist.org"
+      ],
+      "category": "volunteering",
+      "subcategory": "volunteer_opportunities_events",
+      "region_coverage": "global (180+ countries)",
+      "integration": {
+        "access": "api",
+        "methods": [
+          "rest_api",
+          "graphql_api"
+        ],
+        "api_public": true,
+        "auth": "api_key"
+      },
+      "update_frequency": "frequent",
+      "status": "active",
+      "notes": "Largest volunteering database per doc; includes opportunities and one-time events.",
+      "metrics": {
+        "event_volume_estimate": "80,000+ active opportunities; 200,000 orgs (per doc)",
+        "metadata_richness": 4,
+        "update_frequency_score": 4,
+        "accessibility_score": 4,
+        "reliability_score": 4,
+        "dedupe_risk": 2,
+        "legal_risk": 1
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "instagram_local_event_posts_tags",
+      "name": "Instagram (Local Event Posts & Tags)",
+      "domains": [
+        "instagram.com"
+      ],
+      "category": "social_media",
+      "subcategory": "promo_posts_hashtags",
+      "region_coverage": "global",
+      "integration": {
+        "access": "restricted",
+        "methods": [
+          "graph_api_approved",
+          "third_party_scrape",
+          "image_caption_nlp"
+        ],
+        "api_public": "limited"
+      },
+      "update_frequency": "continuous",
+      "status": "active",
+      "notes": "Great for last-minute pop-ups; needs parsing from captions/posters.",
+      "metrics": {
+        "metadata_richness": 2,
+        "update_frequency_score": 5,
+        "accessibility_score": 2,
+        "reliability_score": 3,
+        "dedupe_risk": 4,
+        "legal_risk": 4
+      },
+      "doc_refs": [
+        "Real-Time Event & Experience Discovery Sources_ Mobile Apps & Alternative Platforms.pdf"
+      ]
+    },
+    {
+      "source_id": "irl",
+      "name": "IRL",
+      "domains": [],
+      "category": "mobile_app",
+      "subcategory": "social_calendar_discovery",
+      "region_coverage": "North America",
+      "integration": {
+        "access": "defunct",
+        "methods": [
+          "none"
+        ],
+        "api_public": false
+      },
+      "update_frequency": "n/a",
+      "status": "defunct (shut down mid-2023 per doc)",
+      "notes": "Defunct; mentioned as concept for social signals.",
+      "metrics": {
+        "metadata_richness": 0,
+        "update_frequency_score": 0,
+        "accessibility_score": 0,
+        "reliability_score": 0,
+        "dedupe_risk": 0,
+        "legal_risk": 0
+      },
+      "doc_refs": [
+        "Real-Time Event & Experience Discovery Sources_ Mobile Apps & Alternative Platforms.pdf"
+      ]
+    },
+    {
+      "source_id": "linkedin_events",
+      "name": "LinkedIn Events",
+      "domains": [
+        "linkedin.com"
+      ],
+      "category": "professional_network",
+      "subcategory": "webinars_b2b_events",
+      "region_coverage": "global",
+      "integration": {
+        "access": "closed_login",
+        "methods": [
+          "manual_monitoring",
+          "limited_scrape"
+        ],
+        "api_public": false
+      },
+      "update_frequency": "continuous",
+      "status": "active",
+      "notes": "Growing source for webinars/panels; login constraints.",
+      "metrics": {
+        "metadata_richness": 3,
+        "update_frequency_score": 4,
+        "accessibility_score": 1,
+        "reliability_score": 3,
+        "dedupe_risk": 3,
+        "legal_risk": 4
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "local_influencer_calendars",
+      "name": "Local Influencer Calendars",
+      "domains": [],
+      "category": "publisher_curated",
+      "subcategory": "blogger_influencer_event_lists",
+      "region_coverage": "city/region-specific",
+      "integration": {
+        "access": "manual",
+        "methods": [
+          "rss",
+          "ical",
+          "web_scrape"
+        ],
+        "api_public": false
+      },
+      "update_frequency": "weekly/monthly",
+      "status": "active",
+      "notes": "High uniqueness/trendiness; requires maintaining curator registry.",
+      "metrics": {
+        "metadata_richness": 3,
+        "update_frequency_score": 2,
+        "accessibility_score": 2,
+        "reliability_score": 3,
+        "dedupe_risk": 3,
+        "legal_risk": 3
+      },
+      "doc_refs": [
+        "Real-Time Event & Experience Discovery Sources_ Mobile Apps & Alternative Platforms.pdf"
+      ]
+    },
+    {
+      "source_id": "localist",
+      "name": "Localist",
+      "domains": [
+        "localist.com"
+      ],
+      "category": "institutional_calendar",
+      "subcategory": "university_city_calendars",
+      "region_coverage": "primarily US (many institutions)",
+      "integration": {
+        "access": "api_per_instance",
+        "methods": [
+          "rest_api",
+          "rss",
+          "ical"
+        ],
+        "api_public": true
+      },
+      "update_frequency": "real-time (per institution updates)",
+      "status": "active",
+      "notes": "Uniform endpoints per calendar instance.",
+      "metrics": {
+        "metadata_richness": 4,
+        "update_frequency_score": 4,
+        "accessibility_score": 4,
+        "reliability_score": 4,
+        "dedupe_risk": 3,
+        "legal_risk": 1
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "meetup",
+      "name": "Meetup",
+      "domains": [
+        "meetup.com"
+      ],
+      "category": "community_events",
+      "subcategory": "meetups_groups_classes",
+      "region_coverage": "global (193 countries)",
+      "integration": {
+        "access": "api",
+        "methods": [
+          "graphql_api",
+          "rest_api",
+          "ical_feeds"
+        ],
+        "api_public": true,
+        "auth": "oauth"
+      },
+      "update_frequency": "real-time",
+      "status": "active",
+      "notes": "Large grassroots events; some search access may require Pro per doc.",
+      "metrics": {
+        "event_volume_estimate": "100k+ events/week (per doc)",
+        "metadata_richness": 4,
+        "update_frequency_score": 5,
+        "accessibility_score": 3,
+        "reliability_score": 4,
+        "dedupe_risk": 3,
+        "legal_risk": 1
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "national_park_service_nps_api",
+      "name": "National Park Service (NPS) API",
+      "domains": [
+        "nps.gov"
+      ],
+      "category": "government",
+      "subcategory": "park_events_programs",
+      "region_coverage": "US national parks",
+      "integration": {
+        "access": "api",
+        "methods": [
+          "rest_api"
+        ],
+        "api_public": true,
+        "auth": "api_key"
+      },
+      "update_frequency": "as staff update (varies by park)",
+      "status": "active",
+      "notes": "Authoritative ranger programs, tours, volunteer days.",
+      "metrics": {
+        "metadata_richness": 4,
+        "update_frequency_score": 3,
+        "accessibility_score": 4,
+        "reliability_score": 5,
+        "dedupe_risk": 1,
+        "legal_risk": 1
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "nextdoor_events",
+      "name": "Nextdoor Events",
+      "domains": [
+        "nextdoor.com"
+      ],
+      "category": "local_community",
+      "subcategory": "neighborhood_events",
+      "region_coverage": "local/community (mostly US/EU)",
+      "integration": {
+        "access": "closed_login",
+        "methods": [
+          "limited_scrape"
+        ],
+        "api_public": false
+      },
+      "update_frequency": "community-driven",
+      "status": "active",
+      "notes": "Hyper-local; difficult automation due to login/no API.",
+      "metrics": {
+        "metadata_richness": 2,
+        "update_frequency_score": 3,
+        "accessibility_score": 1,
+        "reliability_score": 3,
+        "dedupe_risk": 3,
+        "legal_risk": 4
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "predicthq",
+      "name": "PredictHQ",
+      "domains": [
+        "predicthq.com"
+      ],
+      "category": "commercial_aggregator",
+      "subcategory": "event_intelligence_enrichment",
+      "region_coverage": "global",
+      "integration": {
+        "access": "commercial_api",
+        "methods": [
+          "api"
+        ],
+        "api_public": true
+      },
+      "update_frequency": "high",
+      "status": "active",
+      "notes": "Commercial event intelligence and enrichment (mentioned in doc).",
+      "metrics": {
+        "metadata_richness": 5,
+        "update_frequency_score": 4,
+        "accessibility_score": 2,
+        "reliability_score": 4,
+        "dedupe_risk": 2,
+        "legal_risk": 1
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "reddit_local_threads",
+      "name": "Reddit (Local Threads)",
+      "domains": [
+        "reddit.com"
+      ],
+      "category": "community_forum",
+      "subcategory": "grassroots_event_mentions",
+      "region_coverage": "global (city subreddits)",
+      "integration": {
+        "access": "open",
+        "methods": [
+          "official_api",
+          "rss",
+          "web_scrape"
+        ],
+        "api_public": true
+      },
+      "update_frequency": "frequent (community dependent)",
+      "status": "active",
+      "notes": "Niche/free/underground events; NLP needed for extraction.",
+      "metrics": {
+        "metadata_richness": 2,
+        "update_frequency_score": 3,
+        "accessibility_score": 4,
+        "reliability_score": 3,
+        "dedupe_risk": 4,
+        "legal_risk": 2
+      },
+      "doc_refs": [
+        "Real-Time Event & Experience Discovery Sources_ Mobile Apps & Alternative Platforms.pdf"
+      ]
+    },
+    {
+      "source_id": "seatgeek",
+      "name": "SeatGeek",
+      "domains": [
+        "seatgeek.com"
+      ],
+      "category": "ticket_marketplace",
+      "subcategory": "sports_concerts_theater",
+      "region_coverage": "primarily US",
+      "integration": {
+        "access": "api",
+        "methods": [
+          "rest_api"
+        ],
+        "api_public": true,
+        "auth": "api_key"
+      },
+      "update_frequency": "live",
+      "status": "active",
+      "notes": "Aggregated marketplace; resale-heavy.",
+      "metrics": {
+        "event_volume_estimate": "~100,000 live events (per doc)",
+        "metadata_richness": 4,
+        "update_frequency_score": 4,
+        "accessibility_score": 4,
+        "reliability_score": 4,
+        "dedupe_risk": 3,
+        "legal_risk": 1
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "skiddle",
+      "name": "Skiddle",
+      "domains": [
+        "skiddle.com"
+      ],
+      "category": "ticketing_platform",
+      "subcategory": "uk_nightlife_music_festivals",
+      "region_coverage": "UK (some EU/US)",
+      "integration": {
+        "access": "api",
+        "methods": [
+          "rest_api"
+        ],
+        "api_public": true,
+        "auth": "api_key"
+      },
+      "update_frequency": "real-time",
+      "status": "active",
+      "notes": "Strong UK nightlife coverage.",
+      "metrics": {
+        "metadata_richness": 4,
+        "update_frequency_score": 4,
+        "accessibility_score": 4,
+        "reliability_score": 4,
+        "dedupe_risk": 2,
+        "legal_risk": 1
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "songkick",
+      "name": "Songkick",
+      "domains": [
+        "songkick.com"
+      ],
+      "category": "music_events_db",
+      "subcategory": "concerts_festivals",
+      "region_coverage": "global",
+      "integration": {
+        "access": "api (approval may be slow)",
+        "methods": [
+          "rest_api"
+        ],
+        "api_public": "requires key"
+      },
+      "update_frequency": "frequent",
+      "status": "active",
+      "notes": "Large live music database; artist tours & venue calendars.",
+      "metrics": {
+        "event_volume_estimate": "6M+ concerts (past/upcoming) (per doc)",
+        "metadata_richness": 4,
+        "update_frequency_score": 4,
+        "accessibility_score": 3,
+        "reliability_score": 4,
+        "dedupe_risk": 2,
+        "legal_risk": 1
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "spotty",
+      "name": "Spotty",
+      "domains": [],
+      "category": "mobile_app",
+      "subcategory": "map_based_activity_finder",
+      "region_coverage": "localized/varies",
+      "integration": {
+        "access": "closed",
+        "methods": [
+          "partnering",
+          "app_scrape"
+        ],
+        "api_public": false
+      },
+      "update_frequency": "frequent in supported locales (map pins)",
+      "status": "active",
+      "notes": "Map-centric 'what's happening nearby'—hard without API.",
+      "metrics": {
+        "metadata_richness": 3,
+        "update_frequency_score": 4,
+        "accessibility_score": 1,
+        "reliability_score": 3,
+        "dedupe_risk": 3,
+        "legal_risk": 3
+      },
+      "doc_refs": [
+        "Real-Time Event & Experience Discovery Sources_ Mobile Apps & Alternative Platforms.pdf"
+      ]
+    },
+    {
+      "source_id": "ticketmaster",
+      "name": "Ticketmaster",
+      "domains": [
+        "ticketmaster.com"
+      ],
+      "category": "ticketing_platform",
+      "subcategory": "ticketed_events",
+      "region_coverage": "global (US/EU/AU etc.)",
+      "integration": {
+        "access": "api",
+        "methods": [
+          "rest_api"
+        ],
+        "api_public": true,
+        "auth": "api_key"
+      },
+      "update_frequency": "continuous (real-time via API)",
+      "status": "active",
+      "notes": "Discovery API; broad coverage; includes subsidiaries per doc.",
+      "metrics": {
+        "event_volume_estimate": "~230K events via API (per doc)",
+        "metadata_richness": 5,
+        "update_frequency_score": 5,
+        "accessibility_score": 4,
+        "reliability_score": 5,
+        "dedupe_risk": 2,
+        "legal_risk": 1
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "tiktok_trending_local_experiences",
+      "name": "TikTok (Trending Local Experiences)",
+      "domains": [
+        "tiktok.com"
+      ],
+      "category": "social_media",
+      "subcategory": "trend_signal_local_discovery",
+      "region_coverage": "global",
+      "integration": {
+        "access": "restricted",
+        "methods": [
+          "limited_dev_tools",
+          "third_party_scrape",
+          "hashtag_monitoring"
+        ],
+        "api_public": false
+      },
+      "update_frequency": "continuous (real-time content)",
+      "status": "active",
+      "notes": "Local buzz/hidden gems via Nearby + hashtags; requires unstructured extraction.",
+      "metrics": {
+        "metadata_richness": 2,
+        "update_frequency_score": 5,
+        "accessibility_score": 1,
+        "reliability_score": 3,
+        "dedupe_risk": 4,
+        "legal_risk": 4
+      },
+      "doc_refs": [
+        "Real-Time Event & Experience Discovery Sources_ Mobile Apps & Alternative Platforms.pdf"
+      ]
+    },
+    {
+      "source_id": "todaytix",
+      "name": "TodayTix",
+      "domains": [
+        "todaytix.com"
+      ],
+      "category": "mobile_app",
+      "subcategory": "theatre_ticketing",
+      "region_coverage": "major cities NA/EU + others",
+      "integration": {
+        "access": "semi_open",
+        "methods": [
+          "partner_content_api",
+          "public_endpoints",
+          "web_scrape"
+        ],
+        "api_public": "partner"
+      },
+      "update_frequency": "high (often daily; rush/lottery updates)",
+      "status": "active",
+      "notes": "Theatre & performing arts focus; real-time pricing/availability signals.",
+      "metrics": {
+        "metadata_richness": 5,
+        "update_frequency_score": 4,
+        "accessibility_score": 3,
+        "reliability_score": 4,
+        "dedupe_risk": 2,
+        "legal_risk": 2
+      },
+      "doc_refs": [
+        "Real-Time Event & Experience Discovery Sources_ Mobile Apps & Alternative Platforms.pdf"
+      ]
+    },
+    {
+      "source_id": "travel_apps_culture_trip_atlas_obscura_etc",
+      "name": "Travel Apps (Culture Trip, Atlas Obscura, etc.)",
+      "domains": [
+        "culturetrip.com",
+        "atlasobscura.com"
+      ],
+      "category": "travel_content",
+      "subcategory": "places_and_unusual_experiences",
+      "region_coverage": "global",
+      "integration": {
+        "access": "closed",
+        "methods": [
+          "web_scrape",
+          "manual_ingest"
+        ],
+        "api_public": false
+      },
+      "update_frequency": "moderate",
+      "status": "active",
+      "notes": "Evergreen places + occasional events; novelty/curation layer.",
+      "metrics": {
+        "metadata_richness": 4,
+        "update_frequency_score": 2,
+        "accessibility_score": 2,
+        "reliability_score": 4,
+        "dedupe_risk": 2,
+        "legal_risk": 3
+      },
+      "doc_refs": [
+        "Real-Time Event & Experience Discovery Sources_ Mobile Apps & Alternative Platforms.pdf"
+      ]
+    },
+    {
+      "source_id": "uncover",
+      "name": "Uncover",
+      "domains": [
+        "play.google.com (app listing)"
+      ],
+      "category": "mobile_app",
+      "subcategory": "interest_based_social_meetups",
+      "region_coverage": "emerging Europe (origin Poland)",
+      "integration": {
+        "access": "closed",
+        "methods": [
+          "web_scrape",
+          "manual_sharing"
+        ],
+        "api_public": false
+      },
+      "update_frequency": "moderate (user-hosted + partnered events)",
+      "status": "active",
+      "notes": "Small-group authentic experiences; niche community coverage.",
+      "metrics": {
+        "metadata_richness": 3,
+        "update_frequency_score": 3,
+        "accessibility_score": 2,
+        "reliability_score": 3,
+        "dedupe_risk": 3,
+        "legal_risk": 3
+      },
+      "doc_refs": [
+        "Real-Time Event & Experience Discovery Sources_ Mobile Apps & Alternative Platforms.pdf"
+      ]
+    },
+    {
+      "source_id": "virtual_event_directories_hopin_crowdcast_zoom_events_etc",
+      "name": "Virtual event directories (Hopin, Crowdcast, Zoom Events, etc.)",
+      "domains": [],
+      "category": "virtual_event_platforms",
+      "subcategory": "platform_specific_public_directories",
+      "region_coverage": "global",
+      "integration": {
+        "access": "varies",
+        "methods": [
+          "platform_web_scrape",
+          "partner"
+        ],
+        "api_public": "varies"
+      },
+      "update_frequency": "varies",
+      "status": "active",
+      "notes": "Often have event-management APIs but not public discovery; integrate case-by-case.",
+      "metrics": {
+        "metadata_richness": 3,
+        "update_frequency_score": 3,
+        "accessibility_score": 2,
+        "reliability_score": 3,
+        "dedupe_risk": 3,
+        "legal_risk": 3
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    },
+    {
+      "source_id": "volunteermatch_legacy",
+      "name": "VolunteerMatch (legacy)",
+      "domains": [
+        "volunteermatch.org"
+      ],
+      "category": "volunteering",
+      "subcategory": "volunteer_opportunities",
+      "region_coverage": "US-heavy (some global)",
+      "integration": {
+        "access": "legacy_api",
+        "methods": [
+          "soap_api",
+          "rest_api"
+        ],
+        "api_public": "requires key"
+      },
+      "update_frequency": "as postings update",
+      "status": "active",
+      "notes": "Now integrated with Idealist per doc; legacy feeds may exist for partners.",
+      "metrics": {
+        "metadata_richness": 4,
+        "update_frequency_score": 3,
+        "accessibility_score": 2,
+        "reliability_score": 3,
+        "dedupe_risk": 2,
+        "legal_risk": 1
+      },
+      "doc_refs": [
+        "Sources for Real-Time Event & Experience Data.pdf"
+      ]
+    }
+  ]
+}

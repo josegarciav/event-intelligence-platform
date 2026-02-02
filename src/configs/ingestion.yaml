@@ -4,161 +4,35 @@
 
 sources:
   
+  
   # =========================================================================
-  # RA.CO - Electronic Music Platform
+  # RA.CO SCRAPER - Web scraping-based ingestion
   # =========================================================================
-  ra_co:
+  ra_co_scraper:
     enabled: true
-    base_url: "https://ra.co/graphql"
-    api_key: "${RA_CO_API_KEY}"  # Set via environment variable
-    
+    type: "scraper"
+    scraper_config: "scrapping/configs/sources/ra_co.json"
+
     # HTTP Settings
     request_timeout: 30
     max_retries: 3
-    batch_size: 100
-    rate_limit_per_second: 1.0
-    
+    batch_size: 50
+    rate_limit_per_second: 0.5
+
     # Scheduling
     schedule:
       type: "interval"
-      interval_hours: 6
+      interval_hours: 12
       enabled: true
-      # Alternatively, use cron for more precise scheduling:
-      # type: "cron"
-      # cron: "0 */6 * * *"  # Every 6 hours
-    
+
     # Enrichment options
     enrichment:
-      geocoding: true              # Geocode venues if coordinates missing
-      organizer_metrics: false     # Fetch organizer popularity (future)
-      image_validation: true       # Validate image URLs
-      artist_metadata: false       # Fetch artist info (future)
-    
+      geocoding: true
+
     # Validation rules
     validation:
-      require_coordinates: false   # Soft requirement (warn but don't skip)
-      require_image: false
-      future_events_only: true
-      days_ahead: 90               # Only fetch events within 90 days
-      min_title_length: 3
-      required_fields:
-        - title
-        - location.city
-        - start_datetime
-        - organizer.name
-    
-    # Ra.co-specific settings
-    custom:
-      cities:                       # Cities to fetch events for
-        - "Barcelona"
-        - "Berlin"
-        - "London"
-        - "Amsterdam"
-        - "Paris"
-        - "New York"
-      
-      event_types:                  # Types to prioritize (filter)
-        - "DJ"
-        - "Live"
-        - "Festival"
-        - "Showcase"
-      
-      min_capacity: 0               # Minimum venue capacity
-      include_cancelled: false
-  
-  
-  # =========================================================================
-  # MEETUP - Community Events Platform
-  # =========================================================================
-  meetup:
-    enabled: false
-    base_url: "https://api.meetup.com"
-    api_key: "${MEETUP_API_KEY}"
-    
-    request_timeout: 30
-    max_retries: 3
-    batch_size: 50
-    rate_limit_per_second: 0.5    # Lower rate limit (stricter API)
-    
-    schedule:
-      type: "cron"
-      cron: "0 */4 * * *"           # Every 4 hours
-      enabled: true
-    
-    enrichment:
-      geocoding: true
-      organizer_metrics: true
-      image_validation: true
-    
-    validation:
-      require_coordinates: false
       future_events_only: true
       days_ahead: 60
-      min_attendees: 0              # Minimum confirmed attendees
-    
-    custom:
-      group_ids:                    # Meetup group IDs to monitor
-        - "1234567"
-        - "7654321"
-      
-      categories:                   # Event categories
-        - "tech"
-        - "music"
-        - "sports"
-        - "arts"
-        - "food"
-      
-      topics:                       # Topics to include
-        - "technology"
-        - "networking"
-        - "dancing"
-      
-      min_rsvp_count: 5
-      include_past_events: false
-
-
-  # =========================================================================
-  # TICKETMASTER - Ticketing Platform
-  # =========================================================================
-  ticketmaster:
-    enabled: false                  # Not yet implemented
-    base_url: "https://app.ticketmaster.com/discovery/v2"
-    api_key: "${TICKETMASTER_API_KEY}"
-    
-    request_timeout: 30
-    max_retries: 3
-    batch_size: 200
-    rate_limit_per_second: 2.0
-    
-    schedule:
-      type: "interval"
-      interval_hours: 12
-      enabled: false
-    
-    enrichment:
-      geocoding: false
-      organizer_metrics: false
-      image_validation: true
-    
-    validation:
-      require_image: true           # Ticketmaster usually has images
-      future_events_only: true
-      days_ahead: 180               # Ticketmaster has longer lead times
-    
-    custom:
-      countries:
-        - "US"
-        - "GB"
-      
-      classifiers:                  # Event classifications to include
-        - "music"
-        - "sports"
-        - "arts"
-      
-      markets:                      # Market IDs
-        - "1"      # Metropolitan areas
-        - "2"
-
 
 # =========================================================================
 # GLOBAL SETTINGS
