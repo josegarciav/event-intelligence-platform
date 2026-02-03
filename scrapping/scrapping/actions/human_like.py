@@ -15,7 +15,7 @@ from __future__ import annotations
 import random
 import time
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional, Tuple
+from typing import Any, Optional, Tuple
 
 
 @dataclass
@@ -23,6 +23,7 @@ class HumanLikeOptions:
     """
     Controls how "human" the interactions feel.
     """
+
     seed: Optional[int] = None
 
     # delay ranges
@@ -85,7 +86,9 @@ class HumanLike:
     def random_scroll_delta(self) -> int:
         return self._rnd.randint(self.opts.scroll_min_px, self.opts.scroll_max_px)
 
-    def scroll_wheel(self, page: Any, *, repeats: int = 5, direction: str = "down") -> None:
+    def scroll_wheel(
+        self, page: Any, *, repeats: int = 5, direction: str = "down"
+    ) -> None:
         """
         Playwright: page.mouse.wheel(0, delta)
         For other drivers, wrap/adapter later.
@@ -109,7 +112,9 @@ class HumanLike:
     # Mouse drift
     # -------------------------
 
-    def mouse_drift(self, page: Any, *, bounds: Optional[Tuple[int, int]] = None) -> None:
+    def mouse_drift(
+        self, page: Any, *, bounds: Optional[Tuple[int, int]] = None
+    ) -> None:
         """
         Small random drift to mimic human mouse movement.
 
@@ -117,8 +122,12 @@ class HumanLike:
         """
         steps = self._rnd.randint(*self.opts.drift_steps)
         for _ in range(steps):
-            dx = self._rnd.randint(*self.opts.drift_step_px) * (1 if self._rnd.random() > 0.5 else -1)
-            dy = self._rnd.randint(*self.opts.drift_step_px) * (1 if self._rnd.random() > 0.5 else -1)
+            dx = self._rnd.randint(*self.opts.drift_step_px) * (
+                1 if self._rnd.random() > 0.5 else -1
+            )
+            dy = self._rnd.randint(*self.opts.drift_step_px) * (
+                1 if self._rnd.random() > 0.5 else -1
+            )
 
             try:
                 # Playwright mouse.move expects absolute coords, so we do relative using current pos if available.
@@ -140,7 +149,9 @@ class HumanLike:
     # Typing
     # -------------------------
 
-    def type_text(self, page: Any, selector: str, text: str, *, clear: bool = True) -> None:
+    def type_text(
+        self, page: Any, selector: str, text: str, *, clear: bool = True
+    ) -> None:
         """
         Types text with per-character delays.
 
@@ -156,7 +167,11 @@ class HumanLike:
         # Prefer type() because it triggers key events more naturally than fill()
         try:
             for ch in text:
-                page.type(selector, ch, delay=int(self._rnd.uniform(*self.opts.type_delay_s) * 1000))
+                page.type(
+                    selector,
+                    ch,
+                    delay=int(self._rnd.uniform(*self.opts.type_delay_s) * 1000),
+                )
             return
         except Exception:
             # fallback

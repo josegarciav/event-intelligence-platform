@@ -22,17 +22,14 @@ Later:
 
 from __future__ import annotations
 
-import json
-import os
 import platform
 import sys
 import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from scrapping.engines.base import EngineContext
 from scrapping.engines.http import HttpEngine, HttpEngineOptions
 from scrapping.engines.browser import BrowserEngine, BrowserEngineOptions
 from scrapping.engines.hybrid import HybridEngine, HybridEngineOptions
@@ -58,13 +55,16 @@ from scrapping.monitoring.logging import (
     add_source_file_handler,
     with_context,
 )
-from scrapping.monitoring.metrics import MetricsRegistry
-from scrapping.monitoring.reporting import RunReportBuilder, SourceReport, exception_to_error_dict
-
+from scrapping.monitoring.reporting import (
+    RunReportBuilder,
+    SourceReport,
+    exception_to_error_dict,
+)
 
 # ---------------------------------------------------------------------
 # Options
 # ---------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class OrchestratorOptions:
@@ -82,6 +82,7 @@ class OrchestratorOptions:
 # ---------------------------------------------------------------------
 # Config validation (V1)
 # ---------------------------------------------------------------------
+
 
 def validate_config(cfg: Dict[str, Any], *, verbose: bool = False) -> Dict[str, Any]:
     """
@@ -104,51 +105,122 @@ def validate_config(cfg: Dict[str, Any], *, verbose: bool = False) -> Dict[str, 
     issues: List[Dict[str, Any]] = []
 
     if not isinstance(cfg, dict):
-        return {"ok": False, "issues": [{"level": "error", "code": "bad_root", "msg": "config root must be an object"}]}
+        return {
+            "ok": False,
+            "issues": [
+                {
+                    "level": "error",
+                    "code": "bad_root",
+                    "msg": "config root must be an object",
+                }
+            ],
+        }
 
     sources = cfg.get("sources")
     if not isinstance(sources, list) or not sources:
-        issues.append({"level": "error", "code": "missing_sources", "msg": "config must contain non-empty 'sources' list"})
+        issues.append(
+            {
+                "level": "error",
+                "code": "missing_sources",
+                "msg": "config must contain non-empty 'sources' list",
+            }
+        )
         return {"ok": False, "issues": issues}
 
     seen_ids = set()
     for i, s in enumerate(sources):
         if not isinstance(s, dict):
-            issues.append({"level": "error", "code": "bad_source", "msg": f"source[{i}] must be an object"})
+            issues.append(
+                {
+                    "level": "error",
+                    "code": "bad_source",
+                    "msg": f"source[{i}] must be an object",
+                }
+            )
             continue
 
         sid = s.get("source_id")
         if not sid or not isinstance(sid, str):
-            issues.append({"level": "error", "code": "missing_source_id", "msg": f"source[{i}] missing 'source_id'"})
+            issues.append(
+                {
+                    "level": "error",
+                    "code": "missing_source_id",
+                    "msg": f"source[{i}] missing 'source_id'",
+                }
+            )
             continue
 
         if sid in seen_ids:
-            issues.append({"level": "error", "code": "duplicate_source_id", "msg": f"duplicate source_id: {sid}"})
+            issues.append(
+                {
+                    "level": "error",
+                    "code": "duplicate_source_id",
+                    "msg": f"duplicate source_id: {sid}",
+                }
+            )
         seen_ids.add(sid)
 
         eng = s.get("engine") or {}
         et = str(eng.get("type", "http")).lower().strip()
         if et not in ("http", "browser", "hybrid"):
-            issues.append({"level": "error", "code": "bad_engine_type", "msg": f"{sid}: engine.type must be http|browser|hybrid"})
+            issues.append(
+                {
+                    "level": "error",
+                    "code": "bad_engine_type",
+                    "msg": f"{sid}: engine.type must be http|browser|hybrid",
+                }
+            )
 
         entrypoints = s.get("entrypoints")
         if not isinstance(entrypoints, list) or not entrypoints:
-            issues.append({"level": "error", "code": "missing_entrypoints", "msg": f"{sid}: missing 'entrypoints' list"})
+            issues.append(
+                {
+                    "level": "error",
+                    "code": "missing_entrypoints",
+                    "msg": f"{sid}: missing 'entrypoints' list",
+                }
+            )
         else:
             # check that at least one has url
             if not any(isinstance(ep, dict) and ep.get("url") for ep in entrypoints):
-                issues.append({"level": "error", "code": "bad_entrypoints", "msg": f"{sid}: entrypoints must include at least one object with 'url'"})
+                issues.append(
+                    {
+                        "level": "error",
+                        "code": "bad_entrypoints",
+                        "msg": f"{sid}: entrypoints must include at least one object with 'url'",
+                    }
+                )
 
         discovery = s.get("discovery") or {}
-        link_extract = discovery.get("link_extract") if isinstance(discovery, dict) else None
+        link_extract = (
+            discovery.get("link_extract") if isinstance(discovery, dict) else None
+        )
         if not isinstance(link_extract, dict):
-            issues.append({"level": "warning", "code": "missing_link_extract", "msg": f"{sid}: discovery.link_extract not set; pipeline may find no links"})
+            issues.append(
+                {
+                    "level": "warning",
+                    "code": "missing_link_extract",
+                    "msg": f"{sid}: discovery.link_extract not set; pipeline may find no links",
+                }
+            )
         else:
             method = str(link_extract.get("method", "regex")).lower()
             if method == "regex" and not link_extract.get("pattern"):
-                issues.append({"level": "warning", "code": "regex_no_pattern", "msg": f"{sid}: link_extract.method=regex but no pattern provided"})
+                issues.append(
+                    {
+                        "level": "warning",
+                        "code": "regex_no_pattern",
+                        "msg": f"{sid}: link_extract.method=regex but no pattern provided",
+                    }
+                )
             if method in ("css", "xpath") and not link_extract.get("selector"):
-                issues.append({"level": "warning", "code": "selector_missing", "msg": f"{sid}: link_extract.method={method} but no selector provided"})
+                issues.append(
+                    {
+                        "level": "warning",
+                        "code": "selector_missing",
+                        "msg": f"{sid}: link_extract.method={method} but no selector provided",
+                    }
+                )
 
     ok = not any(x["level"] == "error" for x in issues)
     out = {"ok": ok, "issues": issues}
@@ -161,6 +233,7 @@ def validate_config(cfg: Dict[str, Any], *, verbose: bool = False) -> Dict[str, 
 # ---------------------------------------------------------------------
 # Doctor
 # ---------------------------------------------------------------------
+
 
 def doctor_environment(*, verbose: bool = False) -> Dict[str, Any]:
     """
@@ -197,7 +270,9 @@ def doctor_environment(*, verbose: bool = False) -> Dict[str, Any]:
     info["checks"]["playwright"] = {"ok": ok_pw, "msg": msg_pw}
     if ok_pw and verbose:
         # We cannot run `playwright install` here; just suggest.
-        info["checks"]["playwright"]["hint"] = "If browser binaries missing: run `playwright install`"
+        info["checks"]["playwright"][
+            "hint"
+        ] = "If browser binaries missing: run `playwright install`"
 
     return info
 
@@ -205,6 +280,7 @@ def doctor_environment(*, verbose: bool = False) -> Dict[str, Any]:
 # ---------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------
+
 
 class Orchestrator:
     def __init__(self, *, options: Optional[OrchestratorOptions] = None) -> None:
@@ -233,11 +309,13 @@ class Orchestrator:
         log = with_context(logger, run_id=run_id)
 
         report = RunReportBuilder(run_id=run_id)
-        report.meta.update({
-            "results_dir": str(Path(self.options.results_dir).resolve()),
-            "parallelism": self.options.parallelism,
-            "dry_run": self.options.dry_run,
-        })
+        report.meta.update(
+            {
+                "results_dir": str(Path(self.options.results_dir).resolve()),
+                "parallelism": self.options.parallelism,
+                "dry_run": self.options.dry_run,
+            }
+        )
 
         # run_meta.json (static run info)
         run_meta = {
@@ -253,7 +331,9 @@ class Orchestrator:
         sources = cfg.get("sources") or []
         if self.options.only_sources:
             only = set(self.options.only_sources)
-            sources = [s for s in sources if isinstance(s, dict) and s.get("source_id") in only]
+            sources = [
+                s for s in sources if isinstance(s, dict) and s.get("source_id") in only
+            ]
 
         if not sources:
             report.finish()
@@ -279,13 +359,19 @@ class Orchestrator:
             slog = with_context(logger, run_id=run_id, source_id=source_id)
 
             # per-source log file
-            add_source_file_handler(logger, layout, run_id=run_id, source_id=source_id, options=log_opts)
+            add_source_file_handler(
+                logger, layout, run_id=run_id, source_id=source_id, options=log_opts
+            )
 
             # source meta
             try:
-                write_source_meta(layout, run_id, source_id, meta=s, options=writer_opts)
+                write_source_meta(
+                    layout, run_id, source_id, meta=s, options=writer_opts
+                )
             except Exception as e:
-                slog.error("Failed writing source meta", extra={"payload": {"error": str(e)}})
+                slog.error(
+                    "Failed writing source meta", extra={"payload": {"error": str(e)}}
+                )
 
             # SourceReport setup
             sr = SourceReport(source_id=source_id, ok=False)
@@ -303,7 +389,9 @@ class Orchestrator:
                 engine = self._build_engine_from_source(s)
                 try:
                     slog.info("Running pipeline")
-                    with report.metrics.time("source.run", labels={"source_id": source_id}):
+                    with report.metrics.time(
+                        "source.run", labels={"source_id": source_id}
+                    ):
                         artifacts = run_pipeline_v1(
                             s,
                             engine=engine,
@@ -318,32 +406,76 @@ class Orchestrator:
 
                 # Write artifacts
                 storage_cfg = s.get("storage") or {}
-                items_fmt = self.options.items_format_override or storage_cfg.get("items_format") or "jsonl"
+                items_fmt = (
+                    self.options.items_format_override
+                    or storage_cfg.get("items_format")
+                    or "jsonl"
+                )
                 items_fmt = str(items_fmt).lower()
 
                 # raw pages
-                listing_records = [{"url": lp.url, **fetchresult_to_raw_record(lp.fetch)} for lp in artifacts.listing_pages]
-                detail_records = [{"url": dp.url, **fetchresult_to_raw_record(dp.fetch)} for dp in artifacts.detail_pages]
+                listing_records = [
+                    {"url": lp.url, **fetchresult_to_raw_record(lp.fetch)}
+                    for lp in artifacts.listing_pages
+                ]
+                detail_records = [
+                    {"url": dp.url, **fetchresult_to_raw_record(dp.fetch)}
+                    for dp in artifacts.detail_pages
+                ]
 
                 lp_paths = write_raw_pages_jsonl(
-                    layout, run_id, source_id,
+                    layout,
+                    run_id,
+                    source_id,
                     kind="listing",
                     pages=listing_records,
-                    options=writer_opts
+                    options=writer_opts,
                 )
                 dp_paths = write_raw_pages_jsonl(
-                    layout, run_id, source_id,
+                    layout,
+                    run_id,
+                    source_id,
                     kind="detail",
                     pages=detail_records,
-                    options=writer_opts
+                    options=writer_opts,
                 )
 
                 # links + items
-                links_path = write_links(layout, run_id, source_id, artifacts.extracted_links, options=writer_opts)
+                links_path = write_links(
+                    layout,
+                    run_id,
+                    source_id,
+                    artifacts.extracted_links,
+                    options=writer_opts,
+                )
 
-                items_path = write_items(layout, run_id, source_id, name="items", items=artifacts.items, fmt=items_fmt, options=writer_opts)
-                valid_path = write_items(layout, run_id, source_id, name="items_valid", items=artifacts.valid_items, fmt=items_fmt, options=writer_opts)
-                dropped_path = write_items(layout, run_id, source_id, name="items_dropped", items=artifacts.dropped_items, fmt=items_fmt, options=writer_opts)
+                items_path = write_items(
+                    layout,
+                    run_id,
+                    source_id,
+                    name="items",
+                    items=artifacts.items,
+                    fmt=items_fmt,
+                    options=writer_opts,
+                )
+                valid_path = write_items(
+                    layout,
+                    run_id,
+                    source_id,
+                    name="items_valid",
+                    items=artifacts.valid_items,
+                    fmt=items_fmt,
+                    options=writer_opts,
+                )
+                dropped_path = write_items(
+                    layout,
+                    run_id,
+                    source_id,
+                    name="items_dropped",
+                    items=artifacts.dropped_items,
+                    fmt=items_fmt,
+                    options=writer_opts,
+                )
 
                 # report stats
                 sr.ok = True
@@ -370,7 +502,7 @@ class Orchestrator:
 
                 slog.info(
                     "Source done",
-                    extra={"payload": {"stats": sr.stats, "artifacts": sr.artifacts}}
+                    extra={"payload": {"stats": sr.stats, "artifacts": sr.artifacts}},
                 )
 
             except Exception as e:
@@ -389,7 +521,10 @@ class Orchestrator:
 
         # Summarize
         summary = run_report_dict.get("summary") or {}
-        log.info("Run completed", extra={"payload": {"summary": summary, "run_report_path": str(rp)}})
+        log.info(
+            "Run completed",
+            extra={"payload": {"summary": summary, "run_report_path": str(rp)}},
+        )
 
         return {
             "ok": overall_ok,
@@ -414,7 +549,10 @@ class Orchestrator:
         retry_policy = eng.get("retry_policy") or {}
         max_retries = int(retry_policy.get("max_retries", 3))
         backoff_mode = str(retry_policy.get("backoff", "exp"))
-        retry_on_status = tuple(int(x) for x in (retry_policy.get("retry_on_status") or (429, 500, 502, 503, 504)))
+        retry_on_status = tuple(
+            int(x)
+            for x in (retry_policy.get("retry_on_status") or (429, 500, 502, 503, 504))
+        )
 
         rate = eng.get("rate_limit_policy") or {}
         rps = rate.get("rps", None)
@@ -456,7 +594,9 @@ class Orchestrator:
         if et == "browser":
             return BrowserEngine(options=browser_opts)
         if et == "hybrid":
-            return HybridEngine(options=HybridEngineOptions(http=http_opts, browser=browser_opts))
+            return HybridEngine(
+                options=HybridEngineOptions(http=http_opts, browser=browser_opts)
+            )
 
         # fallback
         return HttpEngine(options=http_opts)

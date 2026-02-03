@@ -65,7 +65,9 @@ def migrate_to_latest(cfg: JsonDict) -> Tuple[JsonDict, MigrationReport]:
         new_cfg["config_version"] = LATEST_VERSION
         applied.append(f"set_version:{LATEST_VERSION}")
 
-    return new_cfg, MigrationReport(source_id, get_config_version(cfg), LATEST_VERSION, applied)
+    return new_cfg, MigrationReport(
+        source_id, get_config_version(cfg), LATEST_VERSION, applied
+    )
 
 
 # Example placeholder for future:

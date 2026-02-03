@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional
 
 from scrapping.engines.http import HttpEngine, HttpEngineOptions
 from scrapping.engines.browser import BrowserEngine, BrowserEngineOptions
@@ -37,10 +37,10 @@ from scrapping.extraction.link_extractors import LinkExtractRequest, extract_lin
 from scrapping.processing.html_to_structured import html_to_structured
 from scrapping.processing.quality_filters import evaluate_quality
 
-
 # -----------------------------
 # Test plan schema (V1)
 # -----------------------------
+
 
 @dataclass
 class TestCase:
@@ -78,6 +78,7 @@ class TestPlan:
 # Agent: generate tests from config
 # -----------------------------
 
+
 class TestsAgent:
     def __init__(self) -> None:
         pass
@@ -97,58 +98,74 @@ class TestsAgent:
         tests: List[TestCase] = []
 
         if first_url:
-            tests.append(TestCase(
-                test_id=f"{source_id}:listing_links",
-                kind="listing_links",
-                target_url=first_url,
-                expectations={
-                    "min_links": 5,
-                    "max_links": 5000,
-                },
-                notes="Fetch listing page and ensure link extraction yields a reasonable count.",
-            ))
+            tests.append(
+                TestCase(
+                    test_id=f"{source_id}:listing_links",
+                    kind="listing_links",
+                    target_url=first_url,
+                    expectations={
+                        "min_links": 5,
+                        "max_links": 5000,
+                    },
+                    notes="Fetch listing page and ensure link extraction yields a reasonable count.",
+                )
+            )
 
         # If config provides known detail sample URLs, include them.
         detail_samples = source_cfg.get("test_samples") or {}
-        detail_urls = detail_samples.get("detail_urls") if isinstance(detail_samples, dict) else None
+        detail_urls = (
+            detail_samples.get("detail_urls")
+            if isinstance(detail_samples, dict)
+            else None
+        )
         if isinstance(detail_urls, list):
             for i, u in enumerate(detail_urls[:5]):
-                tests.append(TestCase(
-                    test_id=f"{source_id}:detail_quality:{i}",
-                    kind="detail_quality",
-                    target_url=str(u),
-                    expectations={
-                        "min_text_len": 250,
-                        "max_boilerplate_ratio": float((source_cfg.get("quality") or {}).get("max_boilerplate_ratio", 0.85)),
-                        "keep": True,
-                    },
-                    notes="Fetch detail page and ensure structured extraction passes QA.",
-                ))
+                tests.append(
+                    TestCase(
+                        test_id=f"{source_id}:detail_quality:{i}",
+                        kind="detail_quality",
+                        target_url=str(u),
+                        expectations={
+                            "min_text_len": 250,
+                            "max_boilerplate_ratio": float(
+                                (source_cfg.get("quality") or {}).get(
+                                    "max_boilerplate_ratio", 0.85
+                                )
+                            ),
+                            "keep": True,
+                        },
+                        notes="Fetch detail page and ensure structured extraction passes QA.",
+                    )
+                )
 
         # Basic blocked-page detection on entrypoint (helps catch CAPTCHAs)
         if first_url:
-            tests.append(TestCase(
-                test_id=f"{source_id}:blocked_page",
-                kind="blocked_page",
-                target_url=first_url,
-                expectations={
-                    "blocked": False,
-                },
-                notes="Ensure listing page is not a captcha/login wall.",
-            ))
+            tests.append(
+                TestCase(
+                    test_id=f"{source_id}:blocked_page",
+                    kind="blocked_page",
+                    target_url=first_url,
+                    expectations={
+                        "blocked": False,
+                    },
+                    notes="Ensure listing page is not a captcha/login wall.",
+                )
+            )
 
         # Optional: smoke pipeline test (single URL run, single page)
         if first_url:
-            tests.append(TestCase(
-                test_id=f"{source_id}:smoke_pipeline",
-                kind="smoke_pipeline",
-                target_url=first_url,
-                expectations={
-                    "pipeline_ok": True,
-                    "min_items_saved": 1,
-                },
-                notes="Runs a minimal pipeline-like sequence: fetch listing -> extract links -> fetch first detail -> parse+QA.",
-            ))
+            tests.append(
+                TestCase(
+                    test_id=f"{source_id}:smoke_pipeline",
+                    kind="smoke_pipeline",
+                    target_url=first_url,
+                    expectations={
+                        "pipeline_ok": True,
+                        "min_items_saved": 1,
+                    },
+                    notes="Runs a minimal pipeline-like sequence: fetch listing -> extract links -> fetch first detail -> parse+QA.",
+                )
+            )
 
         return TestPlan(source_id=source_id, created_at_s=time.time(), tests=tests)
 
@@ -156,7 +173,9 @@ class TestsAgent:
     # Runner: execute tests
     # -----------------------------
 
-    def run_plan(self, source_cfg: Dict[str, Any], plan: TestPlan, *, max_detail_fetch: int = 1) -> Dict[str, Any]:
+    def run_plan(
+        self, source_cfg: Dict[str, Any], plan: TestPlan, *, max_detail_fetch: int = 1
+    ) -> Dict[str, Any]:
         """
         Execute test plan against real network (CI / local).
 
@@ -170,7 +189,9 @@ class TestsAgent:
         try:
             for t in plan.tests:
                 try:
-                    r = self._run_one_test(source_cfg, engine, t, max_detail_fetch=max_detail_fetch)
+                    r = self._run_one_test(
+                        source_cfg, engine, t, max_detail_fetch=max_detail_fetch
+                    )
                     results.append(r)
                     if not r.get("ok", False):
                         failures.append(r)
@@ -196,17 +217,35 @@ class TestsAgent:
             "failures": failures,
         }
 
-    def _run_one_test(self, source_cfg: Dict[str, Any], engine: Any, test: TestCase, *, max_detail_fetch: int) -> Dict[str, Any]:
+    def _run_one_test(
+        self,
+        source_cfg: Dict[str, Any],
+        engine: Any,
+        test: TestCase,
+        *,
+        max_detail_fetch: int,
+    ) -> Dict[str, Any]:
         kind = test.kind
         url = test.target_url
 
         # fetch listing (rendered if browser/hybrid)
-        rendered = str((source_cfg.get("engine") or {}).get("type", "http")).lower() in ("browser", "hybrid")
-        fr = engine.get_rendered(url, ctx=None) if rendered else engine.get(url, ctx=None)
+        rendered = str(
+            (source_cfg.get("engine") or {}).get("type", "http")
+        ).lower() in ("browser", "hybrid")
+        fr = (
+            engine.get_rendered(url, ctx=None)
+            if rendered
+            else engine.get(url, ctx=None)
+        )
 
         if kind == "listing_links":
             if not fr.ok or not fr.text:
-                return {"test_id": test.test_id, "ok": False, "reason": "fetch_failed", "status_code": fr.status_code}
+                return {
+                    "test_id": test.test_id,
+                    "ok": False,
+                    "reason": "fetch_failed",
+                    "status_code": fr.status_code,
+                }
 
             le = (source_cfg.get("discovery") or {}).get("link_extract") or {}
             req = LinkExtractRequest(
@@ -241,15 +280,20 @@ class TestsAgent:
             item = {"url": url, "title": None, "text": fr.text}
             q = evaluate_quality(item, rules={"min_text_len": 50})
             blocked_expected = bool(test.expectations.get("blocked", False))
-            blocked_detected = not q.keep and any(i.code == "blocked_page" for i in q.issues)
+            blocked_detected = not q.keep and any(
+                i.code == "blocked_page" for i in q.issues
+            )
 
-            ok = (blocked_detected == blocked_expected)
+            ok = blocked_detected == blocked_expected
             return {
                 "test_id": test.test_id,
                 "ok": ok,
                 "blocked_detected": blocked_detected,
                 "expected_blocked": blocked_expected,
-                "issues": [{"level": i.level, "code": i.code, "message": i.message} for i in q.issues],
+                "issues": [
+                    {"level": i.level, "code": i.code, "message": i.message}
+                    for i in q.issues
+                ],
             }
 
         if kind == "detail_quality":
@@ -268,13 +312,19 @@ class TestsAgent:
 
             rules = dict(source_cfg.get("quality") or {})
             # test expectations can override
-            rules["min_text_len"] = int(test.expectations.get("min_text_len", rules.get("min_text_len", 250)))
-            rules["max_boilerplate_ratio"] = float(test.expectations.get("max_boilerplate_ratio", rules.get("max_boilerplate_ratio", 0.85)))
+            rules["min_text_len"] = int(
+                test.expectations.get("min_text_len", rules.get("min_text_len", 250))
+            )
+            rules["max_boilerplate_ratio"] = float(
+                test.expectations.get(
+                    "max_boilerplate_ratio", rules.get("max_boilerplate_ratio", 0.85)
+                )
+            )
 
             q = evaluate_quality(item, rules=rules)
 
             expected_keep = bool(test.expectations.get("keep", True))
-            ok = (q.keep == expected_keep)
+            ok = q.keep == expected_keep
 
             return {
                 "test_id": test.test_id,
@@ -282,13 +332,20 @@ class TestsAgent:
                 "keep": q.keep,
                 "expected_keep": expected_keep,
                 "text_len": len(item.get("text") or ""),
-                "issues": [{"level": i.level, "code": i.code, "message": i.message} for i in q.issues],
+                "issues": [
+                    {"level": i.level, "code": i.code, "message": i.message}
+                    for i in q.issues
+                ],
             }
 
         if kind == "smoke_pipeline":
             # minimal pipeline-like sequence on one listing + one detail
             if not fr.ok or not fr.text:
-                return {"test_id": test.test_id, "ok": False, "reason": "listing_fetch_failed"}
+                return {
+                    "test_id": test.test_id,
+                    "ok": False,
+                    "reason": "listing_fetch_failed",
+                }
 
             le = (source_cfg.get("discovery") or {}).get("link_extract") or {}
             req = LinkExtractRequest(
@@ -302,13 +359,26 @@ class TestsAgent:
             )
             links = extract_links(req)
             if not links:
-                return {"test_id": test.test_id, "ok": False, "reason": "no_links_extracted"}
+                return {
+                    "test_id": test.test_id,
+                    "ok": False,
+                    "reason": "no_links_extracted",
+                }
 
             # fetch first detail
             detail_url = links[0]
-            fr2 = engine.get_rendered(detail_url, ctx=None) if rendered else engine.get(detail_url, ctx=None)
+            fr2 = (
+                engine.get_rendered(detail_url, ctx=None)
+                if rendered
+                else engine.get(detail_url, ctx=None)
+            )
             if not fr2.ok or not fr2.text:
-                return {"test_id": test.test_id, "ok": False, "reason": "detail_fetch_failed", "detail_url": detail_url}
+                return {
+                    "test_id": test.test_id,
+                    "ok": False,
+                    "reason": "detail_fetch_failed",
+                    "detail_url": detail_url,
+                }
 
             parse_cfg = source_cfg.get("parse") or {}
             doc = html_to_structured(
@@ -333,15 +403,23 @@ class TestsAgent:
                 "items_saved": items_saved,
                 "min_items_saved": mn_items,
                 "detail_url": detail_url,
-                "issues": [{"level": i.level, "code": i.code, "message": i.message} for i in q.issues],
+                "issues": [
+                    {"level": i.level, "code": i.code, "message": i.message}
+                    for i in q.issues
+                ],
             }
 
-        return {"test_id": test.test_id, "ok": False, "reason": f"unknown_test_kind:{kind}"}
+        return {
+            "test_id": test.test_id,
+            "ok": False,
+            "reason": f"unknown_test_kind:{kind}",
+        }
 
 
 # -----------------------------
 # Engine builder (local to tests)
 # -----------------------------
+
 
 def _build_engine(source_cfg: Dict[str, Any]):
     eng = source_cfg.get("engine") or {}
@@ -383,13 +461,16 @@ def _build_engine(source_cfg: Dict[str, Any]):
     if et == "browser":
         return BrowserEngine(options=browser_opts)
     if et == "hybrid":
-        return HybridEngine(options=HybridEngineOptions(http=http_opts, browser=browser_opts))
+        return HybridEngine(
+            options=HybridEngineOptions(http=http_opts, browser=browser_opts)
+        )
     return HttpEngine(options=http_opts)
 
 
 def _guess_base(url: str) -> Optional[str]:
     try:
         from urllib.parse import urlparse
+
         p = urlparse(url)
         if not p.scheme or not p.netloc:
             return None

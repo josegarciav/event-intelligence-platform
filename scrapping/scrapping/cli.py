@@ -19,8 +19,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -31,23 +29,46 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
 
     # run
     pr = sub.add_parser("run", help="Run scraping pipeline")
-    pr.add_argument("--config", "-c", required=True, help="Path to JSON config (single file)")
-    pr.add_argument("--results", "-o", default="results", help="Results output directory")
-    pr.add_argument("--parallelism", "-p", type=int, default=16, help="Parallelism for fetch/detail")
+    pr.add_argument(
+        "--config", "-c", required=True, help="Path to JSON config (single file)"
+    )
+    pr.add_argument(
+        "--results", "-o", default="results", help="Results output directory"
+    )
+    pr.add_argument(
+        "--parallelism", "-p", type=int, default=16, help="Parallelism for fetch/detail"
+    )
     pr.add_argument("--only", nargs="*", default=None, help="Run only these source_ids")
     pr.add_argument("--json-logs", action="store_true", help="Emit JSON logs")
-    pr.add_argument("--strict", action="store_true", help="Fail if optional deps are missing for requested outputs")
-    pr.add_argument("--items-format", default=None, choices=["jsonl", "csv", "parquet"], help="Override items output format")
-    pr.add_argument("--dry-run", action="store_true", help="Do not fetch; only validate+plan (no network calls)")
+    pr.add_argument(
+        "--strict",
+        action="store_true",
+        help="Fail if optional deps are missing for requested outputs",
+    )
+    pr.add_argument(
+        "--items-format",
+        default=None,
+        choices=["jsonl", "csv", "parquet"],
+        help="Override items output format",
+    )
+    pr.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Do not fetch; only validate+plan (no network calls)",
+    )
 
     # validate
     pv = sub.add_parser("validate", help="Validate config file(s)")
     pv.add_argument("--config", "-c", required=True, help="Path to JSON config")
-    pv.add_argument("--verbose", "-v", action="store_true", help="Print parsed config summary")
+    pv.add_argument(
+        "--verbose", "-v", action="store_true", help="Print parsed config summary"
+    )
 
     # doctor
     pd = sub.add_parser("doctor", help="Check environment readiness")
-    pd.add_argument("--verbose", "-v", action="store_true", help="Print extra diagnostics")
+    pd.add_argument(
+        "--verbose", "-v", action="store_true", help="Print extra diagnostics"
+    )
 
     return p.parse_args(argv)
 
@@ -99,13 +120,19 @@ def main(argv: Optional[list[str]] = None) -> int:
         run_out = orch.run(cfg)
 
         # Print final run report path + summary
-        print(json.dumps({
-            "ok": run_out.get("ok", False),
-            "run_id": run_out.get("run_id"),
-            "run_dir": run_out.get("run_dir"),
-            "run_report_path": run_out.get("run_report_path"),
-            "summary": run_out.get("summary"),
-        }, indent=2, ensure_ascii=False))
+        print(
+            json.dumps(
+                {
+                    "ok": run_out.get("ok", False),
+                    "run_id": run_out.get("run_id"),
+                    "run_dir": run_out.get("run_dir"),
+                    "run_report_path": run_out.get("run_report_path"),
+                    "summary": run_out.get("summary"),
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+        )
 
         return 0 if run_out.get("ok", False) else 1
 

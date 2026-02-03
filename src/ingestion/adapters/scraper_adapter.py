@@ -4,13 +4,12 @@ Scraper Source Adapter.
 Adapter for fetching data from web scraping sources using Playwright.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Callable, Dict, Optional
 import logging
 
 from .base_adapter import BaseSourceAdapter, AdapterConfig, FetchResult, SourceType
-
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +19,7 @@ class ScraperAdapterConfig(AdapterConfig):
     """
     Configuration for scraper-based adapters.
     """
+
     base_url: str = ""
     url_pattern: str = ""
     url_identifier: str = ""

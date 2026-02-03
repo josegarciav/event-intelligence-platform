@@ -22,11 +22,12 @@ import logging
 import uuid
 
 from src.ingestion.normalization.event_schema import EventSchema
-from src.ingestion.adapters import BaseSourceAdapter, SourceType, FetchResult
+from src.ingestion.adapters import BaseSourceAdapter, SourceType
 
 
 class PipelineStatus(str, Enum):
     """Status of a pipeline execution."""
+
     PENDING = "pending"
     RUNNING = "running"
     SUCCESS = "success"
@@ -41,6 +42,7 @@ class PipelineConfig:
 
     This is pipeline-level config, separate from adapter-level config.
     """
+
     source_name: str
     source_type: SourceType = SourceType.API
     request_timeout: int = 30
@@ -55,6 +57,7 @@ class PipelineConfig:
 @dataclass
 class PipelineExecutionResult:
     """Result of a pipeline execution."""
+
     status: PipelineStatus
     source_name: str
     source_type: SourceType
@@ -234,7 +237,9 @@ class BasePipeline(ABC):
                     execution_id=self.execution_id,
                     started_at=self.execution_start_time,
                     ended_at=datetime.utcnow(),
-                    errors=[{"error": e, "stage": "fetch"} for e in fetch_result.errors],
+                    errors=[
+                        {"error": e, "stage": "fetch"} for e in fetch_result.errors
+                    ],
                     metadata=fetch_result.metadata,
                 )
 
@@ -245,14 +250,26 @@ class BasePipeline(ABC):
 
             # Step 7: Deduplication
             if self.config.deduplicate and normalized_events:
-                from src.ingestion.deduplication import get_deduplicator, DeduplicationStrategy
-                deduplicator = get_deduplicator(DeduplicationStrategy(self.config.deduplication_strategy))
+                from src.ingestion.deduplication import (
+                    get_deduplicator,
+                    DeduplicationStrategy,
+                )
+
+                deduplicator = get_deduplicator(
+                    DeduplicationStrategy(self.config.deduplication_strategy)
+                )
                 before_count = len(normalized_events)
                 normalized_events = deduplicator.deduplicate(normalized_events)
-                self.logger.info(f"Deduplication: {before_count} -> {len(normalized_events)} events")
+                self.logger.info(
+                    f"Deduplication: {before_count} -> {len(normalized_events)} events"
+                )
 
-            status = PipelineStatus.SUCCESS if normalized_events else PipelineStatus.FAILED
-            if normalized_events and len(normalized_events) < len(fetch_result.raw_data):
+            status = (
+                PipelineStatus.SUCCESS if normalized_events else PipelineStatus.FAILED
+            )
+            if normalized_events and len(normalized_events) < len(
+                fetch_result.raw_data
+            ):
                 status = PipelineStatus.PARTIAL_SUCCESS
 
             result = PipelineExecutionResult(
@@ -304,14 +321,18 @@ class BasePipeline(ABC):
                 primary_cat, taxonomy_dims = self.map_to_taxonomy(parsed_event)
 
                 # Step 4: Normalize
-                event = self.normalize_to_schema(parsed_event, primary_cat, taxonomy_dims)
+                event = self.normalize_to_schema(
+                    parsed_event, primary_cat, taxonomy_dims
+                )
 
                 # Step 5: Validate
                 is_valid, validation_messages = self.validate_event(event)
                 event.normalization_errors.extend(validation_messages)
 
                 if not is_valid:
-                    self.logger.warning(f"Validation warnings for event {idx}: {validation_messages}")
+                    self.logger.warning(
+                        f"Validation warnings for event {idx}: {validation_messages}"
+                    )
 
                 # Step 6: Enrich
                 event = self.enrich_event(event)
@@ -332,11 +353,13 @@ class BasePipeline(ABC):
         score = 0.0
 
         # Key fields (40%)
-        key_fields_present = all([
-            event.title,
-            event.location.city,
-            event.start_datetime,
-        ])
+        key_fields_present = all(
+            [
+                event.title,
+                event.location.city,
+                event.start_datetime,
+            ]
+        )
         score += 0.4 if key_fields_present else 0.0
 
         # Enrichment fields (30%)
@@ -385,23 +408,33 @@ class BasePipeline(ABC):
                 for a in artists_list
             )
 
-            taxonomy_json = json.dumps([
-                {
-                    "primary_category": dim.primary_category,
-                    "subcategory": dim.subcategory,
-                    "confidence": dim.confidence,
-                }
-                for dim in event.taxonomy_dimensions
-            ])
+            taxonomy_json = json.dumps(
+                [
+                    {
+                        "primary_category": dim.primary_category,
+                        "subcategory": dim.subcategory,
+                        "confidence": dim.confidence,
+                    }
+                    for dim in event.taxonomy_dimensions
+                ]
+            )
 
             # Handle event_type which could be Enum or string
             event_type_val = None
             if event.event_type:
-                event_type_val = event.event_type.value if hasattr(event.event_type, 'value') else str(event.event_type)
+                event_type_val = (
+                    event.event_type.value
+                    if hasattr(event.event_type, "value")
+                    else str(event.event_type)
+                )
 
             format_val = None
             if event.format:
-                format_val = event.format.value if hasattr(event.format, 'value') else str(event.format)
+                format_val = (
+                    event.format.value
+                    if hasattr(event.format, "value")
+                    else str(event.format)
+                )
 
             row = {
                 "event_id": event.event_id,
@@ -418,8 +451,16 @@ class BasePipeline(ABC):
                 "event_type": event_type_val,
                 "format": format_val,
                 "is_free": event.price.is_free if event.price else None,
-                "min_price": float(event.price.minimum_price) if event.price and event.price.minimum_price else None,
-                "max_price": float(event.price.maximum_price) if event.price and event.price.maximum_price else None,
+                "min_price": (
+                    float(event.price.minimum_price)
+                    if event.price and event.price.minimum_price
+                    else None
+                ),
+                "max_price": (
+                    float(event.price.maximum_price)
+                    if event.price and event.price.maximum_price
+                    else None
+                ),
                 "currency_code": event.price.currency if event.price else None,
                 "organizer": event.organizer.name if event.organizer else None,
                 "source_url": event.source.source_url if event.source else None,

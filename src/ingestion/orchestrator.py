@@ -5,7 +5,7 @@ Coordinates execution, scheduling, and management of all event ingestion pipelin
 Supports both API and scraper-based sources through the adapter pattern.
 """
 
-from typing import Dict, List, Optional, Type, Callable
+from typing import Dict, List, Optional, Callable
 from datetime import datetime
 import logging
 from dataclasses import dataclass
@@ -22,13 +22,13 @@ from src.ingestion.base_pipeline import (
 )
 from src.ingestion.normalization.event_schema import EventSchema
 
-
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class ScheduledPipeline:
     """Configuration for a scheduled pipeline execution."""
+
     pipeline_name: str
     schedule_type: str  # 'interval', 'cron', 'manual'
     interval_hours: Optional[int] = None
@@ -52,9 +52,11 @@ def register_pipeline(source_name: str):
         def create_ra_co_pipeline(config: PipelineConfig) -> RaCoPipeline:
             return RaCoPipeline(config)
     """
+
     def decorator(factory: PipelineFactory) -> PipelineFactory:
         PIPELINE_REGISTRY[source_name] = factory
         return factory
+
     return decorator
 
 
@@ -123,11 +125,7 @@ class PipelineOrchestrator:
     # EXECUTION
     # ========================================================================
 
-    def execute_pipeline(
-        self,
-        source_name: str,
-        **kwargs
-    ) -> PipelineExecutionResult:
+    def execute_pipeline(self, source_name: str, **kwargs) -> PipelineExecutionResult:
         """
         Execute a single pipeline.
 
@@ -150,8 +148,10 @@ class PipelineOrchestrator:
             self._store_execution_result(result)
             return result
 
-        except Exception as e:
-            self.logger.error(f"Pipeline execution failed: {source_name}", exc_info=True)
+        except Exception:
+            self.logger.error(
+                f"Pipeline execution failed: {source_name}", exc_info=True
+            )
             raise
 
     def execute_all_pipelines(self, **kwargs) -> Dict[str, PipelineExecutionResult]:
@@ -173,9 +173,7 @@ class PipelineOrchestrator:
         return results
 
     def execute_by_type(
-        self,
-        source_type: SourceType,
-        **kwargs
+        self, source_type: SourceType, **kwargs
     ) -> Dict[str, PipelineExecutionResult]:
         """
         Execute all pipelines of a specific type (API or scraper).
@@ -204,9 +202,7 @@ class PipelineOrchestrator:
     # ========================================================================
 
     def schedule_pipeline(
-        self,
-        source_name: str,
-        schedule_config: Dict
+        self, source_name: str, schedule_config: Dict
     ) -> ScheduledPipeline:
         """
         Schedule a pipeline for recurring execution.
@@ -238,9 +234,7 @@ class PipelineOrchestrator:
     # ========================================================================
 
     def get_execution_history(
-        self,
-        source_name: Optional[str] = None,
-        limit: int = 10
+        self, source_name: Optional[str] = None, limit: int = 10
     ) -> List[PipelineExecutionResult]:
         """Get execution history, optionally filtered by source."""
         results = self.execution_history

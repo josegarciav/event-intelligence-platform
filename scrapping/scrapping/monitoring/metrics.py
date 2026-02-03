@@ -15,7 +15,7 @@ from __future__ import annotations
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterator, Optional, Tuple
+from typing import Any, Dict, Iterator, Optional
 
 
 def _key(name: str, labels: Optional[Dict[str, str]]) -> str:
@@ -29,17 +29,25 @@ def _key(name: str, labels: Optional[Dict[str, str]]) -> str:
 class MetricsRegistry:
     counters: Dict[str, float] = field(default_factory=dict)
     gauges: Dict[str, float] = field(default_factory=dict)
-    timers: Dict[str, Dict[str, float]] = field(default_factory=dict)  # sum, count, max, min
+    timers: Dict[str, Dict[str, float]] = field(
+        default_factory=dict
+    )  # sum, count, max, min
 
-    def inc(self, name: str, value: float = 1.0, *, labels: Optional[Dict[str, str]] = None) -> None:
+    def inc(
+        self, name: str, value: float = 1.0, *, labels: Optional[Dict[str, str]] = None
+    ) -> None:
         k = _key(name, labels)
         self.counters[k] = float(self.counters.get(k, 0.0)) + float(value)
 
-    def set_gauge(self, name: str, value: float, *, labels: Optional[Dict[str, str]] = None) -> None:
+    def set_gauge(
+        self, name: str, value: float, *, labels: Optional[Dict[str, str]] = None
+    ) -> None:
         k = _key(name, labels)
         self.gauges[k] = float(value)
 
-    def observe(self, name: str, value: float, *, labels: Optional[Dict[str, str]] = None) -> None:
+    def observe(
+        self, name: str, value: float, *, labels: Optional[Dict[str, str]] = None
+    ) -> None:
         k = _key(name, labels)
         d = self.timers.get(k)
         if d is None:
@@ -51,7 +59,9 @@ class MetricsRegistry:
         d["min"] = min(d["min"], float(value))
 
     @contextmanager
-    def time(self, name: str, *, labels: Optional[Dict[str, str]] = None) -> Iterator[None]:
+    def time(
+        self, name: str, *, labels: Optional[Dict[str, str]] = None
+    ) -> Iterator[None]:
         t0 = time.time()
         try:
             yield

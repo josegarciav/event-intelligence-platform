@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
@@ -88,7 +88,9 @@ def xpath_values(html: str, xpath: str) -> List[str]:
     out: List[str] = []
     for x in res:
         if isinstance(x, (str, bytes)):
-            out.append(x.decode("utf-8", errors="ignore") if isinstance(x, bytes) else x)
+            out.append(
+                x.decode("utf-8", errors="ignore") if isinstance(x, bytes) else x
+            )
         else:
             try:
                 out.append(str(x))
@@ -101,7 +103,10 @@ def xpath_values(html: str, xpath: str) -> List[str]:
 # trafilatura (optional)
 # ---------------------------------------------------------------------
 
-def extract_structured_trafilatura(html: str, *, url: Optional[str] = None) -> TextExtractResult:
+
+def extract_structured_trafilatura(
+    html: str, *, url: Optional[str] = None
+) -> TextExtractResult:
     """
     If trafilatura is installed, returns structured content.
 
@@ -111,7 +116,9 @@ def extract_structured_trafilatura(html: str, *, url: Optional[str] = None) -> T
         import trafilatura  # type: ignore
         from trafilatura.settings import use_config  # type: ignore
     except Exception as e:
-        return TextExtractResult(ok=False, text="", error=f"trafilatura not available: {type(e).__name__}")
+        return TextExtractResult(
+            ok=False, text="", error=f"trafilatura not available: {type(e).__name__}"
+        )
 
     try:
         downloaded = html
@@ -120,9 +127,17 @@ def extract_structured_trafilatura(html: str, *, url: Optional[str] = None) -> T
 
         # Use trafilatura defaults (can be configured later)
         config = use_config()
-        text = trafilatura.extract(downloaded, config=config, url=url, include_comments=False, include_tables=False)
+        text = trafilatura.extract(
+            downloaded,
+            config=config,
+            url=url,
+            include_comments=False,
+            include_tables=False,
+        )
         if not text:
-            return TextExtractResult(ok=False, text="", error="trafilatura returned empty")
+            return TextExtractResult(
+                ok=False, text="", error="trafilatura returned empty"
+            )
 
         meta = trafilatura.metadata.extract_metadata(downloaded, url=url)
         return TextExtractResult(
@@ -148,6 +163,7 @@ def extract_structured_trafilatura(html: str, *, url: Optional[str] = None) -> T
 # ---------------------------------------------------------------------
 
 _WS = re.compile(r"\s+")
+
 
 def _collapse_ws(s: str) -> str:
     return _WS.sub(" ", (s or "").strip())

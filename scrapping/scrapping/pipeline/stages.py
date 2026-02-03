@@ -18,13 +18,16 @@ This is engine-agnostic and config-driven.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from urllib.parse import urljoin
 
 from scrapping.engines.base import BaseEngine, EngineContext, FetchResult
 from scrapping.extraction.link_extractors import LinkExtractRequest, extract_links
-from scrapping.extraction.parsers import extract_structured_trafilatura, get_text_bs4, select_text_bs4
+from scrapping.extraction.parsers import (
+    extract_structured_trafilatura,
+    get_text_bs4,
+    select_text_bs4,
+)
 from scrapping.extraction.transforms import normalize_item_fields
 from scrapping.pipeline.validators import validate_item
 from scrapping.pipeline.dedupe import DedupeStore, InMemoryDedupeStore, dedupe_items
@@ -70,6 +73,7 @@ class PipelineArtifacts:
 # ---------------------------------------------------------------------
 # Discover
 # ---------------------------------------------------------------------
+
 
 def discover_listing_urls(source_cfg: Dict[str, Any]) -> List[str]:
     """
@@ -128,6 +132,7 @@ def discover_listing_urls(source_cfg: Dict[str, Any]) -> List[str]:
 # Fetch helpers
 # ---------------------------------------------------------------------
 
+
 def fetch_pages(
     urls: Sequence[str],
     *,
@@ -166,6 +171,7 @@ def fetch_pages(
 # Main pipeline (V1)
 # ---------------------------------------------------------------------
 
+
 def run_pipeline_v1(
     source_cfg: Dict[str, Any],
     *,
@@ -197,7 +203,7 @@ def run_pipeline_v1(
     wait_for = None
     if isinstance(source_cfg.get("discovery"), dict):
         # optional: discovery.wait_for selector
-        wait_for = (source_cfg["discovery"].get("wait_for") or None)
+        wait_for = source_cfg["discovery"].get("wait_for") or None
 
     # 1) discover listing URLs
     listing_urls = discover_listing_urls(source_cfg)
@@ -225,7 +231,9 @@ def run_pipeline_v1(
 
     # 3) extract links
     discovery = source_cfg.get("discovery") or {}
-    link_cfg = (discovery.get("link_extract") or {}) if isinstance(discovery, dict) else {}
+    link_cfg = (
+        (discovery.get("link_extract") or {}) if isinstance(discovery, dict) else {}
+    )
 
     base_url = _guess_base_url(listing_urls[0]) if listing_urls else None
     all_links: List[str] = []
@@ -262,7 +270,9 @@ def run_pipeline_v1(
         engine=engine,
         ctx=ctx,
         parallelism=max(1, parallelism),
-        rendered=(engine_type in ("browser", "hybrid")),  # for hybrid, get_rendered => browser
+        rendered=(
+            engine_type in ("browser", "hybrid")
+        ),  # for hybrid, get_rendered => browser
         actions=actions if engine_type in ("browser", "hybrid") else None,
         wait_for=None,
     )
@@ -278,9 +288,13 @@ def run_pipeline_v1(
 
     # 5) parse + normalize items
     items: List[Dict[str, Any]] = []
-    parse_cfg = (source_cfg.get("parse") or {}) if isinstance(source_cfg.get("parse"), dict) else {}
+    parse_cfg = (
+        (source_cfg.get("parse") or {})
+        if isinstance(source_cfg.get("parse"), dict)
+        else {}
+    )
     title_selector = parse_cfg.get("title_selector")  # optional
-    text_selector = parse_cfg.get("text_selector")    # optional
+    text_selector = parse_cfg.get("text_selector")  # optional
 
     for dp in detail_pages:
         if not dp.fetch.ok or not dp.fetch.text:
@@ -296,7 +310,11 @@ def run_pipeline_v1(
             text = structured.text
         else:
             title = select_text_bs4(html, title_selector) if title_selector else None
-            text = select_text_bs4(html, text_selector) if text_selector else get_text_bs4(html)
+            text = (
+                select_text_bs4(html, text_selector)
+                if text_selector
+                else get_text_bs4(html)
+            )
 
         item = {
             "url": url,
@@ -311,7 +329,11 @@ def run_pipeline_v1(
     stats.items_parsed = len(items)
 
     # 6) validate
-    val_rules = (source_cfg.get("validation") or {}) if isinstance(source_cfg.get("validation"), dict) else {}
+    val_rules = (
+        (source_cfg.get("validation") or {})
+        if isinstance(source_cfg.get("validation"), dict)
+        else {}
+    )
     valid_items: List[Dict[str, Any]] = []
     invalid_items: List[Dict[str, Any]] = []
 
@@ -357,6 +379,7 @@ def run_pipeline_v1(
 def _guess_base_url(url: str) -> Optional[str]:
     try:
         from urllib.parse import urlparse
+
         p = urlparse(url)
         if not p.scheme or not p.netloc:
             return None

@@ -19,7 +19,7 @@ for SeleniumBase with the same action schema.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, Optional, Sequence
 
 from .human_like import HumanLike, HumanLikeOptions
 
@@ -29,6 +29,7 @@ class ActionRunnerOptions:
     """
     Behavior for how strictly we treat failures.
     """
+
     strict: bool = False  # if True, unknown actions or failures raise
     default_timeout_s: float = 20.0
 
@@ -85,7 +86,7 @@ class BrowserActionRunner:
                 else:
                     self._unknown(atype, idx)
 
-            except Exception as e:
+            except Exception:
                 if self.options.strict:
                     raise
                 # best-effort mode: swallow, but keep a tiny delay to reduce aggressive retries
@@ -95,14 +96,26 @@ class BrowserActionRunner:
     # Action implementations
     # ------------------------------------------------------------------
 
-    def _wait_for(self, page: Any, selector: Optional[str], params: Dict[str, Any], timeout_s: float) -> None:
+    def _wait_for(
+        self,
+        page: Any,
+        selector: Optional[str],
+        params: Dict[str, Any],
+        timeout_s: float,
+    ) -> None:
         if not selector:
             if self.options.strict:
                 raise ValueError("wait_for requires selector")
             return
         page.wait_for_selector(selector, timeout=int(timeout_s * 1000))
 
-    def _click(self, page: Any, selector: Optional[str], params: Dict[str, Any], timeout_s: float) -> None:
+    def _click(
+        self,
+        page: Any,
+        selector: Optional[str],
+        params: Dict[str, Any],
+        timeout_s: float,
+    ) -> None:
         if not selector:
             if self.options.strict:
                 raise ValueError("click requires selector")
@@ -116,6 +129,7 @@ class BrowserActionRunner:
             page.click(selector, timeout=int(timeout_s * 1000))
             if pause > 0:
                 import time
+
                 time.sleep(self.human.jitter(pause, 0.25))
 
     def _hover(self, page: Any, selector: Optional[str], timeout_s: float) -> None:
@@ -184,7 +198,10 @@ class BrowserActionRunner:
         try:
             self.human.scroll_wheel(page, repeats=repeat, direction=direction)
         finally:
-            self.human.opts.scroll_min_px, self.human.opts.scroll_max_px = old_min, old_max
+            self.human.opts.scroll_min_px, self.human.opts.scroll_max_px = (
+                old_min,
+                old_max,
+            )
 
     def _sleep(self, params: Dict[str, Any]) -> None:
         """
@@ -205,7 +222,11 @@ class BrowserActionRunner:
                 self.human.medium_pause()
             return
 
-        if "range_s" in params and isinstance(params["range_s"], (list, tuple)) and len(params["range_s"]) == 2:
+        if (
+            "range_s" in params
+            and isinstance(params["range_s"], (list, tuple))
+            and len(params["range_s"]) == 2
+        ):
             lo, hi = float(params["range_s"][0]), float(params["range_s"][1])
             self.human.sleep_range((lo, hi))
             return

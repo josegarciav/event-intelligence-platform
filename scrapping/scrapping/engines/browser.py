@@ -15,7 +15,15 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Sequence
 
-from .base import BaseEngine, EngineContext, FetchResult, FetchTimings, Headers, RateLimiter, compute_backoff_s
+from .base import (
+    BaseEngine,
+    EngineContext,
+    FetchResult,
+    FetchTimings,
+    Headers,
+    RateLimiter,
+    compute_backoff_s,
+)
 
 
 @dataclass
@@ -180,7 +188,9 @@ class BrowserEngine(BaseEngine):
 
                 # retry on render failures / 4xx/5xx is source-specific; keep conservative
                 if attempt < self.options.max_retries:
-                    delay = compute_backoff_s(attempt + 1, mode=self.options.backoff_mode)
+                    delay = compute_backoff_s(
+                        attempt + 1, mode=self.options.backoff_mode
+                    )
                     if delay > 0:
                         time.sleep(delay)
                     last_err = result
@@ -210,7 +220,9 @@ class BrowserEngine(BaseEngine):
                     pass
 
                 if attempt < self.options.max_retries:
-                    delay = compute_backoff_s(attempt + 1, mode=self.options.backoff_mode)
+                    delay = compute_backoff_s(
+                        attempt + 1, mode=self.options.backoff_mode
+                    )
                     if delay > 0:
                         time.sleep(delay)
                     last_err = result
@@ -233,7 +245,9 @@ class BrowserEngine(BaseEngine):
     # Action DSL
     # -------------------------
 
-    def _run_actions(self, page: Any, actions: Sequence[Dict[str, Any]], *, timeout_s: float) -> None:
+    def _run_actions(
+        self, page: Any, actions: Sequence[Dict[str, Any]], *, timeout_s: float
+    ) -> None:
         """
         actions: list of dict like:
           {"type":"scroll", "params":{"min_px":200,"max_px":450,"repeat":6}}
@@ -290,6 +304,7 @@ class BrowserEngine(BaseEngine):
                 sleep_s = float(params.get("sleep_s", 0.2))
 
                 import random
+
                 for _ in range(max(1, repeat)):
                     if mode == "down":
                         delta = max_px

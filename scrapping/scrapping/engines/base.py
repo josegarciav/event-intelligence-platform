@@ -15,8 +15,7 @@ import time
 import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Sequence, Tuple
-
+from typing import Any, Dict, Optional, Sequence
 
 Headers = Dict[str, str]
 
@@ -54,6 +53,7 @@ class EngineContext:
     The minimum execution context engines may need.
     Keep it small. If you need more, add fields deliberately.
     """
+
     timeout_s: float = 15.0
     verify_ssl: bool = True
     user_agent: Optional[str] = None
@@ -101,6 +101,7 @@ class BaseEngine(ABC):
 # Rate limiting + retries helpers
 # ---------------------------------------------------------------------
 
+
 class RateLimiter:
     """
     Simple process-local leaky bucket.
@@ -137,7 +138,9 @@ class RateLimiter:
         # Enforce min delay + jitter between calls
         now = time.time()
         since_last = now - self._last_call_s
-        target_delay = self.min_delay_s + (random.random() * self.jitter_s if self.jitter_s else 0.0)
+        target_delay = self.min_delay_s + (
+            random.random() * self.jitter_s if self.jitter_s else 0.0
+        )
         if target_delay > since_last:
             time.sleep(target_delay - since_last)
 

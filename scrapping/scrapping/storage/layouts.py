@@ -30,7 +30,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -59,24 +58,32 @@ class Layout:
     def raw_detail_dir(self, run_id: str, source_id: str) -> Path:
         return self.raw_pages_dir(run_id, source_id) / "detail"
 
-    def raw_listing_path(self, run_id: str, source_id: str, part: int = 0, ext: str = "jsonl") -> Path:
+    def raw_listing_path(
+        self, run_id: str, source_id: str, part: int = 0, ext: str = "jsonl"
+    ) -> Path:
         return self.raw_listing_dir(run_id, source_id) / f"part-{part:05d}.{ext}"
 
-    def raw_detail_path(self, run_id: str, source_id: str, part: int = 0, ext: str = "jsonl") -> Path:
+    def raw_detail_path(
+        self, run_id: str, source_id: str, part: int = 0, ext: str = "jsonl"
+    ) -> Path:
         return self.raw_detail_dir(run_id, source_id) / f"part-{part:05d}.{ext}"
 
     # links
     def links_dir(self, run_id: str, source_id: str) -> Path:
         return self.source_dir(run_id, source_id) / "links"
 
-    def extracted_links_path(self, run_id: str, source_id: str, ext: str = "jsonl") -> Path:
+    def extracted_links_path(
+        self, run_id: str, source_id: str, ext: str = "jsonl"
+    ) -> Path:
         return self.links_dir(run_id, source_id) / f"extracted_links.{ext}"
 
     # items
     def items_dir(self, run_id: str, source_id: str) -> Path:
         return self.source_dir(run_id, source_id) / "items"
 
-    def items_path(self, run_id: str, source_id: str, name: str = "items", ext: str = "jsonl") -> Path:
+    def items_path(
+        self, run_id: str, source_id: str, name: str = "items", ext: str = "jsonl"
+    ) -> Path:
         return self.items_dir(run_id, source_id) / f"{name}.{ext}"
 
     # run-level

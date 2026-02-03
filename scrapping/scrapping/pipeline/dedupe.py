@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Set
 
 from scrapping.extraction.transforms import canonicalize_url, normalize_ws
 
@@ -28,7 +28,9 @@ def fingerprint_text(text: str) -> str:
     return h
 
 
-def fingerprint_item(item: Dict[str, Any], *, fields: Sequence[str] = ("title", "text")) -> str:
+def fingerprint_item(
+    item: Dict[str, Any], *, fields: Sequence[str] = ("title", "text")
+) -> str:
     parts: List[str] = []
     for f in fields:
         v = item.get(f)

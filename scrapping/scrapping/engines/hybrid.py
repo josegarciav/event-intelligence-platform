@@ -52,4 +52,6 @@ class HybridEngine(BaseEngine):
         actions: Optional[Sequence[Dict[str, Any]]] = None,
         wait_for: Optional[str] = None,
     ) -> FetchResult:
-        return self.browser.get_rendered(url, ctx=ctx, actions=actions, wait_for=wait_for)
+        return self.browser.get_rendered(
+            url, ctx=ctx, actions=actions, wait_for=wait_for
+        )

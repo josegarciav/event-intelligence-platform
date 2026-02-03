@@ -15,6 +15,7 @@ from src.ingestion.normalization.event_schema import EventSchema
 
 class DeduplicationStrategy(str, Enum):
     """Available deduplication strategies."""
+
     EXACT = "exact"
     FUZZY = "fuzzy"  # Not yet implemented
     METADATA = "metadata"  # Not yet implemented
@@ -146,7 +147,7 @@ class CompositeDeduplicator(EventDeduplicator):
 
 
 def get_deduplicator(
-    strategy: DeduplicationStrategy = DeduplicationStrategy.EXACT
+    strategy: DeduplicationStrategy = DeduplicationStrategy.EXACT,
 ) -> EventDeduplicator:
     """
     Factory function to get a deduplicator by strategy.

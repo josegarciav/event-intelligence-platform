@@ -78,6 +78,7 @@ class FeatureExtractor:
         if self.provider == "openai":
             try:
                 from openai import OpenAI
+
                 self._client = OpenAI(api_key=self.api_key)
             except ImportError:
                 logger.warning("openai package not installed")
@@ -85,6 +86,7 @@ class FeatureExtractor:
         elif self.provider == "anthropic":
             try:
                 import anthropic
+
                 self._client = anthropic.Anthropic(api_key=self.api_key)
             except ImportError:
                 logger.warning("anthropic package not installed")
@@ -162,12 +164,14 @@ class FeatureExtractor:
         if not client:
             # Fall back to keyword matching
             from src.ingestion.normalization.taxonomy import find_best_activity_match
-            return find_best_activity_match(f"{event_title} {event_description}", subcategory_id)
+
+            return find_best_activity_match(
+                f"{event_title} {event_description}", subcategory_id
+            )
 
         # Build activity list for prompt
         activity_list = "\n".join(
-            f"- {a['activity_id']}: {a.get('name', 'Unknown')}"
-            for a in activities
+            f"- {a['activity_id']}: {a.get('name', 'Unknown')}" for a in activities
         )
 
         prompt = f"""Given this event:

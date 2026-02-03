@@ -18,14 +18,12 @@ import time
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional
 from urllib.parse import urljoin, urlparse
 
 from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
 from src.ingestion.adapters import ScraperAdapter, SourceType
 from src.ingestion.adapters.scraper_adapter import ScraperAdapterConfig
-from src.ingestion.normalization.event_schema import EventSchema
-
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +32,11 @@ logger = logging.getLogger(__name__)
 # DATA CLASSES
 # =============================================================================
 
+
 @dataclass
 class PageFetchResult:
     """Result of fetching a single page."""
+
     ok: bool
     url: str
     final_url: str
@@ -49,6 +49,7 @@ class PageFetchResult:
 @dataclass
 class ScraperConfig:
     """Configuration for the EventScraper."""
+
     source_id: str
     base_url: str
     url_pattern: str  # Regex pattern for extracting event URLs
@@ -201,6 +202,7 @@ load_event_scraper_config = load_scraper_config
 # EVENT SCRAPER
 # =============================================================================
 
+
 class EventScraper:
     """
     Event scraper using Playwright for browser automation.
@@ -317,7 +319,8 @@ class EventScraper:
             is_blocked = "captcha" in html.lower() or status_code == 403
 
             return PageFetchResult(
-                ok=not is_blocked and (status_code is None or (200 <= status_code < 400)),
+                ok=not is_blocked
+                and (status_code is None or (200 <= status_code < 400)),
                 url=url,
                 final_url=final_url,
                 status_code=status_code,
@@ -374,7 +377,9 @@ class EventScraper:
             results.append(result)
 
             if result.ok:
-                logger.info(f"Successfully fetched: {url} ({len(result.html or '')} chars)")
+                logger.info(
+                    f"Successfully fetched: {url} ({len(result.html or '')} chars)"
+                )
             else:
                 logger.warning(f"Failed to fetch: {url} - {result.error}")
 
@@ -452,7 +457,9 @@ class EventScraper:
 
             time.sleep(self.config.min_delay_s)
 
-        logger.info(f"Fetched {len(results)} event pages, {sum(1 for r in results if r.ok)} successful")
+        logger.info(
+            f"Fetched {len(results)} event pages, {sum(1 for r in results if r.ok)} successful"
+        )
         return results
 
     def __enter__(self) -> "EventScraper":
@@ -465,6 +472,7 @@ class EventScraper:
 # =============================================================================
 # BASE SCRAPER PIPELINE
 # =============================================================================
+
 
 class BaseScraperPipeline(BasePipeline):
     """

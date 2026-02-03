@@ -17,7 +17,11 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-from scrapping.extraction.parsers import bs4_soup, get_text_bs4, select_text_bs4, extract_structured_trafilatura
+from scrapping.extraction.parsers import (
+    get_text_bs4,
+    select_text_bs4,
+    extract_structured_trafilatura,
+)
 from scrapping.extraction.transforms import normalize_ws, strip_or_none
 
 
@@ -128,6 +132,7 @@ def html_to_structured(
 
 
 _TAGS = re.compile(r"<[^>]+>")
+
 
 def _strip_tags(html: str) -> str:
     return _TAGS.sub(" ", html or "")

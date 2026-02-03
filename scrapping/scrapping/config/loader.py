@@ -22,7 +22,7 @@ import glob
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import ValidationError
 
@@ -51,7 +51,7 @@ def load_sources(
     *,
     config_path: Optional[Union[str, Path]] = None,
     configs_glob: Optional[str] = None,
-    options: Optional[LoadOptions] = None
+    options: Optional[LoadOptions] = None,
 ) -> LoadResult:
     """
     Load and validate SourceConfig(s).
@@ -87,7 +87,9 @@ def load_sources(
 
     if options.only_source_id_contains:
         needle = options.only_source_id_contains.lower()
-        raw_source_dicts = [d for d in raw_source_dicts if needle in str(d.get("source_id", "")).lower()]
+        raw_source_dicts = [
+            d for d in raw_source_dicts if needle in str(d.get("source_id", "")).lower()
+        ]
 
     if options.max_sources is not None:
         raw_source_dicts = raw_source_dicts[: int(options.max_sources)]
@@ -96,16 +98,22 @@ def load_sources(
     sources: List[SourceConfig] = []
     for d in raw_source_dicts:
         migrated, report = migrate_to_latest(d)
-        migration_reports.append({
-            "source_id": report.source_id,
-            "from_version": report.from_version,
-            "to_version": report.to_version,
-            "applied_steps": report.applied_steps,
-        })
+        migration_reports.append(
+            {
+                "source_id": report.source_id,
+                "from_version": report.from_version,
+                "to_version": report.to_version,
+                "applied_steps": report.applied_steps,
+            }
+        )
 
         # loader-level warnings
-        if migrated.get("engine", {}).get("type") == "browser" and not migrated.get("engine", {}).get("browser"):
-            warnings.append(f"{migrated.get('source_id','<no source_id>')}: engine.browser not set (recommended: seleniumbase|playwright)")
+        if migrated.get("engine", {}).get("type") == "browser" and not migrated.get(
+            "engine", {}
+        ).get("browser"):
+            warnings.append(
+                f"{migrated.get('source_id','<no source_id>')}: engine.browser not set (recommended: seleniumbase|playwright)"
+            )
 
         try:
             sources.append(SourceConfig.model_validate(migrated))
@@ -127,9 +135,7 @@ def load_sources(
 
 
 def _resolve_paths(
-    *,
-    config_path: Optional[Union[str, Path]],
-    configs_glob: Optional[str]
+    *, config_path: Optional[Union[str, Path]], configs_glob: Optional[str]
 ) -> List[Path]:
     if config_path and configs_glob:
         raise ValueError("Provide only one of config_path or configs_glob")

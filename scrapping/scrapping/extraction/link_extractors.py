@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Iterable, List, Optional, Sequence, Set, Tuple
 from urllib.parse import urljoin, urlparse, urlunparse, parse_qsl, urlencode
 
 
@@ -33,8 +33,15 @@ class LinkExtractRequest:
     normalize: bool = True
     drop_tracking_params: bool = True
     tracking_params: Tuple[str, ...] = (
-        "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
-        "gclid", "fbclid", "mc_cid", "mc_eid",
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+        "utm_term",
+        "utm_content",
+        "gclid",
+        "fbclid",
+        "mc_cid",
+        "mc_eid",
     )
 
 
@@ -65,7 +72,9 @@ def extract_links(req: LinkExtractRequest) -> List[str]:
     elif method == "js":
         # Placeholder for future: if html is from browser engine we can also do page.evaluate,
         # but that belongs to engine/actions; here we stay HTML-only.
-        raise NotImplementedError("js extraction is not supported in pure HTML mode yet")
+        raise NotImplementedError(
+            "js extraction is not supported in pure HTML mode yet"
+        )
 
     else:
         raise ValueError(f"unknown link extract method: {method}")
@@ -103,6 +112,7 @@ def extract_links(req: LinkExtractRequest) -> List[str]:
 # ---------------------------------------------------------------------
 # Extractors
 # ---------------------------------------------------------------------
+
 
 def _extract_regex(html: str, pattern: str) -> List[str]:
     # If pattern has capturing group(s), return the first group; else return whole match.
@@ -166,7 +176,9 @@ def _extract_xpath(html: str, xpath: str) -> List[str]:
     out: List[str] = []
     for x in res:
         if isinstance(x, (str, bytes)):
-            out.append(x.decode("utf-8", errors="ignore") if isinstance(x, bytes) else x)
+            out.append(
+                x.decode("utf-8", errors="ignore") if isinstance(x, bytes) else x
+            )
         else:
             # lxml may return nodes; attempt href/src
             try:
@@ -200,6 +212,7 @@ def _lxml_doc(html: str):
 # ---------------------------------------------------------------------
 # URL canonicalization
 # ---------------------------------------------------------------------
+
 
 def canonicalize_url(
     url: str,

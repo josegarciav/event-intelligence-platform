@@ -11,7 +11,7 @@ Requests-based engine:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 import requests
 
@@ -68,7 +68,9 @@ class HttpEngine(BaseEngine):
     def get(self, url: str, *, ctx: Optional[EngineContext] = None) -> FetchResult:
         ctx = ctx or EngineContext()
         timeout_s = float(ctx.timeout_s or self.options.timeout_s)
-        verify_ssl = bool(ctx.verify_ssl if ctx.verify_ssl is not None else self.options.verify_ssl)
+        verify_ssl = bool(
+            ctx.verify_ssl if ctx.verify_ssl is not None else self.options.verify_ssl
+        )
 
         headers: Headers = {}
         if self.options.user_agent:
@@ -122,10 +124,15 @@ class HttpEngine(BaseEngine):
                     return result
 
                 # non-OK, maybe retry
-                if attempt < self.options.max_retries and should_retry(result.status_code, self.options.retry_on_status):
-                    delay = compute_backoff_s(attempt + 1, mode=self.options.backoff_mode)
+                if attempt < self.options.max_retries and should_retry(
+                    result.status_code, self.options.retry_on_status
+                ):
+                    delay = compute_backoff_s(
+                        attempt + 1, mode=self.options.backoff_mode
+                    )
                     if delay > 0:
                         import time
+
                         time.sleep(delay)
                     last_err = result
                     continue
@@ -146,9 +153,12 @@ class HttpEngine(BaseEngine):
                 )
 
                 if attempt < self.options.max_retries:
-                    delay = compute_backoff_s(attempt + 1, mode=self.options.backoff_mode)
+                    delay = compute_backoff_s(
+                        attempt + 1, mode=self.options.backoff_mode
+                    )
                     if delay > 0:
                         import time
+
                         time.sleep(delay)
                     last_err = result
                     continue

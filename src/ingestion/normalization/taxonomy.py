@@ -1,4 +1,4 @@
-# normalization/taxonomy.py
+# src/ingestion/normalization/taxonomy.py
 """
 Builds and provides access to the Human Experience Taxonomy index.
 
@@ -10,8 +10,7 @@ Provides functions to:
 """
 
 import json
-from pathlib import Path
-from typing import Dict, Set, List, Any, Optional, Tuple
+from typing import Dict, Set, List, Any, Optional
 from functools import lru_cache
 
 from src.configs.config import Config
@@ -63,11 +62,13 @@ def get_all_subcategory_options() -> List[Dict[str, Any]]:
     for cat in taxonomy["categories"]:
         primary = _normalize_primary_key(cat["category"])
         for sub in cat.get("subcategories", []):
-            out.append({
-                "id": sub["id"],
-                "name": sub["name"],
-                "primary_category": primary,
-            })
+            out.append(
+                {
+                    "id": sub["id"],
+                    "name": sub["name"],
+                    "primary_category": primary,
+                }
+            )
     return out
 
 

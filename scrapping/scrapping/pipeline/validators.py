@@ -15,7 +15,7 @@ Later:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 from scrapping.extraction.transforms import normalize_ws
@@ -42,9 +42,7 @@ class ValidationResult:
 
 
 def validate_item(
-    item: Dict[str, Any],
-    *,
-    rules: Optional[Dict[str, Any]] = None
+    item: Dict[str, Any], *, rules: Optional[Dict[str, Any]] = None
 ) -> ValidationResult:
     """
     Generic item validation.
@@ -69,31 +67,53 @@ def validate_item(
     # URL presence & sanity
     url = item.get(url_field)
     if not url:
-        issues.append(ValidationIssue("error", "missing_url", "Item missing url", field=url_field))
+        issues.append(
+            ValidationIssue("error", "missing_url", "Item missing url", field=url_field)
+        )
     elif not _looks_like_url(str(url)):
-        issues.append(ValidationIssue("error", "bad_url", "URL is not valid", field=url_field))
+        issues.append(
+            ValidationIssue("error", "bad_url", "URL is not valid", field=url_field)
+        )
 
     # title/text checks
     title = item.get(title_field)
     if require_title and not title:
-        issues.append(ValidationIssue("error", "missing_title", "Item missing title", field=title_field))
+        issues.append(
+            ValidationIssue(
+                "error", "missing_title", "Item missing title", field=title_field
+            )
+        )
     elif not title:
-        issues.append(ValidationIssue("warning", "missing_title", "Title is missing", field=title_field))
+        issues.append(
+            ValidationIssue(
+                "warning", "missing_title", "Title is missing", field=title_field
+            )
+        )
 
     text = item.get(text_field)
     if require_text and not text:
-        issues.append(ValidationIssue("error", "missing_text", "Item missing text", field=text_field))
+        issues.append(
+            ValidationIssue(
+                "error", "missing_text", "Item missing text", field=text_field
+            )
+        )
     elif not text:
-        issues.append(ValidationIssue("warning", "missing_text", "Text is missing", field=text_field))
+        issues.append(
+            ValidationIssue(
+                "warning", "missing_text", "Text is missing", field=text_field
+            )
+        )
     else:
         txt = normalize_ws(str(text))
         if min_text_len > 0 and len(txt) < min_text_len:
-            issues.append(ValidationIssue(
-                "warning",
-                "short_text",
-                f"Text length {len(txt)} < min_text_len={min_text_len}",
-                field=text_field
-            ))
+            issues.append(
+                ValidationIssue(
+                    "warning",
+                    "short_text",
+                    f"Text length {len(txt)} < min_text_len={min_text_len}",
+                    field=text_field,
+                )
+            )
 
     ok = not any(i.level == "error" for i in issues)
     return ValidationResult(ok=ok, issues=issues)

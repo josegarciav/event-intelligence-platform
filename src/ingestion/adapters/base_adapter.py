@@ -15,6 +15,7 @@ import logging
 
 class SourceType(str, Enum):
     """Type of data source."""
+
     API = "api"
     SCRAPER = "scraper"
 
@@ -26,6 +27,7 @@ class FetchResult:
 
     Provides a unified result format for both API and scraper sources.
     """
+
     success: bool
     source_type: SourceType
     raw_data: List[Dict[str, Any]] = field(default_factory=list)
@@ -50,6 +52,7 @@ class AdapterConfig:
 
     Extended by specific adapter types (API, Scraper).
     """
+
     source_id: str
     source_type: SourceType
     request_timeout: int = 30

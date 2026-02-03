@@ -12,13 +12,9 @@ The pipeline uses:
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import logging
-import re
-import time
 
-import requests
 
 from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
 from src.ingestion.adapters import SourceType, FetchResult
@@ -35,9 +31,16 @@ from src.ingestion.normalization.event_schema import (
     PrimaryCategory,
 )
 from src.ingestion.normalization.currency import CurrencyParser
-from src.ingestion.normalization.field_mapper import FieldMapper, create_field_mapper_from_config
-from src.ingestion.normalization.taxonomy_mapper import TaxonomyMapper, create_taxonomy_mapper_from_config
-from src.ingestion.normalization.feature_extractor import FeatureExtractor, create_feature_extractor_from_config
+from src.ingestion.normalization.field_mapper import (
+    FieldMapper,
+)
+from src.ingestion.normalization.taxonomy_mapper import (
+    TaxonomyMapper,
+)
+from src.ingestion.normalization.feature_extractor import (
+    FeatureExtractor,
+    create_feature_extractor_from_config,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +58,7 @@ class APISourceConfig:
     - Assign taxonomy
     - Validate events
     """
+
     # Source identification
     source_name: str
     enabled: bool = True
@@ -141,7 +145,9 @@ class ConfigDrivenAPIAdapter(APIAdapter):
             params["date_from"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         if "date_to" not in params:
             days_ahead = params.get("days_ahead", 30)
-            params["date_to"] = (datetime.now(timezone.utc) + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
+            params["date_to"] = (
+                datetime.now(timezone.utc) + timedelta(days=days_ahead)
+            ).strftime("%Y-%m-%d")
 
         if self.source_config.protocol == "graphql":
             # Build GraphQL query
@@ -190,15 +196,11 @@ class ConfigDrivenAPIAdapter(APIAdapter):
 
         elif isinstance(template, dict):
             return {
-                k: self._substitute_variables(v, params)
-                for k, v in template.items()
+                k: self._substitute_variables(v, params) for k, v in template.items()
             }
 
         elif isinstance(template, list):
-            return [
-                self._substitute_variables(item, params)
-                for item in template
-            ]
+            return [self._substitute_variables(item, params) for item in template]
 
         return template
 
@@ -268,7 +270,9 @@ class ConfigDrivenAPIAdapter(APIAdapter):
 
             # Check if we've fetched all available events
             if len(result.raw_data) < page_size:
-                logger.info(f"Received {len(result.raw_data)} events (less than page_size), stopping pagination")
+                logger.info(
+                    f"Received {len(result.raw_data)} events (less than page_size), stopping pagination"
+                )
                 break
 
             # Check if we've reached total available
@@ -278,7 +282,9 @@ class ConfigDrivenAPIAdapter(APIAdapter):
 
             page += 1
 
-        logger.info(f"Pagination complete: fetched {len(all_data)} total events across {page} pages")
+        logger.info(
+            f"Pagination complete: fetched {len(all_data)} total events across {page} pages"
+        )
 
         return FetchResult(
             success=len(all_data) > 0,
@@ -346,8 +352,16 @@ class BaseAPIPipeline(BasePipeline):
             request_timeout=self.source_config.timeout_seconds,
             max_retries=self.source_config.max_retries,
             rate_limit_per_second=self.source_config.rate_limit_per_second,
-            graphql_endpoint=self.source_config.endpoint if self.source_config.protocol == "graphql" else None,
-            base_url=self.source_config.endpoint if self.source_config.protocol == "rest" else "",
+            graphql_endpoint=(
+                self.source_config.endpoint
+                if self.source_config.protocol == "graphql"
+                else None
+            ),
+            base_url=(
+                self.source_config.endpoint
+                if self.source_config.protocol == "rest"
+                else ""
+            ),
         )
 
         return ConfigDrivenAPIAdapter(api_config, self.source_config)
@@ -382,7 +396,11 @@ class BaseAPIPipeline(BasePipeline):
         # Convert TaxonomyDimension objects to dicts for normalize_to_schema
         dims_as_dicts = [
             {
-                "primary_category": dim.primary_category.value if hasattr(dim.primary_category, 'value') else dim.primary_category,
+                "primary_category": (
+                    dim.primary_category.value
+                    if hasattr(dim.primary_category, "value")
+                    else dim.primary_category
+                ),
                 "subcategory": dim.subcategory,
                 "values": dim.values,
                 "confidence": dim.confidence,
@@ -420,17 +438,22 @@ class BaseAPIPipeline(BasePipeline):
             venue_name=parsed_event.get("venue_name"),
             street_address=parsed_event.get("venue_address"),
             city=parsed_event.get("city") or loc_defaults.get("city", "Unknown"),
-            country_code=(parsed_event.get("country_code") or loc_defaults.get("country_code", "US")).upper(),
+            country_code=(
+                parsed_event.get("country_code")
+                or loc_defaults.get("country_code", "US")
+            ).upper(),
             timezone=loc_defaults.get("timezone"),
         )
 
         # Parse price
         price_str = parsed_event.get("cost") or ""
-        min_price, max_price, currency = CurrencyParser.parse_price_string(str(price_str))
+        min_price, max_price, currency = CurrencyParser.parse_price_string(
+            str(price_str)
+        )
 
-        is_free = (
-            min_price is None and max_price is None
-        ) or str(price_str).lower() in ["free", "0", "gratis"]
+        is_free = (min_price is None and max_price is None) or str(
+            price_str
+        ).lower() in ["free", "0", "gratis"]
 
         price = PriceInfo(
             currency=currency or "EUR",
@@ -442,7 +465,9 @@ class BaseAPIPipeline(BasePipeline):
 
         # Build organizer
         organizer = OrganizerInfo(
-            name=parsed_event.get("organizer_name") or parsed_event.get("venue_name") or "Unknown",
+            name=parsed_event.get("organizer_name")
+            or parsed_event.get("venue_name")
+            or "Unknown",
         )
 
         # Build source info
@@ -470,7 +495,9 @@ class BaseAPIPipeline(BasePipeline):
 
         # Use feature extractor for missing fields
         if self.feature_extractor:
-            missing_fields = self.source_config.feature_extraction.get("fill_missing", [])
+            missing_fields = self.source_config.feature_extraction.get(
+                "fill_missing", []
+            )
             if missing_fields:
                 extracted = self.feature_extractor.extract_missing_fields(
                     parsed_event, missing_fields
@@ -499,7 +526,9 @@ class BaseAPIPipeline(BasePipeline):
             },
         )
 
-    def _determine_event_type(self, parsed_event: Dict[str, Any]) -> Optional[EventType]:
+    def _determine_event_type(
+        self, parsed_event: Dict[str, Any]
+    ) -> Optional[EventType]:
         """Determine event type from configured rules."""
         title = (parsed_event.get("title") or "").lower()
 
@@ -561,9 +590,13 @@ class BaseAPIPipeline(BasePipeline):
         validation_config = self.source_config.validation
 
         # Required fields
-        required_fields = validation_config.get("required_fields", ["title", "source_event_id"])
+        required_fields = validation_config.get(
+            "required_fields", ["title", "source_event_id"]
+        )
         for field_name in required_fields:
-            if field_name == "title" and (not event.title or event.title == "Untitled Event"):
+            if field_name == "title" and (
+                not event.title or event.title == "Untitled Event"
+            ):
                 errors.append("Title is required")
             elif field_name == "source_event_id" and not event.source.source_event_id:
                 errors.append("Source event ID is required")
@@ -639,9 +672,12 @@ def create_api_pipeline_from_config(
     source_config = APISourceConfig(
         source_name=source_name,
         enabled=source_config_dict.get("enabled", True),
-        endpoint=connection.get("endpoint") or source_config_dict.get("graphql_endpoint", ""),
+        endpoint=connection.get("endpoint")
+        or source_config_dict.get("graphql_endpoint", ""),
         protocol=connection.get("protocol", "graphql"),
-        timeout_seconds=connection.get("timeout_seconds", source_config_dict.get("request_timeout", 30)),
+        timeout_seconds=connection.get(
+            "timeout_seconds", source_config_dict.get("request_timeout", 30)
+        ),
         max_retries=source_config_dict.get("max_retries", 3),
         rate_limit_per_second=source_config_dict.get("rate_limit_per_second", 1.0),
         query_template=query_config.get("template"),
@@ -651,7 +687,9 @@ def create_api_pipeline_from_config(
         total_results_path=query_config.get("total_results_path"),
         pagination_type=pagination.get("type", "page_number"),
         max_pages=pagination.get("max_pages", 10),
-        default_page_size=pagination.get("default_page_size", source_config_dict.get("batch_size", 50)),
+        default_page_size=pagination.get(
+            "default_page_size", source_config_dict.get("batch_size", 50)
+        ),
         field_mappings=source_config_dict.get("field_mappings", {}),
         transformations=source_config_dict.get("transformations", {}),
         taxonomy_config=source_config_dict.get("taxonomy", {}),

@@ -6,14 +6,13 @@ Adapter for fetching data from API-based sources (REST, GraphQL).
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 import logging
 import time
 
 import requests
 
 from .base_adapter import BaseSourceAdapter, AdapterConfig, FetchResult, SourceType
-
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +22,7 @@ class APIAdapterConfig(AdapterConfig):
     """
     Configuration for API-based adapters.
     """
+
     base_url: str = ""
     api_key: Optional[str] = None
     headers: Dict[str, str] = field(default_factory=dict)
@@ -79,13 +79,17 @@ class APIAdapter(BaseSourceAdapter):
         """Get or create HTTP session."""
         if self._session is None:
             self._session = requests.Session()
-            self._session.headers.update({
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-                "Accept": "application/json",
-                **self.api_config.headers,
-            })
+            self._session.headers.update(
+                {
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+                    "Accept": "application/json",
+                    **self.api_config.headers,
+                }
+            )
             if self.api_config.api_key:
-                self._session.headers["Authorization"] = f"Bearer {self.api_config.api_key}"
+                self._session.headers["Authorization"] = (
+                    f"Bearer {self.api_config.api_key}"
+                )
         return self._session
 
     def fetch(self, **kwargs) -> FetchResult:
@@ -184,7 +188,7 @@ class APIAdapter(BaseSourceAdapter):
 
         except requests.RequestException as e:
             if retry_count < self.api_config.max_retries:
-                wait_time = 2 ** retry_count
+                wait_time = 2**retry_count
                 logger.warning(f"Request failed, retrying in {wait_time}s: {e}")
                 time.sleep(wait_time)
                 return self._make_request(session, query_data, retry_count + 1)
@@ -199,7 +203,11 @@ class APIAdapter(BaseSourceAdapter):
     def _default_response_parser(self, response: Dict) -> List[Dict]:
         """Default response parser - override or provide custom."""
         if "data" in response:
-            return response["data"] if isinstance(response["data"], list) else [response["data"]]
+            return (
+                response["data"]
+                if isinstance(response["data"], list)
+                else [response["data"]]
+            )
         return [response]
 
     def close(self) -> None:

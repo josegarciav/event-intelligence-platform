@@ -12,20 +12,18 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import sys
 import time
-from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterator, Optional
+from typing import Any, Dict, Optional
 
 from scrapping.storage.layouts import Layout, ensure_parent
-
 
 # ---------------------------------------------------------------------
 # Formatters
 # ---------------------------------------------------------------------
+
 
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
@@ -82,6 +80,7 @@ class TextFormatter(logging.Formatter):
 # ---------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class LoggingOptions:
@@ -168,6 +167,7 @@ def add_source_file_handler(
 # Context injection
 # ---------------------------------------------------------------------
 
+
 class ContextAdapter(logging.LoggerAdapter):
     def process(self, msg: str, kwargs: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
         extra = kwargs.get("extra", {})
@@ -177,7 +177,13 @@ class ContextAdapter(logging.LoggerAdapter):
         return msg, kwargs
 
 
-def with_context(logger: logging.Logger, *, run_id: Optional[str] = None, source_id: Optional[str] = None, stage: Optional[str] = None) -> ContextAdapter:
+def with_context(
+    logger: logging.Logger,
+    *,
+    run_id: Optional[str] = None,
+    source_id: Optional[str] = None,
+    stage: Optional[str] = None,
+) -> ContextAdapter:
     extra: Dict[str, Any] = {}
     if run_id:
         extra["run_id"] = run_id

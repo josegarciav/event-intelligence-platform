@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterable, List, Sequence
 
 from scrapping.storage.layouts import Layout, ensure_parent
 
@@ -34,27 +34,34 @@ class WriterOptions:
 # Generic low-level writers
 # ---------------------------------------------------------------------
 
+
 def write_json(path: Path, obj: Any, *, encoding: str = "utf-8") -> None:
     ensure_parent(path)
     with path.open("w", encoding=encoding) as f:
         json.dump(obj, f, indent=2, ensure_ascii=False)
 
 
-def write_jsonl(path: Path, rows: Iterable[Dict[str, Any]], *, encoding: str = "utf-8") -> None:
+def write_jsonl(
+    path: Path, rows: Iterable[Dict[str, Any]], *, encoding: str = "utf-8"
+) -> None:
     ensure_parent(path)
     with path.open("w", encoding=encoding) as f:
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
 
-def append_jsonl(path: Path, rows: Iterable[Dict[str, Any]], *, encoding: str = "utf-8") -> None:
+def append_jsonl(
+    path: Path, rows: Iterable[Dict[str, Any]], *, encoding: str = "utf-8"
+) -> None:
     ensure_parent(path)
     with path.open("a", encoding=encoding) as f:
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
 
-def write_csv(path: Path, rows: List[Dict[str, Any]], *, options: WriterOptions) -> None:
+def write_csv(
+    path: Path, rows: List[Dict[str, Any]], *, options: WriterOptions
+) -> None:
     """
     CSV needs stable columns; pandas makes it easier.
     """
@@ -72,7 +79,9 @@ def write_csv(path: Path, rows: List[Dict[str, Any]], *, options: WriterOptions)
     df.to_csv(path, index=False, encoding=options.default_encoding)
 
 
-def write_parquet(path: Path, rows: List[Dict[str, Any]], *, options: WriterOptions) -> None:
+def write_parquet(
+    path: Path, rows: List[Dict[str, Any]], *, options: WriterOptions
+) -> None:
     """
     Parquet writing: prefer pyarrow, fallback to pandas if it can.
     """
@@ -80,6 +89,7 @@ def write_parquet(path: Path, rows: List[Dict[str, Any]], *, options: WriterOpti
     try:
         import pyarrow as pa  # type: ignore
         import pyarrow.parquet as pq  # type: ignore
+
         ensure_parent(path)
         table = pa.Table.from_pylist(rows)
         pq.write_table(table, path.as_posix())
@@ -88,6 +98,7 @@ def write_parquet(path: Path, rows: List[Dict[str, Any]], *, options: WriterOpti
         # Try pandas -> parquet
         try:
             import pandas as pd  # type: ignore
+
             ensure_parent(path)
             df = pd.DataFrame(rows)
             df.to_parquet(path, index=False)  # requires pyarrow or fastparquet anyway
@@ -96,32 +107,53 @@ def write_parquet(path: Path, rows: List[Dict[str, Any]], *, options: WriterOpti
             if options.strict:
                 raise RuntimeError(f"Parquet write failed: {e_arrow} | {e_pd}")
             # fallback jsonl
-            write_jsonl(path.with_suffix(".jsonl"), rows, encoding=options.default_encoding)
+            write_jsonl(
+                path.with_suffix(".jsonl"), rows, encoding=options.default_encoding
+            )
 
 
 # ---------------------------------------------------------------------
 # Artifact writers (pipeline-level)
 # ---------------------------------------------------------------------
 
-def write_run_meta(layout: Layout, run_id: str, meta: Dict[str, Any], *, options: WriterOptions) -> Path:
+
+def write_run_meta(
+    layout: Layout, run_id: str, meta: Dict[str, Any], *, options: WriterOptions
+) -> Path:
     path = layout.run_meta_path(run_id)
     write_json(path, meta, encoding=options.default_encoding)
     return path
 
 
-def write_run_report(layout: Layout, run_id: str, report: Dict[str, Any], *, options: WriterOptions) -> Path:
+def write_run_report(
+    layout: Layout, run_id: str, report: Dict[str, Any], *, options: WriterOptions
+) -> Path:
     path = layout.run_report_path(run_id)
     write_json(path, report, encoding=options.default_encoding)
     return path
 
 
-def write_source_meta(layout: Layout, run_id: str, source_id: str, meta: Dict[str, Any], *, options: WriterOptions) -> Path:
+def write_source_meta(
+    layout: Layout,
+    run_id: str,
+    source_id: str,
+    meta: Dict[str, Any],
+    *,
+    options: WriterOptions,
+) -> Path:
     path = layout.source_meta_path(run_id, source_id)
     write_json(path, meta, encoding=options.default_encoding)
     return path
 
 
-def write_links(layout: Layout, run_id: str, source_id: str, links: Sequence[str], *, options: WriterOptions) -> Path:
+def write_links(
+    layout: Layout,
+    run_id: str,
+    source_id: str,
+    links: Sequence[str],
+    *,
+    options: WriterOptions,
+) -> Path:
     path = layout.extracted_links_path(run_id, source_id, ext="jsonl")
     rows = [{"url": u} for u in links]
     write_jsonl(path, rows, encoding=options.default_encoding)
@@ -135,7 +167,7 @@ def write_raw_pages_jsonl(
     *,
     kind: str,  # "listing" or "detail"
     pages: List[Dict[str, Any]],
-    options: WriterOptions
+    options: WriterOptions,
 ) -> List[Path]:
     """
     Write raw pages as JSONL, chunked.
@@ -151,7 +183,7 @@ def write_raw_pages_jsonl(
 
     for i in range(0, len(pages), chunk_size):
         part = i // chunk_size
-        chunk = pages[i:i + chunk_size]
+        chunk = pages[i : i + chunk_size]
         if kind == "listing":
             path = layout.raw_listing_path(run_id, source_id, part=part, ext="jsonl")
         else:
@@ -170,7 +202,7 @@ def write_items(
     name: str,
     items: List[Dict[str, Any]],
     fmt: str,
-    options: WriterOptions
+    options: WriterOptions,
 ) -> Path:
     """
     Write items in requested format, with graceful fallback.
@@ -178,7 +210,9 @@ def write_items(
     fmt: jsonl|csv|parquet
     """
     fmt = (fmt or "jsonl").lower().strip()
-    path = layout.items_path(run_id, source_id, name=name, ext=fmt if fmt != "jsonl" else "jsonl")
+    path = layout.items_path(
+        run_id, source_id, name=name, ext=fmt if fmt != "jsonl" else "jsonl"
+    )
 
     if fmt == "jsonl":
         write_jsonl(path, items, encoding=options.default_encoding)
@@ -201,6 +235,7 @@ def write_items(
 # ---------------------------------------------------------------------
 # Converters for pipeline artifacts
 # ---------------------------------------------------------------------
+
 
 def fetchresult_to_raw_record(fr: Any) -> Dict[str, Any]:
     """

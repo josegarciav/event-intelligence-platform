@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional
 
 from scrapping.extraction.transforms import normalize_ws, strip_or_none
 
@@ -57,9 +57,7 @@ _WS = re.compile(r"\s+")
 
 
 def evaluate_quality(
-    item: Dict[str, Any],
-    *,
-    rules: Optional[Dict[str, Any]] = None
+    item: Dict[str, Any], *, rules: Optional[Dict[str, Any]] = None
 ) -> QualityResult:
     """
     Evaluate item quality and decide keep/drop.
@@ -88,28 +86,48 @@ def evaluate_quality(
     if isinstance(required, (list, tuple)):
         for f in required:
             if not item.get(f):
-                issues.append(QualityIssue("error", "missing_field", f"Missing required field: {f}"))
+                issues.append(
+                    QualityIssue(
+                        "error", "missing_field", f"Missing required field: {f}"
+                    )
+                )
 
     # min lengths
     min_text_len = int(rules.get("min_text_len", 200))
     min_title_len = int(rules.get("min_title_len", 3))
 
     if len(title) < min_title_len:
-        issues.append(QualityIssue("warning", "short_title", f"title length {len(title)} < {min_title_len}"))
+        issues.append(
+            QualityIssue(
+                "warning", "short_title", f"title length {len(title)} < {min_title_len}"
+            )
+        )
 
     if len(text) < min_text_len:
-        issues.append(QualityIssue("error", "short_text", f"text length {len(text)} < {min_text_len}"))
+        issues.append(
+            QualityIssue(
+                "error", "short_text", f"text length {len(text)} < {min_text_len}"
+            )
+        )
 
     # anti-bot / blocked page patterns
     patterns = rules.get("block_patterns") or _DEFAULT_BLOCK_PATTERNS
     try:
         for p in patterns:
             if re.search(p, text.lower(), flags=re.IGNORECASE):
-                issues.append(QualityIssue("error", "blocked_page", f"Matched block pattern: {p}"))
+                issues.append(
+                    QualityIssue("error", "blocked_page", f"Matched block pattern: {p}")
+                )
                 break
     except Exception:
         # if patterns are malformed, warn but don't kill
-        issues.append(QualityIssue("warning", "bad_block_patterns", "Invalid block patterns; skipped matching"))
+        issues.append(
+            QualityIssue(
+                "warning",
+                "bad_block_patterns",
+                "Invalid block patterns; skipped matching",
+            )
+        )
 
     # boilerplate heuristic
     # This is a rough heuristic: if too many repeated tokens or too low lexical variety, it's often garbage.
@@ -119,13 +137,19 @@ def evaluate_quality(
             max_boilerplate_ratio = float(max_boilerplate_ratio)
             ratio = _boilerplate_ratio(text)
             if ratio > max_boilerplate_ratio:
-                issues.append(QualityIssue(
-                    "error",
-                    "boilerplate",
-                    f"boilerplate_ratio {ratio:.3f} > {max_boilerplate_ratio:.3f}"
-                ))
+                issues.append(
+                    QualityIssue(
+                        "error",
+                        "boilerplate",
+                        f"boilerplate_ratio {ratio:.3f} > {max_boilerplate_ratio:.3f}",
+                    )
+                )
         except Exception:
-            issues.append(QualityIssue("warning", "bad_boilerplate_rule", "Invalid max_boilerplate_ratio"))
+            issues.append(
+                QualityIssue(
+                    "warning", "bad_boilerplate_rule", "Invalid max_boilerplate_ratio"
+                )
+            )
 
     # language allow/deny (uses extracted language if present)
     lang = strip_or_none(item.get("language"))
@@ -133,10 +157,16 @@ def evaluate_quality(
     deny = rules.get("language_deny")
 
     if lang and isinstance(deny, (list, tuple)) and lang in deny:
-        issues.append(QualityIssue("error", "lang_denied", f"language '{lang}' is denied"))
+        issues.append(
+            QualityIssue("error", "lang_denied", f"language '{lang}' is denied")
+        )
 
     if lang and isinstance(allow, (list, tuple)) and allow and (lang not in allow):
-        issues.append(QualityIssue("error", "lang_not_allowed", f"language '{lang}' not in allowed list"))
+        issues.append(
+            QualityIssue(
+                "error", "lang_not_allowed", f"language '{lang}' not in allowed list"
+            )
+        )
 
     keep = not any(i.level == "error" for i in issues)
     return QualityResult(keep=keep, issues=issues)

@@ -6,7 +6,6 @@ API-based pipeline for ingesting events from ra.co using their GraphQL API.
 
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
-from decimal import Decimal
 import logging
 
 from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
@@ -24,7 +23,6 @@ from src.ingestion.normalization.event_schema import (
     PrimaryCategory,
 )
 from src.ingestion.normalization.currency import CurrencyParser
-
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +87,7 @@ class RaCoAdapter(APIAdapter):
         page: int = 1,
         date_from: Optional[str] = None,
         date_to: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ) -> Dict[str, Any]:
         """Build GraphQL query for ra.co events."""
         if date_from is None:
@@ -105,11 +103,11 @@ class RaCoAdapter(APIAdapter):
                     "listingDate": {
                         "gte": date_from,
                         "lte": date_to,
-                    }
+                    },
                 },
                 "pageSize": page_size,
                 "page": page,
-            }
+            },
         }
 
     def fetch(self, **kwargs) -> FetchResult:
@@ -157,7 +155,9 @@ class RaCoAdapter(APIAdapter):
 
             # Check if we've fetched all available events
             if len(result.raw_data) < page_size:
-                logger.info(f"Received {len(result.raw_data)} events (less than page_size), stopping pagination")
+                logger.info(
+                    f"Received {len(result.raw_data)} events (less than page_size), stopping pagination"
+                )
                 break
 
             # Check if we've reached total available
@@ -167,7 +167,9 @@ class RaCoAdapter(APIAdapter):
 
             page += 1
 
-        logger.info(f"Pagination complete: fetched {len(all_events)} total events across {page} pages")
+        logger.info(
+            f"Pagination complete: fetched {len(all_events)} total events across {page} pages"
+        )
 
         return FetchResult(
             success=len(all_events) > 0,
@@ -283,21 +285,25 @@ class RaCoPipeline(BasePipeline):
 
         # Add exploration dimension for festivals
         if any(word in title_lower for word in ["festival", "carnival", "outdoor"]):
-            taxonomy_dimensions.append({
-                "primary_category": PrimaryCategory.EXPLORATION_AND_ADVENTURE.value,
-                "subcategory": "2.4",
-                "values": ["curiosity", "discovery"],
-                "confidence": 0.65,
-            })
+            taxonomy_dimensions.append(
+                {
+                    "primary_category": PrimaryCategory.EXPLORATION_AND_ADVENTURE.value,
+                    "subcategory": "2.4",
+                    "values": ["curiosity", "discovery"],
+                    "confidence": 0.65,
+                }
+            )
 
         # Add learning dimension for workshops
         if any(word in title_lower for word in ["workshop", "masterclass", "talk"]):
-            taxonomy_dimensions.append({
-                "primary_category": PrimaryCategory.LEARNING_AND_INTELLECTUAL.value,
-                "subcategory": "4.2",
-                "values": ["growth", "mastery"],
-                "confidence": 0.7,
-            })
+            taxonomy_dimensions.append(
+                {
+                    "primary_category": PrimaryCategory.LEARNING_AND_INTELLECTUAL.value,
+                    "subcategory": "4.2",
+                    "values": ["growth", "mastery"],
+                    "confidence": 0.7,
+                }
+            )
 
         return primary_category, taxonomy_dimensions
 
@@ -312,7 +318,9 @@ class RaCoPipeline(BasePipeline):
         event_id = f"ra_co_{source_event_id}"
 
         # Parse dates
-        start_dt = self._parse_datetime(parsed_event.get("start_time") or parsed_event.get("date"))
+        start_dt = self._parse_datetime(
+            parsed_event.get("start_time") or parsed_event.get("date")
+        )
         end_dt = self._parse_datetime(parsed_event.get("end_time"))
 
         # Location
@@ -326,11 +334,13 @@ class RaCoPipeline(BasePipeline):
 
         # Price
         price_str = parsed_event.get("cost") or ""
-        min_price, max_price, currency = CurrencyParser.parse_price_string(str(price_str))
+        min_price, max_price, currency = CurrencyParser.parse_price_string(
+            str(price_str)
+        )
 
-        is_free = (
-            min_price is None and max_price is None
-        ) or str(price_str).lower() in ["free", "0", "gratis"]
+        is_free = (min_price is None and max_price is None) or str(
+            price_str
+        ).lower() in ["free", "0", "gratis"]
 
         price = PriceInfo(
             currency=currency or "EUR",
@@ -469,8 +479,7 @@ class RaCoPipeline(BasePipeline):
 
 
 def create_ra_co_pipeline(
-    pipeline_config: PipelineConfig,
-    source_config: Dict[str, Any]
+    pipeline_config: PipelineConfig, source_config: Dict[str, Any]
 ) -> RaCoPipeline:
     """
     Factory function to create a configured ra.co pipeline.

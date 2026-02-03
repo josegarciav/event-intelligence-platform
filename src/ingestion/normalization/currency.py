@@ -153,7 +153,12 @@ class CurrencyParser:
         """
         # Remove currency symbols and common text
         clean = re.sub(r"[€£$¥₹]", "", price_str)
-        clean = re.sub(r"\b(EUR|GBP|USD|JPY|CHF|AUD|CAD|BRL|PLN|CZK|SEK|NOK|DKK)\b", "", clean, flags=re.IGNORECASE)
+        clean = re.sub(
+            r"\b(EUR|GBP|USD|JPY|CHF|AUD|CAD|BRL|PLN|CZK|SEK|NOK|DKK)\b",
+            "",
+            clean,
+            flags=re.IGNORECASE,
+        )
 
         # Find all number patterns (including decimals with . or ,)
         # Pattern matches: 15, 15.50, 15,50

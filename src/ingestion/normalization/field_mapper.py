@@ -10,7 +10,7 @@ Supports:
 """
 
 import re
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,9 @@ class FieldMapper:
                 value = self._extract_field(raw_event, source_path)
                 result[target_field] = value
             except Exception as e:
-                logger.debug(f"Failed to extract {target_field} from {source_path}: {e}")
+                logger.debug(
+                    f"Failed to extract {target_field} from {source_path}: {e}"
+                )
                 result[target_field] = None
 
         # Apply transformations
@@ -250,7 +252,9 @@ class FieldMapper:
                     result[field_name] = separator.join(values)
 
             except Exception as e:
-                logger.warning(f"Failed to apply transformation {transform_type} to {field_name}: {e}")
+                logger.warning(
+                    f"Failed to apply transformation {transform_type} to {field_name}: {e}"
+                )
 
         return result
 

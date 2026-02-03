@@ -22,8 +22,7 @@ from typing import Dict, Optional
 
 import yaml
 
-from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
-from src.ingestion.adapters import SourceType
+from src.ingestion.base_pipeline import BasePipeline
 
 logger = logging.getLogger(__name__)
 
@@ -95,10 +94,7 @@ class PipelineFactory:
 
     def list_enabled_sources(self) -> list:
         """List names of all enabled sources."""
-        return [
-            name for name, info in self.list_sources().items()
-            if info["enabled"]
-        ]
+        return [name for name, info in self.list_sources().items() if info["enabled"]]
 
     def create_pipeline(self, source_name: str) -> BasePipeline:
         """
@@ -120,7 +116,9 @@ class PipelineFactory:
         if not source_config.get("enabled", True):
             raise ValueError(f"Source '{source_name}' is not enabled")
 
-        pipeline_type = source_config.get("pipeline_type", source_config.get("type", "api"))
+        pipeline_type = source_config.get(
+            "pipeline_type", source_config.get("type", "api")
+        )
 
         if pipeline_type == "api":
             return self._create_api_pipeline(source_name, source_config)
@@ -135,7 +133,9 @@ class PipelineFactory:
         source_config: Dict,
     ) -> BasePipeline:
         """Create an API-based pipeline."""
-        from src.ingestion.pipelines.apis.base_api import create_api_pipeline_from_config
+        from src.ingestion.pipelines.apis.base_api import (
+            create_api_pipeline_from_config,
+        )
 
         return create_api_pipeline_from_config(source_name, source_config)
 
@@ -196,7 +196,9 @@ def get_factory(config_path: Optional[str] = None) -> PipelineFactory:
     return _factory
 
 
-def create_pipeline(source_name: str, config_path: Optional[str] = None) -> BasePipeline:
+def create_pipeline(
+    source_name: str, config_path: Optional[str] = None
+) -> BasePipeline:
     """
     Convenience function to create a pipeline by source name.
 
