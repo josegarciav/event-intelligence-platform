@@ -7,6 +7,7 @@ API-based pipeline for ingesting events from ra.co using their GraphQL API.
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 import logging
+import uuid
 
 from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
 from src.ingestion.adapters import APIAdapter, SourceType, FetchResult
@@ -17,6 +18,7 @@ from src.ingestion.normalization.event_schema import (
     EventFormat,
     LocationInfo,
     PriceInfo,
+    TicketInfo,
     OrganizerInfo,
     SourceInfo,
     TaxonomyDimension,
@@ -350,8 +352,10 @@ class RaCoPipeline(BasePipeline):
         taxonomy_dims: List[Dict[str, Any]],
     ) -> EventSchema:
         """Normalize parsed event to EventSchema."""
-        source_event_id = parsed_event.get("source_event_id", "")
-        event_id = f"ra_co_{source_event_id}"
+        source_event_id = str(parsed_event.get("source_event_id", ""))
+
+        # Generate platform UUID for event_id (source ID lives in source_event_id)
+        event_id = str(uuid.uuid4())
 
         # Parse dates
         start_dt = self._parse_datetime(
@@ -393,11 +397,18 @@ class RaCoPipeline(BasePipeline):
 
         # Source
         content_url = parsed_event.get("content_url", "")
+        source_url = f"https://ra.co{content_url}" if content_url else ""
         source = SourceInfo(
             source_name="ra_co",
             source_event_id=source_event_id,
-            source_url=f"https://ra.co{content_url}" if content_url else "",
+            source_url=source_url,
             last_updated_from_source=datetime.utcnow(),
+        )
+
+        # Ticket info - ra.co events link to their event page for tickets
+        ticket_info = TicketInfo(
+            url=f"{source_url}/tickets" if source_url else None,
+            is_sold_out=False,  # Not available from ra.co API
         )
 
         # Taxonomy dimensions with expanded fields
@@ -449,6 +460,7 @@ class RaCoPipeline(BasePipeline):
             event_type=event_type,
             format=EventFormat.IN_PERSON,
             price=price,
+            ticket_info=ticket_info,
             organizer=organizer,
             image_url=parsed_event.get("image_url"),
             source=source,

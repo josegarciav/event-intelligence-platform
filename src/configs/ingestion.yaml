@@ -133,8 +133,8 @@ sources:
     # Default values
     defaults:
       area_id: 20  # Barcelona
-      page_size: 50
-      days_ahead: 30
+      page_size: 1000
+      days_ahead: 120
       location:
         city: "Barcelona"
         country_code: "ES"
@@ -142,7 +142,7 @@ sources:
 
     # Validation rules
     validation:
-      required_fields: ["title", "source_event_id"]
+      required_fields: ["title", "source_event_id", "city", "start_datetime"]
       future_events_only: true
 
     # Enrichment options
@@ -150,10 +150,29 @@ sources:
       geocoding: true
       # Feature extraction (LLM-based)
       feature_extraction:
-        enabled: false  # Set to true when API key is configured
+        enabled: true
         provider: "openai"
-        model_name: "gpt-3.5-turbo"
-        fill_missing: ["event_type", "tags", "activity_id"]
+        model_name: "gpt-4o-mini"
+        fill_missing:
+          - "event_type"
+          - "tags"
+          - "activity_id"
+          - "activity_name"
+          - "energy_level"
+          - "social_intensity"
+          - "cognitive_load"
+          - "physical_involvement"
+          - "cost_level"
+          - "time_scale"
+          - "environment"
+          - "emotional_output"
+          - "risk_level"
+          - "age_accessibility"
+          - "repeatability"
+          - "event_type"
+          - "capacity"
+          - "event_format"
+          - "tags"
 
     # Scheduling
     schedule:

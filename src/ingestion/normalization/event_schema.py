@@ -497,6 +497,9 @@ class SourceInfo(BaseModel):
     )
     source_event_id: str = Field(description="Event ID from the original source")
     source_url: str = Field(description="Direct URL to event on source platform")
+    raw_html: Optional[str] = Field(
+        None, description="Raw HTML or JSON data from source for debugging/validation"
+    )
     last_updated_from_source: datetime
     ingestion_timestamp: datetime = Field(
         default_factory=datetime.utcnow, description="When we ingested this event"
@@ -647,7 +650,7 @@ class EventSchema(BaseModel):
         use_enum_values = True
         json_schema_extra = {
             "example": {
-                "event_id": "ra_co_12345_2026-03-15",  # generated unique UUID by us (pulsecity), randomly generated
+                "event_id": "550e8400-e29b-41d4-a716-446655440000",  # platform-generated UUID (pulsecity), source ID is in source.source_event_id
                 "title": "Floating Points DJ Set",  # the event title
                 "description": "Electronic music performance",  # the description including artist name
                 "taxonomy_dimensions": [

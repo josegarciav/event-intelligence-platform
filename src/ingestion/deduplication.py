@@ -19,7 +19,7 @@ class DeduplicationStrategy(str, Enum):
     EXACT = "exact"
     FUZZY = "fuzzy"  # Not yet implemented
     METADATA = "metadata"  # Not yet implemented
-    COMPOSITE = "composite"
+    COMPOSITE = "composite" # Not yet implemented
 
 
 class EventDeduplicator(ABC):

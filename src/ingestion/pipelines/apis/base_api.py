@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 import logging
+import uuid
 
 
 from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
@@ -422,7 +423,8 @@ class BaseAPIPipeline(BasePipeline):
         Uses configuration for defaults and FeatureExtractor for missing fields.
         """
         source_event_id = str(parsed_event.get("source_event_id", ""))
-        event_id = f"{self.source_config.source_name}_{source_event_id}"
+        # Generate platform UUID for event_id (source ID lives in source.source_event_id)
+        event_id = str(uuid.uuid4())
 
         # Parse dates
         start_dt = self._parse_datetime(

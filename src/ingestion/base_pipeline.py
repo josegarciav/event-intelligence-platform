@@ -397,35 +397,36 @@ class BasePipeline(ABC):
 
     def to_dataframe(self, events: List[EventSchema]):
         """
-        Convert events to pandas DataFrame.
+        Convert events to comprehensive pandas DataFrame (Master Schema).
 
-        Includes:
-        - Core event fields (title, description, dates, location)
-        - Pricing information
-        - Primary taxonomy dimension with all enrichment fields
-        - Full taxonomy JSON for reference
+        This creates the master database from which all derived schemas
+        (price, ticket_info, venue, etc.) can be built.
+
+        Includes ALL fields from EventSchema with proper flattening of nested objects.
         """
         import pandas as pd
         import json
 
         rows = []
         for event in events:
+            # ---- ARTISTS (from custom_fields) ----
             artists_list = event.custom_fields.get("artists", [])
             artists_str = ", ".join(
                 a.get("name", "") if isinstance(a, dict) else str(a)
                 for a in artists_list
             )
 
-            # Build full taxonomy JSON with all fields
+            # ---- TAXONOMY DIMENSIONS (JSON + flattened primary) ----
             taxonomy_json = json.dumps(
                 [
                     {
                         "primary_category": dim.primary_category,
                         "subcategory": dim.subcategory,
                         "subcategory_name": dim.subcategory_name,
+                        "values": dim.values,
+                        "confidence": dim.confidence,
                         "activity_id": dim.activity_id,
                         "activity_name": dim.activity_name,
-                        "confidence": dim.confidence,
                         "energy_level": dim.energy_level,
                         "social_intensity": dim.social_intensity,
                         "cognitive_load": dim.cognitive_load,
@@ -442,91 +443,163 @@ class BasePipeline(ABC):
                 ]
             )
 
-            # Handle event_type which could be Enum or string
-            event_type_val = None
-            if event.event_type:
-                event_type_val = (
-                    event.event_type.value
-                    if hasattr(event.event_type, "value")
-                    else str(event.event_type)
-                )
-
-            format_val = None
-            if event.format:
-                format_val = (
-                    event.format.value
-                    if hasattr(event.format, "value")
-                    else str(event.format)
-                )
-
             # Get primary taxonomy dimension for flat columns
             primary_dim = (
                 event.taxonomy_dimensions[0] if event.taxonomy_dimensions else None
             )
 
+            # ---- ENUM VALUE EXTRACTION ----
+            def get_enum_value(val):
+                if val is None:
+                    return None
+                return val.value if hasattr(val, "value") else str(val)
+
+            # ---- LOCATION FLATTENING ----
+            loc = event.location
+            lat = loc.coordinates.latitude if loc.coordinates else None
+            lon = loc.coordinates.longitude if loc.coordinates else None
+
+            # ---- PRICE FLATTENING ----
+            price = event.price
+
+            # ---- TICKET INFO FLATTENING ----
+            ticket = event.ticket_info
+
+            # ---- ORGANIZER FLATTENING ----
+            org = event.organizer
+
+            # ---- SOURCE FLATTENING ----
+            src = event.source
+
+            # ---- ENGAGEMENT FLATTENING ----
+            eng = event.engagement
+
+            # ---- MEDIA ASSETS (JSON) ----
+            media_json = json.dumps(
+                [
+                    {
+                        "type": m.type,
+                        "url": m.url,
+                        "title": m.title,
+                        "description": m.description,
+                    }
+                    for m in event.media_assets
+                ]
+            ) if event.media_assets else None
+
             row = {
-                # Core event info
+                # ==== CORE EVENT INFO ====
                 "event_id": event.event_id,
                 "title": event.title,
-                "description": event.description[:500] if event.description else None,
+                "description": event.description,
+
+                # ==== TIMING ====
                 "start_datetime": event.start_datetime,
                 "end_datetime": event.end_datetime,
                 "duration_minutes": event.duration_minutes,
-                # Location
-                "city": event.location.city,
-                "country_code": event.location.country_code,
-                "venue_name": event.location.venue_name,
-                # Artists
-                "artists": artists_str,
-                # Taxonomy - primary category
-                "primary_category": event.primary_category,
-                "subcategory": primary_dim.subcategory if primary_dim else None,
-                "subcategory_name": primary_dim.subcategory_name if primary_dim else None,
-                # Taxonomy - activity level fields
-                "activity_name": primary_dim.activity_name if primary_dim else None,
-                "energy_level": primary_dim.energy_level if primary_dim else None,
-                "social_intensity": primary_dim.social_intensity if primary_dim else None,
-                "cognitive_load": primary_dim.cognitive_load if primary_dim else None,
-                "physical_involvement": (
-                    primary_dim.physical_involvement if primary_dim else None
-                ),
-                "cost_level": primary_dim.cost_level if primary_dim else None,
-                "time_scale": primary_dim.time_scale if primary_dim else None,
-                "environment": primary_dim.environment if primary_dim else None,
-                "emotional_output": (
-                    ", ".join(primary_dim.emotional_output)
-                    if primary_dim and primary_dim.emotional_output
-                    else None
-                ),
-                "risk_level": primary_dim.risk_level if primary_dim else None,
-                "age_accessibility": (
-                    primary_dim.age_accessibility if primary_dim else None
-                ),
-                "repeatability": primary_dim.repeatability if primary_dim else None,
-                # Full taxonomy JSON
-                "taxonomy_json": taxonomy_json,
-                # Event type & format
-                "event_type": event_type_val,
-                "format": format_val,
-                # Pricing
-                "is_free": event.price.is_free if event.price else None,
-                "min_price": (
-                    float(event.price.minimum_price)
-                    if event.price and event.price.minimum_price
-                    else None
-                ),
-                "max_price": (
-                    float(event.price.maximum_price)
-                    if event.price and event.price.maximum_price
-                    else None
-                ),
-                "currency_code": event.price.currency if event.price else None,
-                # Organizer & source
-                "organizer": event.organizer.name if event.organizer else None,
-                "source_url": event.source.source_url if event.source else None,
+                "is_all_day": event.is_all_day,
+                "is_recurring": event.is_recurring,
+                "recurrence_pattern": event.recurrence_pattern,
+
+                # ==== LOCATION (flattened) ====
+                "venue_name": loc.venue_name,
+                "street_address": loc.street_address,
+                "city": loc.city,
+                "state_or_region": loc.state_or_region,
+                "postal_code": loc.postal_code,
+                "country_code": loc.country_code,
+                "latitude": lat,
+                "longitude": lon,
+                "timezone": loc.timezone,
+
+                # ==== EVENT DETAILS ====
+                "event_type": get_enum_value(event.event_type),
+                "event_format": get_enum_value(event.format),
+                "capacity": event.capacity,
+                "age_restriction": event.age_restriction,
+
+                # ==== PRICE (flattened) ====
+                "price_currency": price.currency if price else None,
+                "price_is_free": price.is_free if price else None,
+                "price_minimum": float(price.minimum_price) if price and price.minimum_price else None,
+                "price_maximum": float(price.maximum_price) if price and price.maximum_price else None,
+                "price_early_bird": float(price.early_bird_price) if price and price.early_bird_price else None,
+                "price_standard": float(price.standard_price) if price and price.standard_price else None,
+                "price_vip": float(price.vip_price) if price and price.vip_price else None,
+                "price_raw_text": price.price_raw_text if price else None,
+
+                # ==== TICKET INFO (flattened) ====
+                "ticket_url": ticket.url if ticket else None,
+                "ticket_is_sold_out": ticket.is_sold_out if ticket else None,
+                "ticket_count_available": ticket.ticket_count_available if ticket else None,
+                "ticket_early_bird_deadline": ticket.early_bird_deadline if ticket else None,
+
+                # ==== ORGANIZER (flattened) ====
+                "organizer_name": org.name if org else None,
+                "organizer_url": org.url if org else None,
+                "organizer_email": org.email if org else None,
+                "organizer_phone": org.phone if org else None,
+                "organizer_image_url": org.image_url if org else None,
+                "organizer_follower_count": org.follower_count if org else None,
+                "organizer_verified": org.verified if org else None,
+
+                # ==== SOURCE (flattened) ====
+                "source_name": src.source_name if src else None,
+                "source_event_id": src.source_event_id if src else None,
+                "source_url": src.source_url if src else None,
+                "source_last_updated": src.last_updated_from_source if src else None,
+                "source_ingestion_timestamp": src.ingestion_timestamp if src else None,
+
+                # ==== MEDIA ====
                 "image_url": event.image_url,
-                # Quality
+                "media_assets_json": media_json,
+
+                # ==== ENGAGEMENT (flattened) ====
+                "engagement_going_count": eng.going_count if eng else None,
+                "engagement_interested_count": eng.interested_count if eng else None,
+                "engagement_views_count": eng.views_count if eng else None,
+                "engagement_shares_count": eng.shares_count if eng else None,
+                "engagement_comments_count": eng.comments_count if eng else None,
+                "engagement_likes_count": eng.likes_count if eng else None,
+                "engagement_last_updated": eng.last_updated if eng else None,
+
+                # ==== TAXONOMY - PRIMARY CATEGORY ====
+                "primary_category": get_enum_value(event.primary_category),
+
+                # ==== TAXONOMY - PRIMARY DIMENSION (flattened) ====
+                "taxonomy_subcategory": primary_dim.subcategory if primary_dim else None,
+                "taxonomy_subcategory_name": primary_dim.subcategory_name if primary_dim else None,
+                "taxonomy_values": ", ".join(primary_dim.values) if primary_dim and primary_dim.values else None,
+                "taxonomy_confidence": primary_dim.confidence if primary_dim else None,
+                "taxonomy_activity_id": primary_dim.activity_id if primary_dim else None,
+                "taxonomy_activity_name": primary_dim.activity_name if primary_dim else None,
+                "taxonomy_energy_level": primary_dim.energy_level if primary_dim else None,
+                "taxonomy_social_intensity": primary_dim.social_intensity if primary_dim else None,
+                "taxonomy_cognitive_load": primary_dim.cognitive_load if primary_dim else None,
+                "taxonomy_physical_involvement": primary_dim.physical_involvement if primary_dim else None,
+                "taxonomy_cost_level": primary_dim.cost_level if primary_dim else None,
+                "taxonomy_time_scale": primary_dim.time_scale if primary_dim else None,
+                "taxonomy_environment": primary_dim.environment if primary_dim else None,
+                "taxonomy_emotional_output": ", ".join(primary_dim.emotional_output) if primary_dim and primary_dim.emotional_output else None,
+                "taxonomy_risk_level": primary_dim.risk_level if primary_dim else None,
+                "taxonomy_age_accessibility": primary_dim.age_accessibility if primary_dim else None,
+                "taxonomy_repeatability": primary_dim.repeatability if primary_dim else None,
+
+                # ==== FULL TAXONOMY JSON (all dimensions) ====
+                "taxonomy_dimensions_json": taxonomy_json,
+
+                # ==== QUALITY & ERRORS ====
                 "data_quality_score": event.data_quality_score,
+                "normalization_errors": ", ".join(event.normalization_errors) if event.normalization_errors else None,
+
+                # ==== ADDITIONAL METADATA ====
+                "tags": ", ".join(event.tags) if event.tags else None,
+                "artists": artists_str,
+                "custom_fields_json": json.dumps(event.custom_fields) if event.custom_fields else None,
+
+                # ==== PLATFORM TIMESTAMPS ====
+                "created_at": event.created_at,
+                "updated_at": event.updated_at,
             }
             rows.append(row)
 
