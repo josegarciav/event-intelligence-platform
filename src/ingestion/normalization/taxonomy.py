@@ -10,7 +10,7 @@ Provides functions to:
 """
 
 import json
-from typing import Dict, Set, List, Any, Optional
+from typing import Dict, Set, List, Any, Optional, Tuple
 from functools import lru_cache
 
 from src.configs.config import Config
@@ -45,6 +45,126 @@ def build_taxonomy_index() -> Dict[str, Set[str]]:
         index[primary] = {sub["id"] for sub in cat.get("subcategories", [])}
 
     return index
+
+
+# =============================================================================
+# PRIMARY CATEGORY ID MAPPING
+# =============================================================================
+
+# Mapping from numeric IDs ("1" through "10") to PrimaryCategory enum values
+_PRIMARY_CATEGORY_ID_MAP: Dict[str, str] = {
+    "1": "play_and_fun",
+    "2": "exploration_and_adventure",
+    "3": "creation_and_expression",
+    "4": "learning_and_intellectual",
+    "5": "social_connection",
+    "6": "body_and_movement",
+    "7": "challenge_and_achievement",
+    "8": "relaxation_and_escapism",
+    "9": "identity_and_meaning",
+    "10": "contribution_and_impact",
+}
+
+# Reverse mapping from enum value to numeric ID
+_PRIMARY_CATEGORY_VALUE_TO_ID: Dict[str, str] = {v: k for k, v in _PRIMARY_CATEGORY_ID_MAP.items()}
+
+
+def get_primary_category_id_map() -> Dict[str, str]:
+    """
+    Get mapping from numeric ID to primary category value.
+
+    Returns:
+        Dict mapping "1" -> "play_and_fun", "2" -> "exploration_and_adventure", etc.
+    """
+    return _PRIMARY_CATEGORY_ID_MAP.copy()
+
+
+def get_primary_category_value_to_id_map() -> Dict[str, str]:
+    """
+    Get mapping from primary category value to numeric ID.
+
+    Returns:
+        Dict mapping "play_and_fun" -> "1", "exploration_and_adventure" -> "2", etc.
+    """
+    return _PRIMARY_CATEGORY_VALUE_TO_ID.copy()
+
+
+def get_primary_category_mappings() -> Tuple[Dict[str, str], Dict[str, str]]:
+    """
+    Build bidirectional ID <-> value mappings for primary categories.
+
+    Returns:
+        Tuple of (id_to_value, value_to_id) dicts.
+        - id_to_value: "1" -> "play_and_fun"
+        - value_to_id: "play_and_fun" -> "1"
+
+    Example:
+        >>> id_to_val, val_to_id = get_primary_category_mappings()
+        >>> id_to_val["1"]
+        'play_and_fun'
+        >>> val_to_id["play_and_fun"]
+        '1'
+    """
+    return _PRIMARY_CATEGORY_ID_MAP.copy(), _PRIMARY_CATEGORY_VALUE_TO_ID.copy()
+
+
+def build_primary_to_subcategory_index() -> Dict[str, Set[str]]:
+    """
+    Map primary_id -> set of valid subcategory_ids.
+
+    Returns:
+        Dict mapping primary category numeric ID to set of subcategory IDs.
+        E.g., "1" -> {"1.1", "1.2", "1.3", "1.4", "1.5"}
+
+    Example:
+        >>> index = build_primary_to_subcategory_index()
+        >>> "1.4" in index["1"]
+        True
+        >>> "2.1" in index["1"]
+        False
+    """
+    taxonomy_index = build_taxonomy_index()
+    result: Dict[str, Set[str]] = {}
+
+    for primary_id, primary_value in _PRIMARY_CATEGORY_ID_MAP.items():
+        # The taxonomy index uses normalized keys like "play_and_pure_fun"
+        # We need to check both possible formats
+        subcats = taxonomy_index.get(primary_value, set())
+        if not subcats:
+            # Try with "pure" variant for category 1
+            alt_key = primary_value.replace("play_and_fun", "play_and_pure_fun")
+            subcats = taxonomy_index.get(alt_key, set())
+        result[primary_id] = subcats
+
+    return result
+
+
+def validate_subcategory_for_primary(subcategory_id: str, primary_id: str) -> bool:
+    """
+    Validate that a subcategory ID belongs to a primary category ID.
+
+    Args:
+        subcategory_id: Subcategory ID (e.g., "1.4")
+        primary_id: Primary category ID (e.g., "1") or value (e.g., "play_and_fun")
+
+    Returns:
+        True if subcategory belongs to primary category, False otherwise.
+
+    Example:
+        >>> validate_subcategory_for_primary("1.4", "1")
+        True
+        >>> validate_subcategory_for_primary("2.1", "1")
+        False
+        >>> validate_subcategory_for_primary("1.4", "play_and_fun")
+        True
+    """
+    # If primary_id is a value, convert to numeric ID
+    if primary_id in _PRIMARY_CATEGORY_VALUE_TO_ID:
+        primary_id = _PRIMARY_CATEGORY_VALUE_TO_ID[primary_id]
+
+    # Simple validation: subcategory should start with primary_id + "."
+    expected_prefix = f"{primary_id}."
+    return subcategory_id.startswith(expected_prefix)
 
 
 @lru_cache

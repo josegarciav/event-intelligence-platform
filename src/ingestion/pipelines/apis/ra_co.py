@@ -21,8 +21,13 @@ from src.ingestion.normalization.event_schema import (
     SourceInfo,
     TaxonomyDimension,
     PrimaryCategory,
+    Subcategory,
 )
 from src.ingestion.normalization.currency import CurrencyParser
+from src.ingestion.normalization.feature_extractor import (
+    FeatureExtractor,
+    create_feature_extractor_from_config,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -216,10 +221,17 @@ class RaCoPipeline(BasePipeline):
     Pipeline for ra.co events.
 
     Uses GraphQL API to fetch electronic music events.
+    Serves as a reference implementation for custom pipelines.
     """
 
-    def __init__(self, config: PipelineConfig, adapter: RaCoAdapter):
+    def __init__(
+        self,
+        config: PipelineConfig,
+        adapter: RaCoAdapter,
+        feature_extractor: Optional[FeatureExtractor] = None,
+    ):
         super().__init__(config, adapter)
+        self.feature_extractor = feature_extractor
 
     def parse_raw_event(self, raw_event: Dict[str, Any]) -> Dict[str, Any]:
         """Parse raw GraphQL event to intermediate format."""
@@ -261,23 +273,32 @@ class RaCoPipeline(BasePipeline):
         Map ra.co event to Human Experience Taxonomy.
 
         Ra.co events are electronic music events, mapping to:
-        - PLAY_AND_FUN -> Music & Rhythm Play (1.4)
-        - SOCIAL_CONNECTION -> Shared Activities (5.7)
+        - PLAY_AND_FUN (ID: 1) -> Music & Rhythm Play (1.4)
+        - SOCIAL_CONNECTION (ID: 5) -> Shared Activities (5.7)
+
+        Uses numeric ID format for primary categories.
         """
         title_lower = (parsed_event.get("title") or "").lower()
 
-        primary_category = PrimaryCategory.PLAY_AND_FUN.value
+        # Use numeric ID format - PrimaryCategory.from_id("1") = play_and_fun
+        primary_category = PrimaryCategory.from_id("1").value
+
+        # Get subcategory names for richer output
+        sub_1_4 = Subcategory.get_by_id("1.4")
+        sub_5_7 = Subcategory.get_by_id("5.7")
 
         taxonomy_dimensions = [
             {
-                "primary_category": PrimaryCategory.PLAY_AND_FUN.value,
+                "primary_category": PrimaryCategory.from_id("1").value,  # play_and_fun
                 "subcategory": "1.4",  # Music & Rhythm Play
+                "subcategory_name": sub_1_4.get("name") if sub_1_4 else None,
                 "values": ["expression", "energy", "flow", "rhythm"],
                 "confidence": 0.95,
             },
             {
-                "primary_category": PrimaryCategory.SOCIAL_CONNECTION.value,
+                "primary_category": PrimaryCategory.from_id("5").value,  # social_connection
                 "subcategory": "5.7",  # Shared Activities
+                "subcategory_name": sub_5_7.get("name") if sub_5_7 else None,
                 "values": ["connection", "belonging", "shared joy"],
                 "confidence": 0.8,
             },
@@ -285,10 +306,12 @@ class RaCoPipeline(BasePipeline):
 
         # Add exploration dimension for festivals
         if any(word in title_lower for word in ["festival", "carnival", "outdoor"]):
+            sub_2_4 = Subcategory.get_by_id("2.4")
             taxonomy_dimensions.append(
                 {
-                    "primary_category": PrimaryCategory.EXPLORATION_AND_ADVENTURE.value,
+                    "primary_category": PrimaryCategory.from_id("2").value,  # exploration_and_adventure
                     "subcategory": "2.4",
+                    "subcategory_name": sub_2_4.get("name") if sub_2_4 else None,
                     "values": ["curiosity", "discovery"],
                     "confidence": 0.65,
                 }
@@ -296,10 +319,12 @@ class RaCoPipeline(BasePipeline):
 
         # Add learning dimension for workshops
         if any(word in title_lower for word in ["workshop", "masterclass", "talk"]):
+            sub_4_2 = Subcategory.get_by_id("4.2")
             taxonomy_dimensions.append(
                 {
-                    "primary_category": PrimaryCategory.LEARNING_AND_INTELLECTUAL.value,
+                    "primary_category": PrimaryCategory.from_id("4").value,  # learning_and_intellectual
                     "subcategory": "4.2",
+                    "subcategory_name": sub_4_2.get("name") if sub_4_2 else None,
                     "values": ["growth", "mastery"],
                     "confidence": 0.7,
                 }
@@ -364,16 +389,31 @@ class RaCoPipeline(BasePipeline):
             last_updated_from_source=datetime.utcnow(),
         )
 
-        # Taxonomy dimensions
+        # Taxonomy dimensions with expanded fields
         taxonomy_objs = [
             TaxonomyDimension(
                 primary_category=dim["primary_category"],
                 subcategory=dim.get("subcategory"),
+                subcategory_name=dim.get("subcategory_name"),
                 values=dim.get("values", []),
                 confidence=dim.get("confidence", 0.5),
             )
             for dim in taxonomy_dims
         ]
+
+        # Enrich taxonomy dimensions with activity-level fields using FeatureExtractor
+        if self.feature_extractor:
+            enriched_dims = []
+            for dim in taxonomy_objs:
+                try:
+                    enriched = self.feature_extractor.enrich_taxonomy_dimension(
+                        dim, parsed_event
+                    )
+                    enriched_dims.append(enriched)
+                except Exception as e:
+                    logger.warning(f"Failed to enrich taxonomy dimension: {e}")
+                    enriched_dims.append(dim)
+            taxonomy_objs = enriched_dims
 
         # Event type
         title_lower = (parsed_event.get("title") or "").lower()
@@ -501,4 +541,11 @@ def create_ra_co_pipeline(
     )
 
     adapter = RaCoAdapter(adapter_config)
-    return RaCoPipeline(pipeline_config, adapter)
+
+    # Create feature extractor if enabled in config
+    feature_extractor = None
+    feature_extraction_config = source_config.get("feature_extraction", {})
+    if feature_extraction_config.get("enabled"):
+        feature_extractor = create_feature_extractor_from_config(feature_extraction_config)
+
+    return RaCoPipeline(pipeline_config, adapter, feature_extractor)

@@ -17,8 +17,9 @@ from src.ingestion.normalization.taxonomy import (
     get_full_taxonomy_dimension,
     get_subcategory_by_id,
     find_best_activity_match,
+    validate_subcategory_for_primary,
 )
-from src.ingestion.normalization.event_schema import TaxonomyDimension, PrimaryCategory
+from src.ingestion.normalization.event_schema import TaxonomyDimension, PrimaryCategory, Subcategory
 
 logger = logging.getLogger(__name__)
 
@@ -46,13 +47,37 @@ class TaxonomyMapper:
 
         Args:
             taxonomy_config: Dict with:
-                - default_primary: Default primary category
+                - default_primary: Default primary category (ID like "1" or value like "play_and_fun")
                 - default_subcategory: Default subcategory ID
                 - rules: List of rule dicts with match conditions and assignments
+
+        Raises:
+            ValueError: If default_subcategory doesn't match default_primary
         """
-        self.default_primary = taxonomy_config.get("default_primary", "play_and_fun")
+        # Parse default_primary - support both numeric ID and string value
+        default_primary_raw = taxonomy_config.get("default_primary", "play_and_fun")
+        try:
+            default_primary_enum = PrimaryCategory.from_id_or_value(default_primary_raw)
+            self.default_primary = default_primary_enum.value
+        except ValueError:
+            logger.warning(
+                f"Invalid default_primary '{default_primary_raw}', using 'play_and_fun'"
+            )
+            self.default_primary = "play_and_fun"
+
         self.default_subcategory = taxonomy_config.get("default_subcategory")
         self.rules = taxonomy_config.get("rules", [])
+
+        # Validate that default_subcategory belongs to default_primary
+        if self.default_subcategory:
+            if not Subcategory.validate_for_primary(
+                self.default_subcategory, self.default_primary
+            ):
+                raise ValueError(
+                    f"default_subcategory '{self.default_subcategory}' does not belong to "
+                    f"default_primary '{self.default_primary}'. "
+                    f"Subcategory must match primary category."
+                )
 
     def map_event(
         self,
@@ -166,34 +191,48 @@ class TaxonomyMapper:
 
         Args:
             event: Parsed event dict
-            assign_config: Dict with assignment values
+            assign_config: Dict with assignment values (primary_category can be ID or value)
 
         Returns:
             TaxonomyDimension or None
         """
-        primary_category_str = assign_config.get(
+        primary_category_raw = assign_config.get(
             "primary_category", self.default_primary
         )
         subcategory_id = assign_config.get("subcategory", self.default_subcategory)
         values = assign_config.get("values", [])
         confidence = assign_config.get("confidence", 0.5)
 
-        # Validate primary category
+        # Parse primary category - support both numeric ID and string value
         try:
-            primary_category = PrimaryCategory(primary_category_str)
+            primary_category = PrimaryCategory.from_id_or_value(primary_category_raw)
         except ValueError:
-            logger.warning(f"Invalid primary category: {primary_category_str}")
+            logger.warning(f"Invalid primary category: {primary_category_raw}")
+            return None
+
+        # Validate subcategory belongs to primary category
+        if subcategory_id and not Subcategory.validate_for_primary(
+            subcategory_id, primary_category.value
+        ):
+            logger.warning(
+                f"Subcategory '{subcategory_id}' does not belong to "
+                f"primary category '{primary_category.value}'"
+            )
             return None
 
         # If no values provided, get from subcategory
-        if not values and subcategory_id:
+        subcategory_name = None
+        if subcategory_id:
             sub = get_subcategory_by_id(subcategory_id)
             if sub:
-                values = sub.get("values", [])
+                if not values:
+                    values = sub.get("values", [])
+                subcategory_name = sub.get("name")
 
         return TaxonomyDimension(
             primary_category=primary_category,
             subcategory=subcategory_id,
+            subcategory_name=subcategory_name,
             values=values,
             confidence=confidence,
         )

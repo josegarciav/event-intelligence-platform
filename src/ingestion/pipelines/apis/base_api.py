@@ -484,11 +484,26 @@ class BaseAPIPipeline(BasePipeline):
             TaxonomyDimension(
                 primary_category=PrimaryCategory(dim["primary_category"]),
                 subcategory=dim.get("subcategory"),
+                subcategory_name=dim.get("subcategory_name"),
                 values=dim.get("values", []),
                 confidence=dim.get("confidence", 0.5),
             )
             for dim in taxonomy_dims
         ]
+
+        # Enrich taxonomy dimensions with activity-level fields using FeatureExtractor
+        if self.feature_extractor:
+            enriched_dims = []
+            for dim in taxonomy_objs:
+                try:
+                    enriched = self.feature_extractor.enrich_taxonomy_dimension(
+                        dim, parsed_event
+                    )
+                    enriched_dims.append(enriched)
+                except Exception as e:
+                    logger.warning(f"Failed to enrich taxonomy dimension: {e}")
+                    enriched_dims.append(dim)
+            taxonomy_objs = enriched_dims
 
         # Determine event type from rules
         event_type = self._determine_event_type(parsed_event)

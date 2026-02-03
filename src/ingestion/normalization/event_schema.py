@@ -17,6 +17,10 @@ from src.ingestion.normalization.taxonomy import (
     build_taxonomy_index,
     get_all_subcategory_options,
     get_all_subcategory_ids,
+    get_subcategory_by_id,
+    get_primary_category_id_map,
+    get_primary_category_value_to_id_map,
+    validate_subcategory_for_primary,
 )
 
 # ============================================================================
@@ -28,7 +32,12 @@ _TAXONOMY_INDEX = build_taxonomy_index()
 
 class PrimaryCategory(str, Enum):
     """
-    Primary experience categories from Human Experience Taxonomy:
+    Primary experience categories from Human Experience Taxonomy.
+
+    Supports both string values and numeric IDs:
+    - PrimaryCategory("play_and_fun") - from string value
+    - PrimaryCategory.from_id("1") - from numeric ID
+    - PrimaryCategory.from_id_or_value("1") or ("play_and_fun") - accepts either
     """
 
     PLAY_AND_PURE_FUN = "play_and_fun"
@@ -41,6 +50,85 @@ class PrimaryCategory(str, Enum):
     RELAXATION_AND_ESCAPISM = "relaxation_and_escapism"
     IDENTITY_AND_MEANING = "identity_and_meaning"
     CONTRIBUTION_AND_IMPACT = "contribution_and_impact"
+
+    @classmethod
+    def from_id(cls, category_id: str) -> "PrimaryCategory":
+        """
+        Get enum from numeric ID ('1' through '10').
+
+        Args:
+            category_id: Numeric ID string (e.g., "1", "2", ...)
+
+        Returns:
+            PrimaryCategory enum member
+
+        Raises:
+            ValueError: If category_id is not valid
+
+        Example:
+            >>> PrimaryCategory.from_id("1")
+            <PrimaryCategory.PLAY_AND_PURE_FUN: 'play_and_fun'>
+        """
+        id_map = get_primary_category_id_map()
+        if category_id not in id_map:
+            raise ValueError(
+                f"Invalid category ID '{category_id}'. "
+                f"Valid IDs are: {list(id_map.keys())}"
+            )
+        return cls(id_map[category_id])
+
+    @classmethod
+    def from_id_or_value(cls, value: str) -> "PrimaryCategory":
+        """
+        Accept either numeric ID ('1') or string value ('play_and_fun').
+
+        Tries to interpret the value as a numeric ID first, then as a string value.
+
+        Args:
+            value: Either a numeric ID ("1") or string value ("play_and_fun")
+
+        Returns:
+            PrimaryCategory enum member
+
+        Raises:
+            ValueError: If value is neither a valid ID nor a valid string value
+
+        Example:
+            >>> PrimaryCategory.from_id_or_value("1")
+            <PrimaryCategory.PLAY_AND_PURE_FUN: 'play_and_fun'>
+            >>> PrimaryCategory.from_id_or_value("play_and_fun")
+            <PrimaryCategory.PLAY_AND_PURE_FUN: 'play_and_fun'>
+        """
+        id_map = get_primary_category_id_map()
+
+        # Try as numeric ID first
+        if value in id_map:
+            return cls(id_map[value])
+
+        # Try as string value
+        try:
+            return cls(value)
+        except ValueError:
+            valid_ids = list(id_map.keys())
+            valid_values = [e.value for e in cls]
+            raise ValueError(
+                f"Invalid value '{value}'. "
+                f"Valid IDs: {valid_ids}, Valid values: {valid_values}"
+            )
+
+    def to_id(self) -> str:
+        """
+        Get numeric ID for this category.
+
+        Returns:
+            Numeric ID string (e.g., "1" for play_and_fun)
+
+        Example:
+            >>> PrimaryCategory.PLAY_AND_PURE_FUN.to_id()
+            '1'
+        """
+        value_to_id = get_primary_category_value_to_id_map()
+        return value_to_id[self.value]
 
 
 class Subcategory:
@@ -74,6 +162,48 @@ class Subcategory:
     def ids_for_primary(cls, primary_key: str) -> set:
         """Set of subcategory ids valid for the given taxonomy primary key."""
         return _TAXONOMY_INDEX.get(primary_key, set())
+
+    @classmethod
+    def get_by_id(cls, subcategory_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get full subcategory data by ID.
+
+        Args:
+            subcategory_id: Subcategory ID (e.g., "1.4")
+
+        Returns:
+            Full subcategory dict with all fields including:
+            - id, name, values, activities
+            - _primary_category, _primary_category_name
+            Returns None if not found.
+
+        Example:
+            >>> sub = Subcategory.get_by_id("1.4")
+            >>> print(sub["name"])  # "Music & Rhythm Play"
+        """
+        return get_subcategory_by_id(subcategory_id)
+
+    @classmethod
+    def validate_for_primary(cls, subcategory_id: str, primary_id: str) -> bool:
+        """
+        Validate subcategory belongs to primary category.
+
+        Args:
+            subcategory_id: Subcategory ID (e.g., "1.4")
+            primary_id: Primary category ID ("1") or value ("play_and_fun")
+
+        Returns:
+            True if subcategory belongs to primary category, False otherwise.
+
+        Example:
+            >>> Subcategory.validate_for_primary("1.4", "1")
+            True
+            >>> Subcategory.validate_for_primary("2.1", "1")
+            False
+            >>> Subcategory.validate_for_primary("1.4", "play_and_fun")
+            True
+        """
+        return validate_subcategory_for_primary(subcategory_id, primary_id)
 
 
 class EventFormat(str, Enum):
@@ -131,15 +261,79 @@ class EventType(str, Enum):
 class TaxonomyDimension(BaseModel):
     """
     Represents a value dimension from the Human Experience Taxonomy.
+
+    Contains both basic category/subcategory info and detailed activity-level
+    attributes populated from the taxonomy or inferred by FeatureExtractor.
     """
 
+    # Core taxonomy fields
     primary_category: PrimaryCategory
     subcategory: Optional[str] = Field(
         default=None,
         description="Subcategory id from the taxonomy (e.g. '1.4'). Must be one of Subcategory.all_ids().",
     )
+    subcategory_name: Optional[str] = Field(
+        default=None,
+        description="Human-readable subcategory name (e.g. 'Music & Rhythm Play')",
+    )
     values: List[str] = Field(default_factory=list)
     confidence: float = Field(0.5, ge=0.0, le=1.0)
+
+    # Activity identification
+    activity_id: Optional[str] = Field(
+        default=None,
+        description="UUID of matched activity from taxonomy",
+    )
+    activity_name: Optional[str] = Field(
+        default=None,
+        description="Name of matched activity",
+    )
+
+    # Activity-level attributes (selected from template options)
+    energy_level: Optional[str] = Field(
+        default=None,
+        description="Energy level: 'low' | 'medium' | 'high'",
+    )
+    social_intensity: Optional[str] = Field(
+        default=None,
+        description="Social intensity: 'solo' | 'small_group' | 'large_group'",
+    )
+    cognitive_load: Optional[str] = Field(
+        default=None,
+        description="Cognitive load: 'low' | 'medium' | 'high'",
+    )
+    physical_involvement: Optional[str] = Field(
+        default=None,
+        description="Physical involvement: 'none' | 'light' | 'moderate'",
+    )
+    cost_level: Optional[str] = Field(
+        default=None,
+        description="Cost level: 'free' | 'low' | 'medium' | 'high'",
+    )
+    time_scale: Optional[str] = Field(
+        default=None,
+        description="Time scale: 'short' | 'long' | 'recurring'",
+    )
+    environment: Optional[str] = Field(
+        default=None,
+        description="Environment: 'indoor' | 'outdoor' | 'digital' | 'mixed'",
+    )
+    emotional_output: List[str] = Field(
+        default_factory=list,
+        description="List of emotional outputs (e.g., ['joy', 'connection', 'energy'])",
+    )
+    risk_level: Optional[str] = Field(
+        default=None,
+        description="Risk level: 'none' | 'very_low' | 'low' | 'medium'",
+    )
+    age_accessibility: Optional[str] = Field(
+        default=None,
+        description="Age accessibility: 'all' | 'teens+' | 'adults'",
+    )
+    repeatability: Optional[str] = Field(
+        default=None,
+        description="Repeatability: 'high' | 'medium' | 'low'",
+    )
 
     @field_validator("subcategory")
     @classmethod
@@ -153,6 +347,19 @@ class TaxonomyDimension(BaseModel):
                 f"Use Subcategory.all_options() or Subcategory.all_ids() for available options."
             )
         return v
+
+    @model_validator(mode="after")
+    def validate_subcategory_primary_match(self) -> "TaxonomyDimension":
+        """Ensure subcategory belongs to the specified primary category."""
+        if self.subcategory is not None:
+            primary_id = self.primary_category.to_id()
+            if not Subcategory.validate_for_primary(self.subcategory, primary_id):
+                raise ValueError(
+                    f"Subcategory '{self.subcategory}' does not belong to "
+                    f"primary category '{self.primary_category.value}' (ID: {primary_id}). "
+                    f"Subcategory must start with '{primary_id}.'."
+                )
+        return self
 
 
 # ============================================================================
@@ -234,6 +441,23 @@ class PriceInfo(BaseModel):
     price_raw_text: Optional[str] = Field(
         None, description="Original price text from source (for debugging/validation)"
     )
+
+    @field_validator(
+        "minimum_price",
+        "maximum_price",
+        "early_bird_price",
+        "standard_price",
+        "vip_price",
+        mode="before",
+    )
+    @classmethod
+    def coerce_to_decimal(cls, v):
+        """Coerce float/int to Decimal for price fields."""
+        if v is None:
+            return None
+        if isinstance(v, Decimal):
+            return v
+        return Decimal(str(v))
 
     @model_validator(mode="after")
     def validate_price_range(self):
@@ -436,7 +660,7 @@ class EventSchema(BaseModel):
             Decimal: lambda v: float(v),
         }
         use_enum_values = True
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "event_id": "ra_co_12345_2026-03-15",  # generated unique UUID by us (pulsecity), randomly generated
                 "title": "Floating Points DJ Set",  # the event title

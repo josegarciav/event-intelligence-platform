@@ -44,6 +44,12 @@ from .taxonomy import (
     get_full_taxonomy_dimension,
     list_all_activities,
     search_activities_by_name,
+    # ID mapping functions
+    get_primary_category_id_map,
+    get_primary_category_value_to_id_map,
+    get_primary_category_mappings,
+    build_primary_to_subcategory_index,
+    validate_subcategory_for_primary,
 )
 from .feature_extractor import FeatureExtractor, create_feature_extractor_from_config
 from .field_mapper import FieldMapper, create_field_mapper_from_config
@@ -90,6 +96,12 @@ __all__ = [
     "get_full_taxonomy_dimension",
     "list_all_activities",
     "search_activities_by_name",
+    # ID mapping functions
+    "get_primary_category_id_map",
+    "get_primary_category_value_to_id_map",
+    "get_primary_category_mappings",
+    "build_primary_to_subcategory_index",
+    "validate_subcategory_for_primary",
     # Feature Extractor
     "FeatureExtractor",
     "create_feature_extractor_from_config",

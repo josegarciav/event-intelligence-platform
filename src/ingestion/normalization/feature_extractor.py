@@ -14,7 +14,10 @@ import json
 import logging
 import os
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.ingestion.normalization.event_schema import TaxonomyDimension
 
 logger = logging.getLogger(__name__)
 
@@ -487,6 +490,270 @@ For list fields like tags, use an array: ["tag1", "tag2", ...]"""
             return "short"
 
         return "long"  # Default for events
+
+    def enrich_taxonomy_dimension(
+        self,
+        dimension: "TaxonomyDimension",
+        event_context: Dict[str, Any],
+    ) -> "TaxonomyDimension":
+        """
+        Enrich a TaxonomyDimension with activity-level fields.
+
+        Given primary_category and subcategory, populate activity-level fields
+        using LLM-based selection from template options or rule-based fallbacks.
+
+        Args:
+            dimension: TaxonomyDimension with at least primary_category and subcategory
+            event_context: Event dict with title, description, venue, price, duration, etc.
+
+        Returns:
+            New TaxonomyDimension with activity-level fields populated
+
+        Process:
+        1. Get activities for subcategory from taxonomy
+        2. Match best activity using LLM (or keyword matching)
+        3. Use LLM to SELECT appropriate option from templates based on context
+        4. Fallback to rule-based defaults if LLM unavailable
+        """
+        from src.ingestion.normalization.taxonomy import (
+            get_activities_for_subcategory,
+            get_subcategory_by_id,
+            find_best_activity_match,
+        )
+        from src.ingestion.normalization.event_schema import TaxonomyDimension
+
+        # Start with existing dimension data
+        enriched_data = {
+            "primary_category": dimension.primary_category,
+            "subcategory": dimension.subcategory,
+            "subcategory_name": dimension.subcategory_name,
+            "values": dimension.values.copy() if dimension.values else [],
+            "confidence": dimension.confidence,
+            "activity_id": dimension.activity_id,
+            "activity_name": dimension.activity_name,
+            "emotional_output": (
+                dimension.emotional_output.copy() if dimension.emotional_output else []
+            ),
+        }
+
+        # Get subcategory details if not already populated
+        if dimension.subcategory and not dimension.subcategory_name:
+            sub = get_subcategory_by_id(dimension.subcategory)
+            if sub:
+                enriched_data["subcategory_name"] = sub.get("name")
+                if not enriched_data["values"]:
+                    enriched_data["values"] = sub.get("values", [])
+
+        # Try to find matching activity if not already set
+        if dimension.subcategory and not dimension.activity_id:
+            event_text = f"{event_context.get('title', '')} {event_context.get('description', '')}"
+
+            # Try LLM-based matching first
+            client = self._get_client()
+            if client:
+                activity_match = self.match_activity(
+                    event_context.get("title", ""),
+                    event_context.get("description", ""),
+                    dimension.subcategory,
+                )
+            else:
+                # Fallback to keyword matching
+                activity_match = find_best_activity_match(event_text, dimension.subcategory)
+
+            if activity_match:
+                enriched_data["activity_id"] = activity_match.get("activity_id")
+                enriched_data["activity_name"] = activity_match.get("name")
+
+        # Define attribute options (from taxonomy templates)
+        attribute_options = {
+            "energy_level": ["low", "medium", "high"],
+            "social_intensity": ["solo", "small_group", "large_group"],
+            "cognitive_load": ["low", "medium", "high"],
+            "physical_involvement": ["none", "light", "moderate"],
+            "environment": ["indoor", "outdoor", "digital", "mixed"],
+            "risk_level": ["none", "very_low", "low", "medium"],
+            "age_accessibility": ["all", "teens+", "adults"],
+            "repeatability": ["high", "medium", "low"],
+        }
+
+        # Select attribute values using LLM or fallback
+        selected_attributes = self._select_attribute_values(
+            event_context, attribute_options
+        )
+
+        # Merge selected attributes into enriched data
+        for attr, value in selected_attributes.items():
+            enriched_data[attr] = value
+
+        # Always use rule-based for cost_level and time_scale
+        enriched_data["cost_level"] = self._infer_cost_level(event_context)
+        enriched_data["time_scale"] = self._infer_time_scale(event_context)
+
+        # Create and return new TaxonomyDimension
+        return TaxonomyDimension(**enriched_data)
+
+    def _select_attribute_values(
+        self,
+        event_context: Dict[str, Any],
+        attribute_options: Dict[str, List[str]],
+    ) -> Dict[str, str]:
+        """
+        Select best option for each attribute based on event context.
+
+        Uses LLM if available, otherwise uses rule-based defaults.
+
+        Args:
+            event_context: Event dict with title, description, etc.
+            attribute_options: Dict mapping attribute name to list of valid options
+
+        Returns:
+            Dict with selected value for each attribute
+        """
+        client = self._get_client()
+
+        if client:
+            return self._select_attribute_values_llm(event_context, attribute_options)
+        else:
+            return self._select_attribute_values_fallback(event_context, attribute_options)
+
+    def _select_attribute_values_llm(
+        self,
+        event_context: Dict[str, Any],
+        attribute_options: Dict[str, List[str]],
+    ) -> Dict[str, str]:
+        """
+        Use LLM to select best option for each attribute based on event context.
+
+        Args:
+            event_context: Event dict with title, description, venue, price, etc.
+            attribute_options: Dict mapping attribute name to list of valid options
+                e.g., {"energy_level": ["low", "medium", "high"]}
+
+        Returns:
+            Dict with selected value for each attribute
+        """
+        context_str = self._build_event_context(event_context)
+
+        # Build options description
+        options_str = "\n".join(
+            f"- {attr}: {' | '.join(options)}"
+            for attr, options in attribute_options.items()
+        )
+
+        prompt = f"""Analyze this event and select the most appropriate option for each attribute:
+
+{context_str}
+
+For each attribute below, select ONE option that best fits the event:
+{options_str}
+
+Respond with JSON containing your selections:
+{{"energy_level": "selected_option", "social_intensity": "selected_option", ...}}
+
+Guidelines:
+- energy_level: Consider the activity type, music style (if applicable), time of day
+- social_intensity: Consider venue size, event type, whether it's a group activity
+- cognitive_load: Consider if it requires active thinking/learning vs passive enjoyment
+- physical_involvement: Consider dancing, standing, walking, etc.
+- environment: Consider indoor venues vs outdoor festivals vs online events
+- risk_level: Consider physical activity level, venue type, activities involved
+- age_accessibility: Consider alcohol presence, venue type, content nature
+- repeatability: Consider if this is a unique experience vs something people do regularly"""
+
+        try:
+            response = self._call_llm(prompt)
+            result = json.loads(response.strip())
+
+            # Validate selections are from allowed options
+            validated = {}
+            for attr, options in attribute_options.items():
+                selected = result.get(attr)
+                if selected in options:
+                    validated[attr] = selected
+                else:
+                    # Use middle option as default
+                    validated[attr] = options[len(options) // 2]
+
+            return validated
+
+        except Exception as e:
+            logger.error(f"LLM attribute selection failed: {e}")
+            return self._select_attribute_values_fallback(event_context, attribute_options)
+
+    def _select_attribute_values_fallback(
+        self,
+        event_context: Dict[str, Any],
+        attribute_options: Dict[str, List[str]],
+    ) -> Dict[str, str]:
+        """
+        Rule-based fallback for attribute selection when LLM is unavailable.
+
+        Args:
+            event_context: Event dict with title, description, etc.
+            attribute_options: Dict mapping attribute name to list of valid options
+
+        Returns:
+            Dict with selected value for each attribute
+        """
+        title = (event_context.get("title") or "").lower()
+        result = {}
+
+        # Energy level based on keywords
+        if any(w in title for w in ["festival", "party", "rave", "club"]):
+            result["energy_level"] = "high"
+        elif any(w in title for w in ["workshop", "talk", "exhibition"]):
+            result["energy_level"] = "medium"
+        elif any(w in title for w in ["meditation", "yoga", "chill"]):
+            result["energy_level"] = "low"
+        else:
+            result["energy_level"] = "medium"
+
+        # Social intensity based on event type
+        if any(w in title for w in ["festival", "party", "concert"]):
+            result["social_intensity"] = "large_group"
+        elif any(w in title for w in ["workshop", "class", "meetup"]):
+            result["social_intensity"] = "small_group"
+        else:
+            result["social_intensity"] = "large_group"  # Default for events
+
+        # Cognitive load
+        if any(w in title for w in ["workshop", "class", "lecture", "learn"]):
+            result["cognitive_load"] = "medium"
+        else:
+            result["cognitive_load"] = "low"
+
+        # Physical involvement
+        if any(w in title for w in ["dance", "yoga", "sports", "run"]):
+            result["physical_involvement"] = "moderate"
+        elif any(w in title for w in ["concert", "festival", "party"]):
+            result["physical_involvement"] = "light"
+        else:
+            result["physical_involvement"] = "none"
+
+        # Environment
+        if any(w in title for w in ["outdoor", "garden", "park", "beach"]):
+            result["environment"] = "outdoor"
+        elif any(w in title for w in ["online", "virtual", "stream"]):
+            result["environment"] = "digital"
+        else:
+            result["environment"] = "indoor"
+
+        # Risk level
+        result["risk_level"] = "very_low"  # Most events are low risk
+
+        # Age accessibility
+        if any(w in title for w in ["club", "bar", "nightlife"]):
+            result["age_accessibility"] = "adults"
+        else:
+            result["age_accessibility"] = "all"
+
+        # Repeatability
+        if any(w in title for w in ["festival", "carnival", "annual"]):
+            result["repeatability"] = "low"  # Unique experiences
+        else:
+            result["repeatability"] = "medium"
+
+        return result
 
 
 def create_feature_extractor_from_config(
