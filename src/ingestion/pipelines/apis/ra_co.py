@@ -309,7 +309,9 @@ class RaCoPipeline(BasePipeline):
                 "confidence": 0.95,
             },
             {
-                "primary_category": PrimaryCategory.from_id("5").value,  # social_connection
+                "primary_category": PrimaryCategory.from_id(
+                    "5"
+                ).value,  # social_connection
                 "subcategory": "5.7",  # Shared Activities
                 "subcategory_name": sub_5_7.get("name") if sub_5_7 else None,
                 "values": ["connection", "belonging", "shared joy"],
@@ -322,7 +324,9 @@ class RaCoPipeline(BasePipeline):
             sub_2_4 = Subcategory.get_by_id("2.4")
             taxonomy_dimensions.append(
                 {
-                    "primary_category": PrimaryCategory.from_id("2").value,  # exploration_and_adventure
+                    "primary_category": PrimaryCategory.from_id(
+                        "2"
+                    ).value,  # exploration_and_adventure
                     "subcategory": "2.4",
                     "subcategory_name": sub_2_4.get("name") if sub_2_4 else None,
                     "values": ["curiosity", "discovery"],
@@ -335,7 +339,9 @@ class RaCoPipeline(BasePipeline):
             sub_4_2 = Subcategory.get_by_id("4.2")
             taxonomy_dimensions.append(
                 {
-                    "primary_category": PrimaryCategory.from_id("4").value,  # learning_and_intellectual
+                    "primary_category": PrimaryCategory.from_id(
+                        "4"
+                    ).value,  # learning_and_intellectual
                     "subcategory": "4.2",
                     "subcategory_name": sub_4_2.get("name") if sub_4_2 else None,
                     "values": ["growth", "mastery"],
@@ -569,6 +575,8 @@ def create_ra_co_pipeline(
     feature_extractor = None
     feature_extraction_config = source_config.get("feature_extraction", {})
     if feature_extraction_config.get("enabled"):
-        feature_extractor = create_feature_extractor_from_config(feature_extraction_config)
+        feature_extractor = create_feature_extractor_from_config(
+            feature_extraction_config
+        )
 
     return RaCoPipeline(pipeline_config, adapter, feature_extractor)

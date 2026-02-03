@@ -321,7 +321,6 @@ class TaxonomyDimension(BaseModel):
         description="Repeatability: 'high' | 'medium' | 'low'",
     )
 
-
     @field_validator("subcategory")
     @classmethod
     def validate_subcategory_id(cls, v: Optional[str]) -> Optional[str]:

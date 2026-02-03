@@ -66,7 +66,9 @@ _PRIMARY_CATEGORY_ID_MAP: Dict[str, str] = {
 }
 
 # Reverse mapping from enum value to numeric ID
-_PRIMARY_CATEGORY_VALUE_TO_ID: Dict[str, str] = {v: k for k, v in _PRIMARY_CATEGORY_ID_MAP.items()}
+_PRIMARY_CATEGORY_VALUE_TO_ID: Dict[str, str] = {
+    v: k for k, v in _PRIMARY_CATEGORY_ID_MAP.items()
+}
 
 
 def get_primary_category_id_map() -> Dict[str, str]:

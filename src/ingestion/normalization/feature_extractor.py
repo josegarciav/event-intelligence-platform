@@ -10,26 +10,18 @@ The extractor injects filtered taxonomy context into prompts
 to ensure accurate classification and attribute selection.
 """
 
-import json
 import logging
 import re
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from src.ingestion.normalization.llm_client import (
-    BaseLLMClient,
     LangChainLLMClient,
-    FallbackLLMClient,
     create_llm_client,
 )
 from src.ingestion.normalization.taxonomy_retriever import (
-    TaxonomyRetriever,
     get_taxonomy_retriever,
 )
 from src.ingestion.normalization.feature_models import (
-    TaxonomyAttributesOutput,
-    ActivityMatchOutput,
-    SubcategoryMatchOutput,
-    PrimaryCategoryOutput,
     FullTaxonomyEnrichmentOutput,
     EventTypeOutput,
     MusicGenresOutput,
@@ -304,7 +296,10 @@ Also suggest relevant emotional outputs (e.g., "joy", "excitement", "connection"
         result = {}
 
         # Energy level
-        if any(w in text for w in ["festival", "rave", "party", "club", "techno", "house", "night"]):
+        if any(
+            w in text
+            for w in ["festival", "rave", "party", "club", "techno", "house", "night"]
+        ):
             result["energy_level"] = "high"
         elif any(w in text for w in ["workshop", "talk", "exhibition", "gallery"]):
             result["energy_level"] = "medium"

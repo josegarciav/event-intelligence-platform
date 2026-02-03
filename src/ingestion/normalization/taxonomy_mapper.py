@@ -17,9 +17,12 @@ from src.ingestion.normalization.taxonomy import (
     get_full_taxonomy_dimension,
     get_subcategory_by_id,
     find_best_activity_match,
-    validate_subcategory_for_primary,
 )
-from src.ingestion.normalization.event_schema import TaxonomyDimension, PrimaryCategory, Subcategory
+from src.ingestion.normalization.event_schema import (
+    TaxonomyDimension,
+    PrimaryCategory,
+    Subcategory,
+)
 
 logger = logging.getLogger(__name__)
 
