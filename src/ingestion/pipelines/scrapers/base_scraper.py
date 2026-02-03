@@ -1,26 +1,12 @@
 """
-Scraper-based event pipelines.
+Base Scraper Pipeline and related utilities.
 
 This module provides:
-- EventScraper: Playwright-based browser automation for web scraping
+- PageFetchResult: Result of fetching a single page
 - ScraperConfig: Configuration for the scraper
+- EventScraper: Playwright-based browser automation for web scraping
 - BaseScraperPipeline: Abstract base class for scraper-based pipelines
 - Config loading utilities for JSON scraper configs
-
-Usage:
-    from src.ingestion.pipelines.scrapers import (
-        EventScraper,
-        ScraperConfig,
-        BaseScraperPipeline,
-        load_scraper_config,
-    )
-
-    # Load config from JSON
-    config = load_scraper_config("ra_co", city="barcelona")
-
-    # Use scraper directly
-    with EventScraper(config) as scraper:
-        results = scraper.fetch_listing_pages()
 """
 
 from __future__ import annotations

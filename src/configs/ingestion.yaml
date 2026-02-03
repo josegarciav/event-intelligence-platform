@@ -9,35 +9,192 @@ sources:
   # =========================================================================
   ra_co:
     enabled: true
-    type: "api"
+    pipeline_type: "api"
 
-    # API Settings
+    # Connection settings
+    connection:
+      endpoint: "https://ra.co/graphql"
+      protocol: "graphql"
+      timeout_seconds: 30
+
+    # Legacy settings (for backwards compatibility)
     graphql_endpoint: "https://ra.co/graphql"
     request_timeout: 30
     max_retries: 3
     batch_size: 50
     rate_limit_per_second: 1.0
 
-    # Default filters
+    # GraphQL Query Configuration
+    query:
+      template: |
+        query GetEvents($filters: FilterInputDtoInput, $pageSize: Int, $page: Int) {
+          eventListings(filters: $filters, pageSize: $pageSize, page: $page) {
+            data {
+              id
+              event {
+                id
+                title
+                date
+                startTime
+                endTime
+                venue {
+                  name
+                  address
+                  area {
+                    name
+                    country {
+                      name
+                      urlCode
+                    }
+                  }
+                }
+                artists {
+                  name
+                }
+                images {
+                  filename
+                }
+                cost
+                contentUrl
+              }
+            }
+            totalResults
+          }
+        }
+      variables:
+        filters:
+          areas:
+            eq: "{{area_id}}"
+          listingDate:
+            gte: "{{date_from}}"
+            lte: "{{date_to}}"
+        pageSize: "{{page_size}}"
+        page: "{{page}}"
+      response_path: "data.eventListings.data"
+      total_results_path: "data.eventListings.totalResults"
+
+    # Pagination
+    pagination:
+      type: "page_number"
+      max_pages: 10
+      default_page_size: 50
+
+    # Field mappings: target_field -> source_path
+    field_mappings:
+      source_event_id: "event.id"
+      title: "event.title"
+      date: "event.date"
+      start_time: "event.startTime"
+      end_time: "event.endTime"
+      venue_name: "event.venue.name"
+      venue_address: "event.venue.address"
+      city: "event.venue.area.name"
+      country_name: "event.venue.area.country.name"
+      country_code: "event.venue.area.country.urlCode"
+      artists: "event.artists[*].name"
+      cost: "event.cost"
+      content_url: "event.contentUrl"
+      image_filename: "event.images[0].filename"
+
+    # Transformations applied after field extraction
+    transformations:
+      image_url:
+        type: "template"
+        template: "https://ra.co/images/events/flyer/{{image_filename}}"
+        when: "image_filename"
+      source_url:
+        type: "template"
+        template: "https://ra.co{{content_url}}"
+      country_code:
+        type: "uppercase"
+
+    # Taxonomy mapping rules
+    taxonomy:
+      default_primary: "play_and_fun"
+      default_subcategory: "1.4"  # Music & Rhythm Play
+      rules:
+        # Festivals and outdoor events
+        - match:
+            title_contains: ["festival", "carnival", "outdoor"]
+          assign:
+            primary_category: "exploration_and_adventure"
+            subcategory: "2.4"  # Cultural Discovery
+            confidence: 0.65
+
+        # Workshops and learning events
+        - match:
+            title_contains: ["workshop", "masterclass", "talk", "class"]
+          assign:
+            primary_category: "learning_and_intellectual"
+            subcategory: "4.2"  # Learning New Skills
+            confidence: 0.7
+
+        # Default for music events - Play & Fun dimension
+        - match:
+            always: true
+          assign:
+            primary_category: "play_and_fun"
+            subcategory: "1.4"  # Music & Rhythm Play
+            values: ["expression", "energy", "flow", "rhythm"]
+            confidence: 0.95
+
+        # Default for music events - Social Connection dimension
+        - match:
+            always: true
+          assign:
+            primary_category: "social_connection"
+            subcategory: "5.7"  # Shared Activities
+            values: ["connection", "belonging", "shared joy"]
+            confidence: 0.8
+
+    # Event type determination rules
+    event_type_rules:
+      - match:
+          title_contains: ["festival"]
+        type: "festival"
+      - match:
+          title_contains: ["party", "fiesta"]
+        type: "party"
+      - match:
+          title_contains: ["live", "concert", "gig"]
+        type: "concert"
+      - match:
+          title_contains: ["workshop", "masterclass"]
+        type: "workshop"
+      - default: true
+        type: "nightlife"
+
+    # Default values
     defaults:
       area_id: 20  # Barcelona
       page_size: 50
       days_ahead: 30
+      location:
+        city: "Barcelona"
+        country_code: "ES"
+        timezone: "Europe/Madrid"
 
-    # Scheduling
-    schedule:
-      type: "interval"
-      interval_hours: 12
-      enabled: true
+    # Validation rules
+    validation:
+      required_fields: ["title", "source_event_id"]
+      future_events_only: true
 
     # Enrichment options
     enrichment:
       geocoding: true
+      # Feature extraction (LLM-based)
+      feature_extraction:
+        enabled: false  # Set to true when API key is configured
+        provider: "openai"
+        model_name: "gpt-3.5-turbo"
+        fill_missing: ["event_type", "tags", "activity_id"]
 
-    # Validation rules
-    validation:
-      future_events_only: true
-      days_ahead: 60
+    # Scheduling
+    schedule:
+      type: "cron" # cron | interval | manual
+      interval_hours: 6
+      cron_expression: "0 */6 * * *"  # Every 6 hours
+      enabled: false
 
 # =========================================================================
 # GLOBAL SETTINGS
@@ -62,6 +219,11 @@ global:
     minimum_quality_score: 0.3
     timezone_confidence: 0.7
 
+  # Deduplication
+  deduplication:
+    enabled: true
+    strategy: "exact"  # exact | fuzzy | metadata | composite
+
   # Enrichment services (optional)
   enrichment_services:
     geocoding:
@@ -83,5 +245,9 @@ global:
 
     alert_on:
       - "pipeline_failure"
+      - "data_quality_breach"
+      - "deduplication_rate_high"
+      - "ingestion_delay"
+      - "missing_required_fields"
       - "low_quality_score"
       - "api_error_rate_high"

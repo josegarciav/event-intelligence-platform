@@ -13,7 +13,7 @@ from typing import Optional, List, Dict, Any
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, model_validator
 from decimal import Decimal
-from src.normalization.taxonomy import (
+from src.ingestion.normalization.taxonomy import (
     build_taxonomy_index,
     get_all_subcategory_options,
     get_all_subcategory_ids,
@@ -41,101 +41,6 @@ class PrimaryCategory(str, Enum):
     RELAXATION_AND_ESCAPISM = "relaxation_and_escapism"
     IDENTITY_AND_MEANING = "identity_and_meaning"
     CONTRIBUTION_AND_IMPACT = "contribution_and_impact"
-
-
-class SubcategoryExamples(str, Enum):
-    """
-    ILLUSTRATIVE - TO BE DEFINED DYNAMICALLY:
-    Subcategories from the taxonomy (examples; can be dynamically extended).
-    """
-
-    # Play & Pure Fun
-    GAMES_AND_PLAY = "games_and_play_systems"
-    HUMOR_AND_LAUGHTER = "humor_and_laughter"
-    SENSORY_STIMULATION = "sensory_stimulation_and_novelty"
-    MUSIC_AND_RHYTHM = "music_and_rhythm_play"
-    SOCIAL_FUN = "social_fun_and_playful_interaction"
-
-    # Exploration & Adventure
-    MICRO_EXPLORATION = "micro_exploration"
-    NATURE_EXPLORATION = "nature_exploration"
-    TRAVEL_AND_TRIPS = "travel_and_trip_adventures"
-    CULTURAL_DISCOVERY = "cultural_discovery"
-    FOOD_AND_TASTE = "food_and_taste_exploration"
-    WATER_ADVENTURES = "water_adventures"
-    ALTITUDE_AND_SKY = "altitude_and_sky_thrills"
-    URBAN_ADVENTURE = "urban_adventure_and_night_exploration"
-
-    # Creation & Expression
-    VISUAL_ART = "visual_art_2d"
-    CRAFTS_AND_HANDMADE = "crafts_and_handmade"
-    MAKING_AND_BUILDING = "making_and_building"
-    WRITING_AND_STORYTELLING = "writing_and_storytelling"
-    MUSIC_CREATION = "music_creation"
-    PERFORMANCE = "performance_and_embodied_expression"
-    PHOTOGRAPHY_AND_VIDEO = "photography_and_video"
-    DIGITAL_CREATION = "digital_creation"
-    COOKING_CREATIVE = "cooking_as_creative_expression"
-    PERSONAL_STYLE = "personal_style_and_aesthetic_creation"
-
-    # Learning & Intellectual Pleasure
-    READING_FOR_PLEASURE = "reading_for_curiosity_and_pleasure"
-    LEARNING_NEW_SKILLS = "learning_new_skills_intellectual"
-    COURSES_AND_LEARNING = "courses_and_structured_learning"
-    RESEARCH_AND_DEEP_DIVES = "research_and_deep_dives"
-    THINKING_AND_REASONING = "thinking_reasoning_and_mental_play"
-    KNOWLEDGE_CONSUMPTION = "knowledge_consumption_audio_visual"
-
-    # Social Connection & Belonging
-    CASUAL_SOCIALIZING = "casual_socializing"
-    DEEP_CONVERSATIONS = "deep_conversations_and_emotional_bonding"
-    FRIENDSHIP_MAINTENANCE = "friendship_maintenance_and_rituals"
-    ROMANCE_AND_INTIMACY = "romance_and_intimate_connection"
-    FAMILY_CONNECTION = "family_connection"
-    COMMUNITY_AND_GROUP = "community_and_group_belonging"
-    SHARED_ACTIVITIES = "shared_activities_and_co_experience"
-    ONLINE_SOCIAL = "online_social_interaction"
-
-    # Body & Movement
-    EVERYDAY_MOVEMENT = "everyday_movement_and_light_activity"
-    FITNESS_AND_STRENGTH = "fitness_and_strength_training"
-    CARDIO_AND_ENDURANCE = "cardio_and_endurance"
-    MIND_BODY_PRACTICES = "mind_body_practices"
-    DANCE_AND_RHYTHM = "dance_and_rhythmic_movement"
-    SPORTS_AND_COMPETITIVE = "sports_and_competitive_physical_play"
-    OUTDOOR_PHYSICAL = "outdoor_physical_experience"
-    BODY_CARE_AND_RECOVERY = "body_care_recovery_and_sensory_regulation"
-
-    # Challenge & Achievement
-    MENTAL_CHALLENGES = "mental_challenges_and_problem_solving"
-    SKILL_MASTERY = "skill_mastery_and_deliberate_practice"
-    PHYSICAL_CHALLENGES = "physical_challenges_and_feats"
-    COMPETITIVE_ACTIVITIES = "competitive_activities"
-    GOAL_SETTING = "goal_setting_and_achievement_systems"
-    PERFORMANCE_UNDER_PRESSURE = "performance_under_pressure"
-
-    # Relaxation & Escapism
-    PASSIVE_RELAXATION = "passive_relaxation"
-    MENTAL_ESCAPE = "mental_escape_and_immersion"
-    SLOW_LIVING = "slow_living_and_doing_nothing"
-    SENSORY_COMFORT = "sensory_comfort_and_soothing"
-    NATURE_BASED_RELAXATION = "nature_based_relaxation"
-    DIGITAL_ESCAPISM = "digital_escapism_and_light_distraction"
-
-    # Identity & Meaning
-    SELF_REFLECTION = "self_reflection_and_inner_inquiry"
-    VALUES_CLARIFICATION = "values_and_belief_clarification"
-    SPIRITUALITY = "spirituality_and_transcendence"
-    IDENTITY_EXPRESSION = "identity_expression_and_authenticity"
-    LIFE_DESIGN = "life_design_and_direction"
-
-    # Contribution & Impact
-    HELPING_INDIVIDUALS = "helping_individuals_directly"
-    EDUCATION_AND_SHARING = "education_and_knowledge_sharing"
-    COMMUNITY_BUILDING = "community_building_and_social_good"
-    VOLUNTEERING_AND_SERVICE = "volunteering_and_service"
-    ACTIVISM_AND_ADVOCACY = "activism_and_advocacy"
-    ENVIRONMENTAL_IMPACT = "environmental_and_sustainability_impact"
 
 
 class Subcategory:

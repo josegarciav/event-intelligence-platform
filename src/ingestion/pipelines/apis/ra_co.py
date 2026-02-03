@@ -12,7 +12,7 @@ import logging
 from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
 from src.ingestion.adapters import APIAdapter, SourceType, FetchResult
 from src.ingestion.adapters.api_adapter import APIAdapterConfig
-from src.normalization.event_schema import (
+from src.ingestion.normalization.event_schema import (
     EventSchema,
     EventType,
     EventFormat,
@@ -23,7 +23,7 @@ from src.normalization.event_schema import (
     TaxonomyDimension,
     PrimaryCategory,
 )
-from src.normalization.currency import CurrencyParser
+from src.ingestion.normalization.currency import CurrencyParser
 
 
 logger = logging.getLogger(__name__)

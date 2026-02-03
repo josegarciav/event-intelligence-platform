@@ -18,7 +18,7 @@ class Config:
     # 2. Define File Paths
     INGESTION_CONFIG_PATH = CONFIG_DIR / "ingestion.yaml"
     TAXONOMY_DATA_PATH = (
-        PROJECT_ROOT / "src" / "normalization" / "human_experience_taxonomy_master.json"
+        PROJECT_ROOT / "src" / "ingestion" / "normalization" / "human_experience_taxonomy_master.json"
     )
 
     @classmethod

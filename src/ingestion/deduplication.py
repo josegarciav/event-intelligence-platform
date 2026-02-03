@@ -10,7 +10,7 @@ Provides multiple deduplication strategies using the Strategy pattern:
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import List, Optional
-from src.normalization.event_schema import EventSchema
+from src.ingestion.normalization.event_schema import EventSchema
 
 
 class DeduplicationStrategy(str, Enum):

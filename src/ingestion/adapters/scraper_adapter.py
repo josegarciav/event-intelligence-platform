@@ -38,7 +38,7 @@ class ScraperAdapter(BaseSourceAdapter):
     """
     Adapter for web scraping data sources.
 
-    Uses the EventScraper from src.ingestion.scrapers to fetch and parse
+    Uses the EventScraper from src.ingestion.pipelines.scrapers to fetch and parse
     web pages. Provides a unified interface that matches the API adapter.
     """
 
@@ -71,7 +71,7 @@ class ScraperAdapter(BaseSourceAdapter):
     def _get_scraper(self):
         """Get or create scraper instance."""
         if self._scraper is None:
-            from src.ingestion.scrapers import EventScraper, ScraperConfig
+            from src.ingestion.pipelines.scrapers import EventScraper, ScraperConfig
 
             scraper_config = ScraperConfig(
                 source_id=self.scraper_config.source_id,

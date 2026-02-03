@@ -20,7 +20,7 @@ from src.ingestion.base_pipeline import (
     PipelineExecutionResult,
     PipelineStatus,
 )
-from src.normalization.event_schema import EventSchema
+from src.ingestion.normalization.event_schema import EventSchema
 
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 class ScheduledPipeline:
     """Configuration for a scheduled pipeline execution."""
     pipeline_name: str
-    schedule_type: str  # 'interval', 'cron', 'once'
+    schedule_type: str  # 'interval', 'cron', 'manual'
     interval_hours: Optional[int] = None
     cron_expression: Optional[str] = None
     enabled: bool = True
