@@ -201,18 +201,19 @@ class EventType(str, Enum):
     High-level event type.
     """
 
-    CONCERT = "concert"
-    FESTIVAL = "festival"
+    CONCERT = "concert" # music related
+    ART_SHOW = "art_show"
+    FESTIVAL = "festival" # music related
     WORKSHOP = "workshop"
     LECTURE = "lecture"
     MEETUP = "meetup"
-    PARTY = "party"
+    PARTY = "party" # music related
     SPORTS = "sports"
     EXHIBITION = "exhibition"
     CONFERENCE = "conference"
     NIGHTLIFE = "nightlife"
     THEATER = "theater"
-    DANCE = "dance"
+    DANCE = "dance" # music related
     FOOD_BEVERAGE = "food_beverage"
     OTHER = "other"
 
@@ -395,12 +396,15 @@ class SourceInfo(BaseModel):
 class MediaAsset(BaseModel):
     """
     Media asset associated with the event.
+    TODO: Implement multimodal media handling in the future
+    to capture features/insights from various media types.
+    Like the image, video, flyer, of last year's event, etc.
     """
 
     type: str = Field(description="Type of media (image, video, flyer, etc.)")
     url: str
     title: Optional[str] = None
-    description: Optional[str] = None
+    description: Optional[str] = None # could be implemented with a model in the future
     width: Optional[int] = None
     height: Optional[int] = None
 
@@ -454,7 +458,7 @@ class EventSchema(BaseModel):
     duration_minutes: Optional[int] = None
     is_all_day: bool = False
     is_recurring: bool = False
-    recurrence_pattern: Optional[str] = None  # e.g., 'weekly', 'monthly'
+    recurrence_pattern: Optional[str] = None  # e.g., 'weekly', 'monthly', 'one_time'
 
     # ---- LOCATION ----
     location: LocationInfo
@@ -506,6 +510,22 @@ class EventSchema(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Config:
+        """
+        Docstring for example schema. 
+        All these fields are illustrative of the schema structure.
+        The available options for each field must be defined according to the
+        Human Experience Taxonomy and the specific event data being normalized.
+        Each field will have either a fixed set of options (enums) or free text
+        depending on the nature of the data.
+        TODO: define classes for music genres, artist enrichment, etc., so that
+        all fields have a predefined data contract.
+        Each feature should have a thorough description so that the context feature
+        extraction from an LLM is clear on what to extract and how to format/reason
+        through it. Sometimes an event could have multiple event types for example, 
+        in these cases each event type should have a thorough description to capture
+        its context properly.
+        """
+
         json_encoders = {
             datetime: lambda v: v.isoformat(),
             Decimal: lambda v: float(v),
@@ -513,47 +533,87 @@ class EventSchema(BaseModel):
         use_enum_values = True
         schema_extra = {
             "example": {
-                "event_id": "ra_co_12345_2026-03-15",
-                "title": "Floating Points DJ Set",
-                "description": "Electronic music performance",
-                "primary_category": "play_and_fun",
+                "event_id": "ra_co_12345_2026-03-15", # generated unique UUID by us (pulsecity), randomly generated 
+                "title": "Floating Points DJ Set", # the event title
+                "description": "Electronic music performance", # the description including artist name
                 "taxonomy_dimensions": [
                     {
-                        "primary_category": "play_and_fun",
-                        "subcategory": "1.4",
-                        "values": ["expression", "energy", "flow"],
-                        "confidence": 0.95,
+                        "primary_category": "play_and_fun", # to be retrieved from the taxonomy, this will also be defined in the source but is subjective, can be changed with another major category from the taxonomy
+                        "subcategory_id": "1.4", # to be retrieved from the taxonomy, the most matching one
+                        "subcategory_name": "social_fun_and_playful_interaction", # to be retrieved from the taxonomy, the most matching one to the event context itself
+                        "subcategory_values": ["expression", "energy", "flow"], # to be retrieved from the taxonomy subcategory values
+                            "activity_id": "6729b1d1-0621-431b-92a0-85c58a18da6f", # to be retrieved from the taxonomy, the most matching one to the event context itself
+                            "activity_name": "Helping with daily tasks", # to be retrieved from the taxonomy activity chosen
+                            "energy_level": "low | medium | high", # to be retrieved from the taxonomy activity chosen
+                            "social_intensity": "solo | small_group | large_group", # to be retrieved from the taxonomy activity chosen
+                            "cognitive_load": "low | medium | high", # to be retrieved from the taxonomy activity chosen
+                            "physical_involvement": "none | light | moderate", # to be retrieved from the taxonomy activity chosen
+                            "cost_level": "free | low | medium | high", # to be retrieved from the taxonomy activity chosen, taking price into consideration. define simple thresholds for each category for now
+                            "time_scale": "short | long | recurring | multi_year", # to be retrieved from the taxonomy activity chosen, taking duration into consideration
+                            "environment": "indoor | outdoor | digital | mixed", # to be retrieved from the taxonomy activity chosen
+                            "emotional_output": [
+                                "purpose",
+                                "usefulness",
+                                "connection",
+                                "fulfillment"
+                            ], # to be retrieved from the taxonomy activity chosen
+                            "risk_level": "none | very_low | low", # to be retrieved from the taxonomy activity chosen
+                            "age_accessibility": "teens+ | adults", # to be retrieved from the taxonomy activity chosen
+                        "repeatability": "medium | low", # to be retrieved from the taxonomy, how often this event can be repeated
                     },
                     {
-                        "primary_category": "social_connection",
-                        "subcategory": "5.7",
-                        "values": ["belonging", "shared joy"],
-                        "confidence": 0.8,
+                        "primary_category": "social_connection", # to be retrieved from the taxonomy, this will also be defined in the source but is subjective, can be changed with another major category from the taxonomy
+                        #...
                     },
                 ],
-                "start_datetime": "2026-03-15T23:00:00Z",
-                "end_datetime": "2026-03-16T06:00:00Z",
+                "start_datetime": "2026-03-15T23:00:00Z", # time the event starts
+                "end_datetime": "2026-03-16T06:00:00Z", # time the event ends
+                "duration_minutes": 420, # duration in minutes
+                "days_of_week": ["sunday", "monday"], # day of the week the event occurs
                 "location": {
-                    "venue_name": "Printworks",
-                    "city": "London",
-                    "country_code": "GB",
-                    "coordinates": {"latitude": 51.5074, "longitude": -0.0759},
-                    "timezone": "Europe/London",
+                    "venue_name": "Printworks", # venue name if available
+                    "city": "London", # required
+                    "street_address": "1 Surrey Quays Rd", # street address if available
+                    "country_code": "GB", # ISO 3166-1 alpha-2 country code
+                    "coordinates": {"latitude": 51.5074, "longitude": -0.0759}, # validated through the class above: Coordinates. we need to get this probably with reverse geocoding if not provided by the source.
+                    "timezone": "Europe/London", # local timezone of the event
                 },
-                "event_type": "concert",
-                "format": "in_person",
+                "event_type": "concert", #EventType enum
+                "music_genres": ["electronic", "house", "techno"], # or None if its not music, implement a class in the future for music genre identification, and to define the hierarchy/availability of genres
+                "artist_name": ["David Guetta", "Calvin Harris"], # or None if its not music, implement a class in the future for artist enrichment with SoundCloud/Spotify/Discogs/etc.
+                "capacity": 4000, # max capacity of the venue
+                "event_format": "in_person", #EventFormat enum
+                "is_recurring": False, # whether its a recurring event or one-time
+                "recurrence_pattern": None, # e.g., 'weekly', 'monthly', 'one_time'
                 "price": {
-                    "currency": "GBP",
-                    "minimum_price": 35.0,
-                    "maximum_price": 50.0,
+                    "currency": "GBP", # ISO 4217 currency code
+                    "minimum_price": 35.0, # minimum ticket price
+                    "maximum_price": 50.0, # maximum ticket price
+                    "is_free": False, # whether the event is free
+                    "price_raw_text": "Tickets from £35 to £50", # original price text from source
                 },
-                "organizer": {"name": "Printworks Events"},
+                "ticket_info": {
+                    "url": "https://ra.co/events/12345/tickets", # direct link to ticket purchase
+                    "is_sold_out": False, # whether tickets are sold out
+                    "ticket_count_available": 150, # estimated number of tickets available
+                    "going_count": 85,  # number of people marked as going (if available)
+                    "age_restriction": "18+", # 14+, 18+, 21+, all ages, etc.
+                },
+                "organizer": {"name": "Printworks Events"}, # organizer info
                 "source": {
-                    "source_name": "ra_co",
-                    "source_event_id": "12345",
-                    "source_url": "https://ra.co/events/12345",
-                    "last_updated_from_source": "2026-01-27T10:00:00Z",
+                    "source_name": "ra_co", # name of the source platform
+                    "source_event_id": "12345", # original event ID from source
+                    "source_url": "https://ra.co/events/12345", # direct URL to event on source platform
+                    "raw_html": "<html>...</html>", # raw HTML or JSON data from source for debugging
                 },
+                "image_url": "https://ra.co/images/events/12345/main.jpg", # main event image
+                "media_assets": None, # could include videos, flyers, etc. None for now
+                "data_quality_score": 0.9, # 0.0 to 1.0, Quality assessment of normalized data (0.0-1.0)
+                "normalization_errors": [], # Warnings/errors encountered during normalization, None otherwise
+                "tags": ["electronic", "dj_set", "nightlife", "artist_name"], # free-text tags for search/filtering, LLM-generated could be improved in the future
+                "custom_fields": {}, # Source-specific fields that don't fit standard schema, links to youtube pages, spotify profiles, venue website, etc., could be anything, to be defined as we get more context from sources, None for now
+                "created_at": "2026-01-27T12:00:00Z", # when we created this record
+                "updated_at": "2026-01-27T12:00:00Z", # when we last updated this record
             }
         }
 
