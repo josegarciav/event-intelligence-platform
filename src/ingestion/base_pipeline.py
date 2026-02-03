@@ -47,6 +47,8 @@ class PipelineConfig:
     max_retries: int = 3
     batch_size: int = 100
     rate_limit_per_second: float = 1.0
+    deduplicate: bool = True
+    deduplication_strategy: str = "exact"
     custom_config: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -240,6 +242,14 @@ class BasePipeline(ABC):
 
             # Step 2-6: Process events through pipeline
             normalized_events = self._process_events_batch(fetch_result.raw_data)
+
+            # Step 7: Deduplication
+            if self.config.deduplicate and normalized_events:
+                from src.ingestion.deduplication import get_deduplicator, DeduplicationStrategy
+                deduplicator = get_deduplicator(DeduplicationStrategy(self.config.deduplication_strategy))
+                before_count = len(normalized_events)
+                normalized_events = deduplicator.deduplicate(normalized_events)
+                self.logger.info(f"Deduplication: {before_count} -> {len(normalized_events)} events")
 
             status = PipelineStatus.SUCCESS if normalized_events else PipelineStatus.FAILED
             if normalized_events and len(normalized_events) < len(fetch_result.raw_data):

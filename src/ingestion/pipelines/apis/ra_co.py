@@ -10,7 +10,7 @@ from decimal import Decimal
 import logging
 
 from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
-from src.ingestion.adapters import APIAdapter, SourceType
+from src.ingestion.adapters import APIAdapter, SourceType, FetchResult
 from src.ingestion.adapters.api_adapter import APIAdapterConfig
 from src.normalization.event_schema import (
     EventSchema,
@@ -29,10 +29,10 @@ from src.normalization.currency import CurrencyParser
 logger = logging.getLogger(__name__)
 
 
-# GraphQL query for fetching events
+# GraphQL query for fetching events with pagination
 EVENTS_QUERY = """
-query GetEvents($filters: FilterInputDtoInput, $pageSize: Int) {
-  eventListings(filters: $filters, pageSize: $pageSize) {
+query GetEvents($filters: FilterInputDtoInput, $pageSize: Int, $page: Int) {
+  eventListings(filters: $filters, pageSize: $pageSize, page: $page) {
     data {
       id
       event {
@@ -86,6 +86,7 @@ class RaCoAdapter(APIAdapter):
         self,
         area_id: int = 20,
         page_size: int = 50,
+        page: int = 1,
         date_from: Optional[str] = None,
         date_to: Optional[str] = None,
         **kwargs
@@ -107,8 +108,81 @@ class RaCoAdapter(APIAdapter):
                     }
                 },
                 "pageSize": page_size,
+                "page": page,
             }
         }
+
+    def fetch(self, **kwargs) -> FetchResult:
+        """
+        Fetch data from ra.co API with pagination.
+
+        Loops through pages until no more results or max_pages reached.
+
+        Args:
+            **kwargs: Parameters passed to query_builder
+                - area_id: Ra.co area ID (default 20 = Barcelona)
+                - page_size: Events per page (default 50, max 100)
+                - max_pages: Maximum pages to fetch (default 10)
+                - date_from: Start date filter
+                - date_to: End date filter
+
+        Returns:
+            FetchResult with all events from all pages
+        """
+        all_events = []
+        page = 1
+        max_pages = kwargs.pop("max_pages", 10)
+        page_size = kwargs.get("page_size", 50)
+        errors = []
+        total_results = 0
+
+        fetch_started = datetime.utcnow()
+
+        while page <= max_pages:
+            logger.info(f"Fetching page {page}/{max_pages}...")
+
+            # Fetch single page using parent class
+            result = super().fetch(page=page, **kwargs)
+
+            if not result.success or not result.raw_data:
+                if result.errors:
+                    errors.extend(result.errors)
+                break
+
+            all_events.extend(result.raw_data)
+
+            # Get total results from metadata
+            if result.metadata.get("total_available"):
+                total_results = result.metadata["total_available"]
+
+            # Check if we've fetched all available events
+            if len(result.raw_data) < page_size:
+                logger.info(f"Received {len(result.raw_data)} events (less than page_size), stopping pagination")
+                break
+
+            # Check if we've reached total available
+            if total_results > 0 and len(all_events) >= total_results:
+                logger.info(f"Fetched all {total_results} available events")
+                break
+
+            page += 1
+
+        logger.info(f"Pagination complete: fetched {len(all_events)} total events across {page} pages")
+
+        return FetchResult(
+            success=len(all_events) > 0,
+            source_type=SourceType.API,
+            raw_data=all_events,
+            total_fetched=len(all_events),
+            errors=errors,
+            metadata={
+                "pages_fetched": page,
+                "total_available": total_results,
+                "max_pages": max_pages,
+            },
+            fetch_started_at=fetch_started,
+            fetch_ended_at=datetime.utcnow(),
+        )
 
     def _parse_response(self, response: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Parse ra.co GraphQL response to event list."""

@@ -1,31 +1,37 @@
-# Base abstract class
 """
 Module for event deduplication strategies.
+
+Provides multiple deduplication strategies using the Strategy pattern:
+- ExactMatchDeduplicator: Match by title + venue + date (exact)
+- FuzzyMatchDeduplicator: Fuzzy match for typos/variations (not yet implemented)
+- CompositeDeduplicator: Chain multiple strategies
 """
 
 from abc import ABC, abstractmethod
-from typing import List
+from enum import Enum
+from typing import List, Optional
 from src.normalization.event_schema import EventSchema
 
 
+class DeduplicationStrategy(str, Enum):
+    """Available deduplication strategies."""
+    EXACT = "exact"
+    FUZZY = "fuzzy"  # Not yet implemented
+    METADATA = "metadata"  # Not yet implemented
+    COMPOSITE = "composite"
+
+
 class EventDeduplicator(ABC):
-    """
-    Abstract base for deduplication strategies
-    """
+    """Abstract base for deduplication strategies."""
 
     @abstractmethod
     def deduplicate(self, events: List[EventSchema]) -> List[EventSchema]:
-        """
-        Deduplicate events and return unique set
-        """
+        """Deduplicate events and return unique set."""
         pass
 
 
-# Protocol implementations
 class ExactMatchDeduplicator(EventDeduplicator):
-    """
-    Match by title + venue + date (exact)
-    """
+    """Match by title + venue + date (exact)."""
 
     def deduplicate(self, events: List[EventSchema]) -> List[EventSchema]:
         """
@@ -38,7 +44,6 @@ class ExactMatchDeduplicator(EventDeduplicator):
         unique_events = []
 
         for event in events:
-            # Create composite key from title, venue name, and start datetime
             venue_name = event.location.venue_name or "unknown_venue"
             key = (event.title, venue_name, str(event.start_datetime))
 
@@ -51,39 +56,49 @@ class ExactMatchDeduplicator(EventDeduplicator):
 
 class FuzzyMatchDeduplicator(EventDeduplicator):
     """
-    Fuzzy match for typos/variations
+    Fuzzy match for typos/variations.
 
-    Uses similarity matching to handle slight variations in titles/venues.
+    NOT YET IMPLEMENTED - falls back to exact match.
+    TODO: Implement with rapidfuzz or difflib
     """
+
+    def __init__(self, threshold: float = 0.85):
+        """
+        Initialize with similarity threshold.
+
+        Args:
+            threshold: Similarity threshold (0.0-1.0) for matching
+        """
+        self.threshold = threshold
 
     def deduplicate(self, events: List[EventSchema]) -> List[EventSchema]:
         """
         Deduplicate events using fuzzy matching.
 
-        Currently uses a basic similarity approach. Can be enhanced with
-        difflib.SequenceMatcher or fuzzy_string_matching libraries.
+        NOTE: Not yet implemented - falls back to exact match.
 
         Returns:
             List of unique events
         """
-        # TODO: Integrate with difflib or rapidfuzz for production
-        # For now, use exact match as placeholder
+        # TODO: Implement with rapidfuzz or difflib
+        # For now, fall back to exact match
         return ExactMatchDeduplicator().deduplicate(events)
 
 
 class MetadataDeduplicator(EventDeduplicator):
     """
-    Match by multiple metadata fields with weights
+    Match by multiple metadata fields with weights.
 
-    Considers multiple fields (title, venue, date, artists) with configurable weights.
+    NOT YET IMPLEMENTED - falls back to exact match.
+    TODO: Implement weighted similarity scoring
     """
 
-    def __init__(self, weights: dict = None):
+    def __init__(self, weights: Optional[dict] = None):
         """
         Initialize with field weights.
 
         Args:
-            weights: Dict of field -> weight (e.g., {'title': 0.4, 'venue': 0.3, 'date': 0.3})
+            weights: Dict of field -> weight (e.g., {'title': 0.4, 'venue': 0.3})
         """
         self.weights = weights or {
             "title": 0.4,
@@ -96,45 +111,59 @@ class MetadataDeduplicator(EventDeduplicator):
         """
         Deduplicate events using weighted metadata matching.
 
+        NOTE: Not yet implemented - falls back to exact match.
+
         Returns:
             List of unique events
         """
         # TODO: Implement weighted similarity scoring
-        # For now, use exact match as placeholder
         return ExactMatchDeduplicator().deduplicate(events)
 
 
 class CompositeDeduplicator(EventDeduplicator):
-    """
-    Combine multiple strategies with fallback logic
+    """Chain multiple deduplication strategies."""
 
-    Tries primary strategy first, falls back to secondary if needed.
-    """
-
-    def __init__(
-        self, primary: EventDeduplicator = None, secondary: EventDeduplicator = None
-    ):
+    def __init__(self, strategies: Optional[List[EventDeduplicator]] = None):
         """
-        Initialize with primary and secondary deduplicators.
+        Initialize with list of strategies to chain.
 
         Args:
-            primary: Primary deduplication strategy
-            secondary: Fallback strategy if primary insufficient
+            strategies: List of deduplicators to apply in sequence
         """
-        self.primary = primary or ExactMatchDeduplicator()
-        self.secondary = secondary or FuzzyMatchDeduplicator()
+        self.strategies = strategies or [ExactMatchDeduplicator()]
 
     def deduplicate(self, events: List[EventSchema]) -> List[EventSchema]:
         """
-        Apply primary deduplicator, then secondary on remaining.
+        Apply each strategy in sequence.
 
         Returns:
-            List of unique events
+            List of unique events after all strategies applied
         """
-        # First pass with primary strategy
-        after_primary = self.primary.deduplicate(events)
+        result = events
+        for strategy in self.strategies:
+            result = strategy.deduplicate(result)
+        return result
 
-        # Second pass with secondary strategy for any remaining duplicates
-        final = self.secondary.deduplicate(after_primary)
 
-        return final
+def get_deduplicator(
+    strategy: DeduplicationStrategy = DeduplicationStrategy.EXACT
+) -> EventDeduplicator:
+    """
+    Factory function to get a deduplicator by strategy.
+
+    Args:
+        strategy: DeduplicationStrategy enum value
+
+    Returns:
+        Configured EventDeduplicator instance
+    """
+    if strategy == DeduplicationStrategy.EXACT:
+        return ExactMatchDeduplicator()
+    elif strategy == DeduplicationStrategy.FUZZY:
+        return FuzzyMatchDeduplicator()
+    elif strategy == DeduplicationStrategy.METADATA:
+        return MetadataDeduplicator()
+    elif strategy == DeduplicationStrategy.COMPOSITE:
+        return CompositeDeduplicator()
+    else:
+        return ExactMatchDeduplicator()
