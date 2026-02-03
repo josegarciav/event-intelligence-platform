@@ -745,7 +745,7 @@ class EventSchema(BaseModel):
                     "going_count": 85,  # number of people marked as going (if available)
                     "age_restriction": "18+",  # 14+, 18+, 21+, all ages, None, etc.
                 },
-                "organizer": {"name": "Printworks Events"},  # organizer info
+                "organizer_name": "Printworks Events",  # organizer info
                 "source": {
                     "source_name": "ra_co",  # name of the source platform
                     "source_event_id": "12345",  # original event ID from source
