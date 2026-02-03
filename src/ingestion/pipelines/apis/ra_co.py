@@ -41,6 +41,7 @@ query GetEvents($filters: FilterInputDtoInput, $pageSize: Int, $page: Int) {
       event {
         id
         title
+        content
         date
         startTime
         endTime
@@ -249,9 +250,19 @@ class RaCoPipeline(BasePipeline):
             if filename:
                 image_url = f"https://ra.co/images/events/flyer/{filename}"
 
+        # Extract description from content field (may contain HTML)
+        description = raw_event.get("content")
+        if description:
+            # Clean basic HTML tags if present
+            import re
+
+            description = re.sub(r"<[^>]+>", " ", description)
+            description = re.sub(r"\s+", " ", description).strip()
+
         return {
             "source_event_id": raw_event.get("id"),
             "title": raw_event.get("title"),
+            "description": description,
             "date": raw_event.get("date"),
             "start_time": raw_event.get("startTime"),
             "end_time": raw_event.get("endTime"),
@@ -429,7 +440,7 @@ class RaCoPipeline(BasePipeline):
         return EventSchema(
             event_id=event_id,
             title=parsed_event.get("title", "Untitled Event"),
-            description=None,
+            description=parsed_event.get("description"),
             primary_category=primary_cat,
             taxonomy_dimensions=taxonomy_objs,
             start_datetime=start_dt,

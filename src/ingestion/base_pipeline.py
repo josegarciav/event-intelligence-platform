@@ -396,7 +396,15 @@ class BasePipeline(ABC):
     # ========================================================================
 
     def to_dataframe(self, events: List[EventSchema]):
-        """Convert events to pandas DataFrame."""
+        """
+        Convert events to pandas DataFrame.
+
+        Includes:
+        - Core event fields (title, description, dates, location)
+        - Pricing information
+        - Primary taxonomy dimension with all enrichment fields
+        - Full taxonomy JSON for reference
+        """
         import pandas as pd
         import json
 
@@ -408,12 +416,27 @@ class BasePipeline(ABC):
                 for a in artists_list
             )
 
+            # Build full taxonomy JSON with all fields
             taxonomy_json = json.dumps(
                 [
                     {
                         "primary_category": dim.primary_category,
                         "subcategory": dim.subcategory,
+                        "subcategory_name": dim.subcategory_name,
+                        "activity_id": dim.activity_id,
+                        "activity_name": dim.activity_name,
                         "confidence": dim.confidence,
+                        "energy_level": dim.energy_level,
+                        "social_intensity": dim.social_intensity,
+                        "cognitive_load": dim.cognitive_load,
+                        "physical_involvement": dim.physical_involvement,
+                        "cost_level": dim.cost_level,
+                        "time_scale": dim.time_scale,
+                        "environment": dim.environment,
+                        "emotional_output": dim.emotional_output,
+                        "risk_level": dim.risk_level,
+                        "age_accessibility": dim.age_accessibility,
+                        "repeatability": dim.repeatability,
                     }
                     for dim in event.taxonomy_dimensions
                 ]
@@ -436,20 +459,56 @@ class BasePipeline(ABC):
                     else str(event.format)
                 )
 
+            # Get primary taxonomy dimension for flat columns
+            primary_dim = (
+                event.taxonomy_dimensions[0] if event.taxonomy_dimensions else None
+            )
+
             row = {
+                # Core event info
                 "event_id": event.event_id,
                 "title": event.title,
-                "description": event.description[:200] if event.description else None,
+                "description": event.description[:500] if event.description else None,
                 "start_datetime": event.start_datetime,
                 "end_datetime": event.end_datetime,
+                "duration_minutes": event.duration_minutes,
+                # Location
                 "city": event.location.city,
                 "country_code": event.location.country_code,
                 "venue_name": event.location.venue_name,
+                # Artists
                 "artists": artists_str,
+                # Taxonomy - primary category
                 "primary_category": event.primary_category,
-                "taxonomy": taxonomy_json,
+                "subcategory": primary_dim.subcategory if primary_dim else None,
+                "subcategory_name": primary_dim.subcategory_name if primary_dim else None,
+                # Taxonomy - activity level fields
+                "activity_name": primary_dim.activity_name if primary_dim else None,
+                "energy_level": primary_dim.energy_level if primary_dim else None,
+                "social_intensity": primary_dim.social_intensity if primary_dim else None,
+                "cognitive_load": primary_dim.cognitive_load if primary_dim else None,
+                "physical_involvement": (
+                    primary_dim.physical_involvement if primary_dim else None
+                ),
+                "cost_level": primary_dim.cost_level if primary_dim else None,
+                "time_scale": primary_dim.time_scale if primary_dim else None,
+                "environment": primary_dim.environment if primary_dim else None,
+                "emotional_output": (
+                    ", ".join(primary_dim.emotional_output)
+                    if primary_dim and primary_dim.emotional_output
+                    else None
+                ),
+                "risk_level": primary_dim.risk_level if primary_dim else None,
+                "age_accessibility": (
+                    primary_dim.age_accessibility if primary_dim else None
+                ),
+                "repeatability": primary_dim.repeatability if primary_dim else None,
+                # Full taxonomy JSON
+                "taxonomy_json": taxonomy_json,
+                # Event type & format
                 "event_type": event_type_val,
                 "format": format_val,
+                # Pricing
                 "is_free": event.price.is_free if event.price else None,
                 "min_price": (
                     float(event.price.minimum_price)
@@ -462,9 +521,11 @@ class BasePipeline(ABC):
                     else None
                 ),
                 "currency_code": event.price.currency if event.price else None,
+                # Organizer & source
                 "organizer": event.organizer.name if event.organizer else None,
                 "source_url": event.source.source_url if event.source else None,
                 "image_url": event.image_url,
+                # Quality
                 "data_quality_score": event.data_quality_score,
             }
             rows.append(row)

@@ -1,20 +1,40 @@
 """
-Feature Extractor for LLM-based field filling.
+Feature Extractor for LLM-based taxonomy enrichment.
 
-Uses LLM to fill missing fields based on event context.
-Can infer:
-- Primary category and subcategory
-- Activity matches
-- Taxonomy attributes (energy_level, social_intensity, etc.)
-- Event type
-- Tags
+Uses LangChain with RAG (Retrieval Augmented Generation) to:
+1. Classify events into taxonomy categories
+2. Match activities from the taxonomy
+3. Select appropriate attribute values based on event context
+
+The extractor injects filtered taxonomy context into prompts
+to ensure accurate classification and attribute selection.
 """
 
 import json
 import logging
-import os
 import re
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
+
+from src.ingestion.normalization.llm_client import (
+    BaseLLMClient,
+    LangChainLLMClient,
+    FallbackLLMClient,
+    create_llm_client,
+)
+from src.ingestion.normalization.taxonomy_retriever import (
+    TaxonomyRetriever,
+    get_taxonomy_retriever,
+)
+from src.ingestion.normalization.feature_models import (
+    TaxonomyAttributesOutput,
+    ActivityMatchOutput,
+    SubcategoryMatchOutput,
+    PrimaryCategoryOutput,
+    FullTaxonomyEnrichmentOutput,
+    EventTypeOutput,
+    MusicGenresOutput,
+    TagsOutput,
+)
 
 if TYPE_CHECKING:
     from src.ingestion.normalization.event_schema import TaxonomyDimension
@@ -24,472 +44,66 @@ logger = logging.getLogger(__name__)
 
 class FeatureExtractor:
     """
-    Uses LLM to fill missing fields based on event context.
+    LLM-based feature extractor for event taxonomy enrichment.
 
-    Supports:
-    - OpenAI API (GPT-3.5, GPT-4)
-    - Anthropic API (Claude)
+    Uses LangChain with structured output to:
+    - Classify events into primary categories and subcategories
+    - Match events to specific activities from the taxonomy
+    - Select appropriate attribute values (energy_level, social_intensity, etc.)
+    - Extract event type, music genres, and tags
 
-    The extractor analyzes event title, description, and other available
-    fields to infer missing information.
+    The extractor supports both LLM-based extraction and rule-based fallbacks
+    when the LLM is unavailable.
+
+    Example:
+        >>> extractor = FeatureExtractor()
+        >>> event = {"title": "Techno Party", "description": "Underground techno night"}
+        >>> enriched_dim = extractor.enrich_taxonomy_dimension(basic_dim, event)
     """
 
     def __init__(
         self,
-        model_name: str = "gpt-3.5-turbo",
-        api_key: Optional[str] = None,
         provider: str = "openai",
-        temperature: float = 0.3,
-        max_tokens: int = 1000,
+        model_name: Optional[str] = None,
+        api_key: Optional[str] = None,
+        temperature: float = 0.1,
+        max_tokens: int = 2000,
     ):
         """
         Initialize the feature extractor.
 
         Args:
-            model_name: Model to use (e.g., "gpt-3.5-turbo", "gpt-4", "claude-3-haiku")
-            api_key: API key (defaults to env var OPENAI_API_KEY or ANTHROPIC_API_KEY)
-            provider: "openai" or "anthropic"
+            provider: LLM provider ("openai" or "anthropic")
+            model_name: Model to use (defaults based on provider)
+            api_key: API key (defaults to env var)
             temperature: Temperature for generation (0.0-1.0)
             max_tokens: Maximum tokens in response
         """
-        self.model_name = model_name
         self.provider = provider
+        self.model_name = model_name
         self.temperature = temperature
         self.max_tokens = max_tokens
 
-        # Get API key
-        if api_key:
-            self.api_key = api_key
-        elif provider == "openai":
-            self.api_key = os.getenv("OPENAI_API_KEY")
-        elif provider == "anthropic":
-            self.api_key = os.getenv("ANTHROPIC_API_KEY")
-        else:
-            self.api_key = None
-
-        self._client = None
-
-    def _get_client(self):
-        """Get or create API client."""
-        if self._client is not None:
-            return self._client
-
-        if not self.api_key:
-            logger.warning(f"No API key found for {self.provider}")
-            return None
-
-        if self.provider == "openai":
-            try:
-                from openai import OpenAI
-
-                self._client = OpenAI(api_key=self.api_key)
-            except ImportError:
-                logger.warning("openai package not installed")
-                return None
-        elif self.provider == "anthropic":
-            try:
-                import anthropic
-
-                self._client = anthropic.Anthropic(api_key=self.api_key)
-            except ImportError:
-                logger.warning("anthropic package not installed")
-                return None
-
-        return self._client
-
-    def extract_missing_fields(
-        self,
-        event: Dict[str, Any],
-        missing_fields: List[str],
-    ) -> Dict[str, Any]:
-        """
-        Use LLM to infer missing fields from event context.
-
-        Args:
-            event: Event dict with available fields
-            missing_fields: List of field names to fill
-
-        Returns:
-            Dict with inferred values for missing fields
-
-        Supported fields:
-        - primary_category
-        - subcategory
-        - event_type
-        - tags
-        - activity_id (requires subcategory context)
-        - energy_level, social_intensity, cognitive_load, etc.
-        """
-        client = self._get_client()
-        if not client:
-            return self._fallback_extraction(event, missing_fields)
-
-        # Build context from event
-        context = self._build_event_context(event)
-
-        # Build prompt
-        prompt = self._build_extraction_prompt(context, missing_fields)
-
-        try:
-            response = self._call_llm(prompt)
-            return self._parse_extraction_response(response, missing_fields)
-        except Exception as e:
-            logger.error(f"LLM extraction failed: {e}")
-            return self._fallback_extraction(event, missing_fields)
-
-    def match_activity(
-        self,
-        event_title: str,
-        event_description: str,
-        subcategory_id: str,
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Find best activity match from taxonomy using semantic similarity.
-
-        Uses LLM to understand event context and match against
-        available activities in the subcategory.
-
-        Args:
-            event_title: Event title
-            event_description: Event description
-            subcategory_id: Subcategory ID to search within
-
-        Returns:
-            Dict with activity_id and match_confidence, or None
-        """
-        from src.ingestion.normalization.taxonomy import get_activities_for_subcategory
-
-        activities = get_activities_for_subcategory(subcategory_id)
-        if not activities:
-            return None
-
-        client = self._get_client()
-        if not client:
-            # Fall back to keyword matching
-            from src.ingestion.normalization.taxonomy import find_best_activity_match
-
-            return find_best_activity_match(
-                f"{event_title} {event_description}", subcategory_id
-            )
-
-        # Build activity list for prompt
-        activity_list = "\n".join(
-            f"- {a['activity_id']}: {a.get('name', 'Unknown')}" for a in activities
+        # Initialize LLM client (with fallback to rules)
+        self._llm_client = create_llm_client(
+            provider=provider,
+            model_name=model_name,
+            api_key=api_key,
+            temperature=temperature,
+            fallback_to_rules=True,
         )
 
-        prompt = f"""Given this event:
-Title: {event_title}
-Description: {event_description}
+        # Initialize taxonomy retriever
+        self._taxonomy = get_taxonomy_retriever()
 
-Match it to the most appropriate activity from this list:
-{activity_list}
+    @property
+    def is_llm_available(self) -> bool:
+        """Check if LLM is available."""
+        return isinstance(self._llm_client, LangChainLLMClient)
 
-Respond with JSON:
-{{"activity_id": "uuid-of-best-match", "confidence": 0.0-1.0, "reasoning": "brief explanation"}}
-
-If no good match exists, respond with:
-{{"activity_id": null, "confidence": 0.0, "reasoning": "no suitable match"}}"""
-
-        try:
-            response = self._call_llm(prompt)
-            result = json.loads(response)
-            if result.get("activity_id"):
-                # Find the full activity data
-                for activity in activities:
-                    if activity.get("activity_id") == result["activity_id"]:
-                        return {
-                            **activity,
-                            "_match_confidence": result.get("confidence", 0.5),
-                            "_match_reasoning": result.get("reasoning"),
-                        }
-            return None
-        except Exception as e:
-            logger.error(f"Activity matching failed: {e}")
-            return None
-
-    def infer_taxonomy_attributes(
-        self,
-        event: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        """
-        Infer taxonomy attributes from event context.
-
-        Uses LLM to analyze event and determine:
-        - energy_level: low | medium | high
-        - social_intensity: solo | small_group | large_group
-        - cognitive_load: low | medium | high
-        - physical_involvement: none | light | moderate
-        - cost_level: free | low | medium | high
-        - time_scale: short | long | recurring
-        - environment: indoor | outdoor | digital | mixed
-        - risk_level: none | very_low | low | medium
-        - age_accessibility: all | teens+ | adults
-
-        Args:
-            event: Event dict with title, description, price, etc.
-
-        Returns:
-            Dict with inferred attribute values
-        """
-        client = self._get_client()
-        context = self._build_event_context(event)
-
-        # Price-based cost level inference (doesn't need LLM)
-        cost_level = self._infer_cost_level(event)
-
-        # Duration-based time scale inference (doesn't need LLM)
-        time_scale = self._infer_time_scale(event)
-
-        if not client:
-            # Return rule-based defaults
-            return {
-                "energy_level": "medium",
-                "social_intensity": "large_group",
-                "cognitive_load": "low",
-                "physical_involvement": "light",
-                "cost_level": cost_level,
-                "time_scale": time_scale,
-                "environment": "indoor",
-                "risk_level": "very_low",
-                "age_accessibility": "adults",
-            }
-
-        prompt = f"""Analyze this event and infer its attributes:
-
-{context}
-
-Respond with JSON containing these attributes:
-- energy_level: "low" | "medium" | "high"
-- social_intensity: "solo" | "small_group" | "large_group"
-- cognitive_load: "low" | "medium" | "high"
-- physical_involvement: "none" | "light" | "moderate"
-- environment: "indoor" | "outdoor" | "digital" | "mixed"
-- risk_level: "none" | "very_low" | "low" | "medium"
-- age_accessibility: "all" | "teens+" | "adults"
-
-Only include fields you can reasonably infer. Example:
-{{"energy_level": "high", "social_intensity": "large_group", "environment": "indoor"}}"""
-
-        try:
-            response = self._call_llm(prompt)
-            result = json.loads(response)
-
-            # Add rule-based inferences
-            result["cost_level"] = cost_level
-            result["time_scale"] = time_scale
-
-            return result
-        except Exception as e:
-            logger.error(f"Attribute inference failed: {e}")
-            return {
-                "cost_level": cost_level,
-                "time_scale": time_scale,
-            }
-
-    def _build_event_context(self, event: Dict[str, Any]) -> str:
-        """Build context string from event data."""
-        lines = []
-
-        if event.get("title"):
-            lines.append(f"Title: {event['title']}")
-
-        if event.get("description"):
-            # Truncate long descriptions
-            desc = event["description"][:500]
-            lines.append(f"Description: {desc}")
-
-        if event.get("venue_name"):
-            lines.append(f"Venue: {event['venue_name']}")
-
-        if event.get("city"):
-            lines.append(f"City: {event['city']}")
-
-        if event.get("artists"):
-            artists = event["artists"]
-            if isinstance(artists, list):
-                artists = ", ".join(str(a) for a in artists[:5])
-            lines.append(f"Artists: {artists}")
-
-        if event.get("cost") or event.get("price"):
-            price = event.get("cost") or event.get("price")
-            lines.append(f"Price: {price}")
-
-        return "\n".join(lines)
-
-    def _build_extraction_prompt(
-        self,
-        context: str,
-        missing_fields: List[str],
-    ) -> str:
-        """Build extraction prompt for missing fields."""
-        field_descriptions = {
-            "primary_category": "Primary experience category from: play_and_fun, exploration_and_adventure, creation_and_expression, learning_and_intellectual, social_connection, body_and_movement, challenge_and_achievement, relaxation_and_escapism, identity_and_meaning, contribution_and_impact",
-            "subcategory": "Subcategory ID (e.g., '1.4' for Music & Rhythm Play)",
-            "event_type": "Event type from: concert, festival, party, workshop, lecture, meetup, sports, exhibition, conference, nightlife, theater, dance, food_beverage, art_show, other",
-            "tags": "List of relevant tags for search/filtering",
-        }
-
-        fields_info = "\n".join(
-            f"- {f}: {field_descriptions.get(f, 'Infer appropriate value')}"
-            for f in missing_fields
-        )
-
-        return f"""Analyze this event and extract the following fields:
-
-{context}
-
-Fields to extract:
-{fields_info}
-
-Respond with JSON containing only the requested fields:
-{{"field_name": "value", ...}}
-
-For list fields like tags, use an array: ["tag1", "tag2", ...]"""
-
-    def _call_llm(self, prompt: str) -> str:
-        """Call the LLM and return response text."""
-        client = self._get_client()
-        if not client:
-            raise ValueError("No LLM client available")
-
-        if self.provider == "openai":
-            response = client.chat.completions.create(
-                model=self.model_name,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-            )
-            return response.choices[0].message.content
-
-        elif self.provider == "anthropic":
-            response = client.messages.create(
-                model=self.model_name,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-            )
-            return response.content[0].text
-
-        raise ValueError(f"Unknown provider: {self.provider}")
-
-    def _parse_extraction_response(
-        self,
-        response: str,
-        missing_fields: List[str],
-    ) -> Dict[str, Any]:
-        """Parse LLM response for extracted fields."""
-        # Try to extract JSON from response
-        try:
-            # Find JSON in response (may be surrounded by text)
-            json_match = response
-            if "```json" in response:
-                json_match = response.split("```json")[1].split("```")[0]
-            elif "```" in response:
-                json_match = response.split("```")[1].split("```")[0]
-
-            result = json.loads(json_match.strip())
-
-            # Filter to only requested fields
-            return {k: v for k, v in result.items() if k in missing_fields}
-        except (json.JSONDecodeError, IndexError) as e:
-            logger.warning(f"Failed to parse LLM response: {e}")
-            return {}
-
-    def _fallback_extraction(
-        self,
-        event: Dict[str, Any],
-        missing_fields: List[str],
-    ) -> Dict[str, Any]:
-        """
-        Fallback extraction using rule-based logic.
-
-        Used when LLM is not available.
-        """
-        result = {}
-        title = (event.get("title") or "").lower()
-
-        if "primary_category" in missing_fields:
-            # Simple keyword-based inference
-            if any(w in title for w in ["festival", "outdoor", "travel"]):
-                result["primary_category"] = "exploration_and_adventure"
-            elif any(w in title for w in ["workshop", "class", "learn"]):
-                result["primary_category"] = "learning_and_intellectual"
-            elif any(w in title for w in ["yoga", "gym", "run", "fitness"]):
-                result["primary_category"] = "body_and_movement"
-            else:
-                result["primary_category"] = "play_and_fun"
-
-        if "event_type" in missing_fields:
-            if "festival" in title:
-                result["event_type"] = "festival"
-            elif any(w in title for w in ["party", "fiesta"]):
-                result["event_type"] = "party"
-            elif any(w in title for w in ["concert", "live"]):
-                result["event_type"] = "concert"
-            elif any(w in title for w in ["workshop", "masterclass"]):
-                result["event_type"] = "workshop"
-            else:
-                result["event_type"] = "nightlife"
-
-        if "tags" in missing_fields:
-            tags = []
-            if "music" in title or "dj" in title:
-                tags.append("music")
-            if "electronic" in title or "techno" in title:
-                tags.append("electronic")
-            if "party" in title:
-                tags.append("party")
-            result["tags"] = tags if tags else ["event"]
-
-        return result
-
-    def _infer_cost_level(self, event: Dict[str, Any]) -> str:
-        """Infer cost level from price data."""
-        # Try to get minimum price
-        price = None
-        if event.get("minimum_price"):
-            price = event["minimum_price"]
-        elif event.get("cost"):
-            cost_str = str(event["cost"])
-            # Extract first number
-            match = re.search(r"[\d.]+", cost_str)
-            if match:
-                try:
-                    price = float(match.group())
-                except ValueError:
-                    pass
-
-        if event.get("is_free") or (price is not None and price == 0):
-            return "free"
-        elif price is None:
-            return "medium"  # Default when unknown
-        elif price <= 15:
-            return "low"
-        elif price <= 50:
-            return "medium"
-        else:
-            return "high"
-
-    def _infer_time_scale(self, event: Dict[str, Any]) -> str:
-        """Infer time scale from duration or event type."""
-        duration = event.get("duration_minutes")
-
-        if duration:
-            if duration <= 120:
-                return "short"
-            elif duration <= 480:
-                return "long"
-            else:
-                return "recurring"
-
-        # Infer from title
-        title = (event.get("title") or "").lower()
-        if "festival" in title:
-            return "long"
-        if "workshop" in title:
-            return "short"
-
-        return "long"  # Default for events
+    # =========================================================================
+    # MAIN ENRICHMENT METHOD
+    # =========================================================================
 
     def enrich_taxonomy_dimension(
         self,
@@ -499,30 +113,23 @@ For list fields like tags, use an array: ["tag1", "tag2", ...]"""
         """
         Enrich a TaxonomyDimension with activity-level fields.
 
-        Given primary_category and subcategory, populate activity-level fields
-        using LLM-based selection from template options or rule-based fallbacks.
+        Given primary_category and subcategory, populate:
+        - subcategory_name (if not set)
+        - activity_id, activity_name (best matching activity)
+        - energy_level, social_intensity, cognitive_load, physical_involvement
+        - cost_level, time_scale, environment, emotional_output
+        - risk_level, age_accessibility, repeatability
 
         Args:
-            dimension: TaxonomyDimension with at least primary_category and subcategory
-            event_context: Event dict with title, description, venue, price, duration, etc.
+            dimension: TaxonomyDimension with at least primary_category
+            event_context: Event dict with title, description, cost, duration, etc.
 
         Returns:
-            New TaxonomyDimension with activity-level fields populated
-
-        Process:
-        1. Get activities for subcategory from taxonomy
-        2. Match best activity using LLM (or keyword matching)
-        3. Use LLM to SELECT appropriate option from templates based on context
-        4. Fallback to rule-based defaults if LLM unavailable
+            New TaxonomyDimension with all fields populated
         """
-        from src.ingestion.normalization.taxonomy import (
-            get_activities_for_subcategory,
-            get_subcategory_by_id,
-            find_best_activity_match,
-        )
         from src.ingestion.normalization.event_schema import TaxonomyDimension
 
-        # Start with existing dimension data
+        # Build enriched data starting with existing values
         enriched_data = {
             "primary_category": dimension.primary_category,
             "subcategory": dimension.subcategory,
@@ -538,222 +145,494 @@ For list fields like tags, use an array: ["tag1", "tag2", ...]"""
 
         # Get subcategory details if not already populated
         if dimension.subcategory and not dimension.subcategory_name:
-            sub = get_subcategory_by_id(dimension.subcategory)
+            sub = self._taxonomy.get_subcategory_by_id(dimension.subcategory)
             if sub:
                 enriched_data["subcategory_name"] = sub.get("name")
                 if not enriched_data["values"]:
                     enriched_data["values"] = sub.get("values", [])
 
-        # Try to find matching activity if not already set
-        if dimension.subcategory and not dimension.activity_id:
-            event_text = f"{event_context.get('title', '')} {event_context.get('description', '')}"
+        # Get category ID for context filtering
+        category_id = None
+        if dimension.subcategory:
+            category_id = dimension.subcategory.split(".")[0]
 
-            # Try LLM-based matching first
-            client = self._get_client()
-            if client:
-                activity_match = self.match_activity(
-                    event_context.get("title", ""),
-                    event_context.get("description", ""),
-                    dimension.subcategory,
-                )
-            else:
-                # Fallback to keyword matching
-                activity_match = find_best_activity_match(event_text, dimension.subcategory)
+        # Use LLM or fallback for attribute enrichment
+        if self.is_llm_available:
+            attributes = self._enrich_with_llm(
+                event_context, dimension.subcategory, category_id
+            )
+        else:
+            attributes = self._enrich_with_rules(event_context)
 
-            if activity_match:
-                enriched_data["activity_id"] = activity_match.get("activity_id")
-                enriched_data["activity_name"] = activity_match.get("name")
+        # Merge attributes into enriched data
+        for key, value in attributes.items():
+            if value is not None:
+                enriched_data[key] = value
 
-        # Define attribute options (from taxonomy templates)
-        attribute_options = {
-            "energy_level": ["low", "medium", "high"],
-            "social_intensity": ["solo", "small_group", "large_group"],
-            "cognitive_load": ["low", "medium", "high"],
-            "physical_involvement": ["none", "light", "moderate"],
-            "environment": ["indoor", "outdoor", "digital", "mixed"],
-            "risk_level": ["none", "very_low", "low", "medium"],
-            "age_accessibility": ["all", "teens+", "adults"],
-            "repeatability": ["high", "medium", "low"],
-        }
-
-        # Select attribute values using LLM or fallback
-        selected_attributes = self._select_attribute_values(
-            event_context, attribute_options
-        )
-
-        # Merge selected attributes into enriched data
-        for attr, value in selected_attributes.items():
-            enriched_data[attr] = value
-
-        # Always use rule-based for cost_level and time_scale
+        # Always use rule-based for cost_level and time_scale (more reliable)
         enriched_data["cost_level"] = self._infer_cost_level(event_context)
         enriched_data["time_scale"] = self._infer_time_scale(event_context)
 
-        # Create and return new TaxonomyDimension
         return TaxonomyDimension(**enriched_data)
 
-    def _select_attribute_values(
+    # =========================================================================
+    # LLM-BASED ENRICHMENT
+    # =========================================================================
+
+    def _enrich_with_llm(
         self,
         event_context: Dict[str, Any],
-        attribute_options: Dict[str, List[str]],
-    ) -> Dict[str, str]:
+        subcategory_id: Optional[str],
+        category_id: Optional[str],
+    ) -> Dict[str, Any]:
         """
-        Select best option for each attribute based on event context.
+        Use LLM to enrich taxonomy attributes.
 
-        Uses LLM if available, otherwise uses rule-based defaults.
-
-        Args:
-            event_context: Event dict with title, description, etc.
-            attribute_options: Dict mapping attribute name to list of valid options
-
-        Returns:
-            Dict with selected value for each attribute
+        Injects filtered taxonomy context into the prompt.
         """
-        client = self._get_client()
-
-        if client:
-            return self._select_attribute_values_llm(event_context, attribute_options)
-        else:
-            return self._select_attribute_values_fallback(event_context, attribute_options)
-
-    def _select_attribute_values_llm(
-        self,
-        event_context: Dict[str, Any],
-        attribute_options: Dict[str, List[str]],
-    ) -> Dict[str, str]:
-        """
-        Use LLM to select best option for each attribute based on event context.
-
-        Args:
-            event_context: Event dict with title, description, venue, price, etc.
-            attribute_options: Dict mapping attribute name to list of valid options
-                e.g., {"energy_level": ["low", "medium", "high"]}
-
-        Returns:
-            Dict with selected value for each attribute
-        """
-        context_str = self._build_event_context(event_context)
-
-        # Build options description
-        options_str = "\n".join(
-            f"- {attr}: {' | '.join(options)}"
-            for attr, options in attribute_options.items()
-        )
-
-        prompt = f"""Analyze this event and select the most appropriate option for each attribute:
-
-{context_str}
-
-For each attribute below, select ONE option that best fits the event:
-{options_str}
-
-Respond with JSON containing your selections:
-{{"energy_level": "selected_option", "social_intensity": "selected_option", ...}}
-
-Guidelines:
-- energy_level: Consider the activity type, music style (if applicable), time of day
-- social_intensity: Consider venue size, event type, whether it's a group activity
-- cognitive_load: Consider if it requires active thinking/learning vs passive enjoyment
-- physical_involvement: Consider dancing, standing, walking, etc.
-- environment: Consider indoor venues vs outdoor festivals vs online events
-- risk_level: Consider physical activity level, venue type, activities involved
-- age_accessibility: Consider alcohol presence, venue type, content nature
-- repeatability: Consider if this is a unique experience vs something people do regularly"""
-
         try:
-            response = self._call_llm(prompt)
-            result = json.loads(response.strip())
+            # Build context string
+            event_str = self._format_event_context(event_context)
 
-            # Validate selections are from allowed options
-            validated = {}
-            for attr, options in attribute_options.items():
-                selected = result.get(attr)
-                if selected in options:
-                    validated[attr] = selected
-                else:
-                    # Use middle option as default
-                    validated[attr] = options[len(options) // 2]
+            # Get taxonomy context filtered by category
+            if subcategory_id:
+                taxonomy_context = self._taxonomy.get_subcategory_context_for_prompt(
+                    subcategory_id
+                )
+            elif category_id:
+                taxonomy_context = self._taxonomy.get_category_context_for_prompt(
+                    category_id
+                )
+            else:
+                taxonomy_context = self._taxonomy.get_attribute_options_string()
 
-            return validated
+            # Build the prompt
+            system_prompt = self._build_enrichment_system_prompt(taxonomy_context)
+            user_prompt = self._build_enrichment_user_prompt(event_str)
+
+            # Call LLM with structured output
+            result = self._llm_client.invoke_with_context(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                output_schema=FullTaxonomyEnrichmentOutput,
+            )
+
+            return result.model_dump()
 
         except Exception as e:
-            logger.error(f"LLM attribute selection failed: {e}")
-            return self._select_attribute_values_fallback(event_context, attribute_options)
+            logger.warning(f"LLM enrichment failed: {e}, falling back to rules")
+            return self._enrich_with_rules(event_context)
 
-    def _select_attribute_values_fallback(
-        self,
-        event_context: Dict[str, Any],
-        attribute_options: Dict[str, List[str]],
-    ) -> Dict[str, str]:
+    def _build_enrichment_system_prompt(self, taxonomy_context: str) -> str:
+        """Build system prompt for taxonomy enrichment."""
+        return f"""You are an expert event classifier for the Human Experience Taxonomy.
+
+Your task is to analyze event information and select the most appropriate attributes
+from the taxonomy based on the event's characteristics.
+
+## Taxonomy Context (filtered for this category):
+{taxonomy_context}
+
+## Attribute Selection Guidelines:
+
+**energy_level**: Consider the activity type, music style, time of day
+- "low": Calm, relaxed events (exhibitions, talks, ambient music)
+- "medium": Moderate engagement (workshops, casual meetups)
+- "high": Intense, active events (raves, festivals, dance parties)
+
+**social_intensity**: Consider venue size, event format, typical attendance
+- "solo": Individual experiences (some exhibitions, digital events)
+- "small_group": Intimate gatherings (workshops, small venue events, 2-10 people)
+- "large_group": Mass gatherings (festivals, large club events, 10+ people)
+
+**cognitive_load**: Consider learning/focus requirements
+- "low": Passive enjoyment (concerts, parties)
+- "medium": Some active engagement (workshops, interactive events)
+- "high": Deep focus/learning (masterclasses, technical workshops)
+
+**physical_involvement**: Consider dancing, movement, activity level
+- "none": Seated/stationary (lectures, screenings)
+- "light": Standing, some movement (exhibitions, casual events)
+- "moderate": Active movement (dancing, sports, festivals)
+
+**environment**: Consider venue type
+- "indoor": Clubs, theaters, galleries
+- "outdoor": Festivals, park events, rooftops
+- "digital": Online/streaming events
+- "mixed": Hybrid or multi-venue events
+
+**age_accessibility**: Consider venue restrictions, content
+- "all": Family-friendly
+- "teens+": 13+ appropriate
+- "adults": 18+/21+ venues (clubs, bars)
+
+**repeatability**: How often people typically attend similar events
+- "high": Weekly/regular (club nights, meetups)
+- "medium": Monthly (special events, concerts)
+- "low": Rare/unique (festivals, special performances)
+
+**risk_level**: Physical or other risks
+- "none": No risk
+- "very_low": Minimal (most indoor events)
+- "low": Some crowd/activity risk
+- "medium": Active sports, adventure activities
+
+Respond with a JSON object matching the requested schema."""
+
+    def _build_enrichment_user_prompt(self, event_str: str) -> str:
+        """Build user prompt for taxonomy enrichment."""
+        return f"""Analyze this event and select the most appropriate taxonomy attributes:
+
+{event_str}
+
+Select ONE value for each attribute based on the event characteristics.
+If an activity from the taxonomy matches this event, include its ID and name.
+Also suggest relevant emotional outputs (e.g., "joy", "excitement", "connection", "energy")."""
+
+    # =========================================================================
+    # RULE-BASED FALLBACK ENRICHMENT
+    # =========================================================================
+
+    def _enrich_with_rules(self, event_context: Dict[str, Any]) -> Dict[str, Any]:
         """
         Rule-based fallback for attribute selection when LLM is unavailable.
-
-        Args:
-            event_context: Event dict with title, description, etc.
-            attribute_options: Dict mapping attribute name to list of valid options
-
-        Returns:
-            Dict with selected value for each attribute
         """
         title = (event_context.get("title") or "").lower()
+        description = (event_context.get("description") or "").lower()
+        text = f"{title} {description}"
+
         result = {}
 
-        # Energy level based on keywords
-        if any(w in title for w in ["festival", "party", "rave", "club"]):
+        # Energy level
+        if any(w in text for w in ["festival", "rave", "party", "club", "techno", "house", "night"]):
             result["energy_level"] = "high"
-        elif any(w in title for w in ["workshop", "talk", "exhibition"]):
+        elif any(w in text for w in ["workshop", "talk", "exhibition", "gallery"]):
             result["energy_level"] = "medium"
-        elif any(w in title for w in ["meditation", "yoga", "chill"]):
+        elif any(w in text for w in ["meditation", "yoga", "chill", "ambient"]):
             result["energy_level"] = "low"
         else:
             result["energy_level"] = "medium"
 
-        # Social intensity based on event type
-        if any(w in title for w in ["festival", "party", "concert"]):
+        # Social intensity
+        if any(w in text for w in ["festival", "party", "concert", "club"]):
             result["social_intensity"] = "large_group"
-        elif any(w in title for w in ["workshop", "class", "meetup"]):
+        elif any(w in text for w in ["workshop", "class", "meetup", "intimate"]):
             result["social_intensity"] = "small_group"
         else:
-            result["social_intensity"] = "large_group"  # Default for events
+            result["social_intensity"] = "large_group"
 
         # Cognitive load
-        if any(w in title for w in ["workshop", "class", "lecture", "learn"]):
+        if any(w in text for w in ["workshop", "class", "lecture", "learn", "course"]):
             result["cognitive_load"] = "medium"
+        elif any(w in text for w in ["masterclass", "seminar", "training"]):
+            result["cognitive_load"] = "high"
         else:
             result["cognitive_load"] = "low"
 
         # Physical involvement
-        if any(w in title for w in ["dance", "yoga", "sports", "run"]):
+        if any(w in text for w in ["dance", "yoga", "sports", "run", "fitness"]):
             result["physical_involvement"] = "moderate"
-        elif any(w in title for w in ["concert", "festival", "party"]):
+        elif any(w in text for w in ["concert", "festival", "party", "club"]):
             result["physical_involvement"] = "light"
         else:
             result["physical_involvement"] = "none"
 
         # Environment
-        if any(w in title for w in ["outdoor", "garden", "park", "beach"]):
+        if any(w in text for w in ["outdoor", "garden", "park", "beach", "rooftop"]):
             result["environment"] = "outdoor"
-        elif any(w in title for w in ["online", "virtual", "stream"]):
+        elif any(w in text for w in ["online", "virtual", "stream", "digital"]):
             result["environment"] = "digital"
+        elif any(w in text for w in ["hybrid", "mixed"]):
+            result["environment"] = "mixed"
         else:
             result["environment"] = "indoor"
 
         # Risk level
-        result["risk_level"] = "very_low"  # Most events are low risk
+        result["risk_level"] = "very_low"
 
         # Age accessibility
-        if any(w in title for w in ["club", "bar", "nightlife"]):
+        if any(w in text for w in ["club", "bar", "nightlife", "18+", "21+"]):
             result["age_accessibility"] = "adults"
-        else:
+        elif any(w in text for w in ["family", "kids", "children", "all ages"]):
             result["age_accessibility"] = "all"
+        else:
+            result["age_accessibility"] = "adults"  # Default for music events
 
         # Repeatability
-        if any(w in title for w in ["festival", "carnival", "annual"]):
-            result["repeatability"] = "low"  # Unique experiences
+        if any(w in text for w in ["festival", "carnival", "annual", "special"]):
+            result["repeatability"] = "low"
+        elif any(w in text for w in ["weekly", "regular", "every"]):
+            result["repeatability"] = "high"
         else:
             result["repeatability"] = "medium"
 
+        # Emotional output
+        result["emotional_output"] = self._infer_emotional_output(text)
+
         return result
+
+    def _infer_emotional_output(self, text: str) -> List[str]:
+        """Infer emotional outputs from event text."""
+        emotions = []
+
+        emotion_keywords = {
+            "joy": ["party", "fun", "celebration", "happy"],
+            "excitement": ["festival", "live", "concert", "rave"],
+            "connection": ["meetup", "community", "together", "social"],
+            "energy": ["dance", "techno", "electronic", "club"],
+            "relaxation": ["chill", "ambient", "lounge", "relax"],
+            "inspiration": ["art", "exhibition", "creative", "gallery"],
+            "growth": ["workshop", "learn", "skill", "course"],
+            "belonging": ["community", "collective", "tribe"],
+        }
+
+        for emotion, keywords in emotion_keywords.items():
+            if any(kw in text for kw in keywords):
+                emotions.append(emotion)
+
+        return emotions if emotions else ["enjoyment"]
+
+    # =========================================================================
+    # SPECIFIC FEATURE EXTRACTION METHODS
+    # =========================================================================
+
+    def extract_event_type(self, event_context: Dict[str, Any]) -> Optional[str]:
+        """
+        Extract event type from event context.
+
+        Args:
+            event_context: Event dict with title, description
+
+        Returns:
+            Event type string or None
+        """
+        if self.is_llm_available:
+            try:
+                event_str = self._format_event_context(event_context)
+                prompt = f"""Classify this event into one of these types:
+concert, festival, party, workshop, lecture, meetup, sports, exhibition,
+conference, nightlife, theater, dance, food_beverage, art_show, other
+
+Event:
+{event_str}
+
+Select the single most appropriate event type."""
+
+                result = self._llm_client.invoke_structured(prompt, EventTypeOutput)
+                return result.event_type
+            except Exception as e:
+                logger.warning(f"Event type extraction failed: {e}")
+
+        # Fallback
+        return self._infer_event_type_rules(event_context)
+
+    def _infer_event_type_rules(self, event_context: Dict[str, Any]) -> str:
+        """Rule-based event type inference."""
+        title = (event_context.get("title") or "").lower()
+
+        if "festival" in title:
+            return "festival"
+        elif any(w in title for w in ["party", "fiesta"]):
+            return "party"
+        elif any(w in title for w in ["concert", "live"]):
+            return "concert"
+        elif any(w in title for w in ["workshop", "masterclass"]):
+            return "workshop"
+        elif "exhibition" in title:
+            return "exhibition"
+        elif "conference" in title:
+            return "conference"
+        else:
+            return "nightlife"
+
+    def extract_music_genres(self, event_context: Dict[str, Any]) -> List[str]:
+        """
+        Extract music genres from event context.
+
+        Args:
+            event_context: Event dict with title, description, artists
+
+        Returns:
+            List of music genres
+        """
+        if self.is_llm_available:
+            try:
+                event_str = self._format_event_context(event_context)
+                prompt = f"""Identify the music genres for this event.
+If this is not a music event, return an empty list.
+
+Event:
+{event_str}
+
+Return a list of relevant music genres (e.g., electronic, techno, house, ambient, jazz, etc.)."""
+
+                result = self._llm_client.invoke_structured(prompt, MusicGenresOutput)
+                return result.genres
+            except Exception as e:
+                logger.warning(f"Genre extraction failed: {e}")
+
+        # Fallback
+        return self._infer_genres_rules(event_context)
+
+    def _infer_genres_rules(self, event_context: Dict[str, Any]) -> List[str]:
+        """Rule-based genre inference."""
+        text = f"{event_context.get('title', '')} {event_context.get('description', '')}".lower()
+        genres = []
+
+        genre_keywords = {
+            "techno": ["techno"],
+            "house": ["house"],
+            "electronic": ["electronic", "edm", "electro"],
+            "ambient": ["ambient", "chill"],
+            "trance": ["trance"],
+            "drum_and_bass": ["drum and bass", "dnb", "d&b"],
+            "hip_hop": ["hip hop", "hip-hop", "rap"],
+            "jazz": ["jazz"],
+            "rock": ["rock"],
+        }
+
+        for genre, keywords in genre_keywords.items():
+            if any(kw in text for kw in keywords):
+                genres.append(genre)
+
+        return genres if genres else ["electronic"]  # Default for ra.co events
+
+    def extract_tags(self, event_context: Dict[str, Any]) -> List[str]:
+        """
+        Generate tags for an event.
+
+        Args:
+            event_context: Event dict with title, description
+
+        Returns:
+            List of tags
+        """
+        if self.is_llm_available:
+            try:
+                event_str = self._format_event_context(event_context)
+                prompt = f"""Generate relevant search tags for this event.
+Include genre tags, activity tags, and atmosphere tags.
+
+Event:
+{event_str}
+
+Return 5-10 relevant tags for search and filtering."""
+
+                result = self._llm_client.invoke_structured(prompt, TagsOutput)
+                return result.tags
+            except Exception as e:
+                logger.warning(f"Tag extraction failed: {e}")
+
+        # Fallback
+        return self._infer_tags_rules(event_context)
+
+    def _infer_tags_rules(self, event_context: Dict[str, Any]) -> List[str]:
+        """Rule-based tag generation."""
+        tags = []
+        title = (event_context.get("title") or "").lower()
+
+        tag_keywords = {
+            "music": ["music", "dj", "live"],
+            "electronic": ["electronic", "techno", "house"],
+            "party": ["party", "fiesta"],
+            "nightlife": ["club", "night"],
+            "festival": ["festival"],
+            "workshop": ["workshop", "class"],
+            "art": ["art", "exhibition", "gallery"],
+        }
+
+        for tag, keywords in tag_keywords.items():
+            if any(kw in title for kw in keywords):
+                tags.append(tag)
+
+        return tags if tags else ["event"]
+
+    # =========================================================================
+    # HELPER METHODS
+    # =========================================================================
+
+    def _format_event_context(self, event_context: Dict[str, Any]) -> str:
+        """Format event context as string for prompts."""
+        lines = []
+
+        if event_context.get("title"):
+            lines.append(f"Title: {event_context['title']}")
+
+        if event_context.get("description"):
+            desc = event_context["description"][:500]
+            lines.append(f"Description: {desc}")
+
+        if event_context.get("venue_name"):
+            lines.append(f"Venue: {event_context['venue_name']}")
+
+        if event_context.get("city"):
+            lines.append(f"City: {event_context['city']}")
+
+        if event_context.get("artists"):
+            artists = event_context["artists"]
+            if isinstance(artists, list):
+                artists = ", ".join(str(a) for a in artists[:5])
+            lines.append(f"Artists: {artists}")
+
+        if event_context.get("cost") or event_context.get("price"):
+            price = event_context.get("cost") or event_context.get("price")
+            lines.append(f"Price: {price}")
+
+        if event_context.get("duration_minutes"):
+            lines.append(f"Duration: {event_context['duration_minutes']} minutes")
+
+        return "\n".join(lines)
+
+    def _infer_cost_level(self, event_context: Dict[str, Any]) -> str:
+        """Infer cost level from price data."""
+        price = None
+
+        if event_context.get("minimum_price"):
+            price = event_context["minimum_price"]
+        elif event_context.get("cost"):
+            cost_str = str(event_context["cost"])
+            match = re.search(r"[\d.]+", cost_str)
+            if match:
+                try:
+                    price = float(match.group())
+                except ValueError:
+                    pass
+
+        if event_context.get("is_free") or (price is not None and price == 0):
+            return "free"
+        elif price is None:
+            return "medium"
+        elif price <= 15:
+            return "low"
+        elif price <= 50:
+            return "medium"
+        else:
+            return "high"
+
+    def _infer_time_scale(self, event_context: Dict[str, Any]) -> str:
+        """Infer time scale from duration."""
+        duration = event_context.get("duration_minutes")
+
+        if duration:
+            if duration <= 120:
+                return "short"
+            elif duration <= 480:
+                return "long"
+            else:
+                return "recurring"
+
+        title = (event_context.get("title") or "").lower()
+        if "festival" in title:
+            return "long"
+        if "workshop" in title:
+            return "short"
+
+        return "long"
+
+
+# =============================================================================
+# FACTORY FUNCTION
+# =============================================================================
 
 
 def create_feature_extractor_from_config(
@@ -772,12 +651,11 @@ def create_feature_extractor_from_config(
         feature_extraction:
           enabled: true
           provider: "openai"
-          model_name: "gpt-3.5-turbo"
-          fill_missing: ["event_type", "tags", "activity_id"]
+          model_name: "gpt-4o-mini"
     """
     return FeatureExtractor(
-        model_name=config.get("model_name", "gpt-3.5-turbo"),
         provider=config.get("provider", "openai"),
-        temperature=config.get("temperature", 0.3),
-        max_tokens=config.get("max_tokens", 1000),
+        model_name=config.get("model_name"),
+        temperature=config.get("temperature", 0.1),
+        max_tokens=config.get("max_tokens", 2000),
     )
