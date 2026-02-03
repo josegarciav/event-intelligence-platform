@@ -5,9 +5,9 @@
   "created_at": "2026-01-19T12:03:17.906760Z",
   "categories": [
     {
+      "category_id": "1",
       "category": "PLAY & PURE FUN",
       "description": "Activities pursued for immediate pleasure, joy, amusement, and light engagement without obligation or long-term goals.",
-      "created_at": "2026-01-19T11:25:10.626936Z",
       "subcategories": [
         {
           "id": "1.1",
@@ -1814,10 +1814,9 @@
       "last_updated": "2026-01-19T11:39:14.933399Z"
     },
     {
+      "category_id": "2",
       "category": "EXPLORATION & ADVENTURE",
       "description": "Activities driven by novelty, discovery, movement into unfamiliar places/ideas, and the thrill of the unknown (from gentle exploration to high-adrenaline adventure).",
-      "created_at": "2026-01-19T11:49:04.919532Z",
-      "version": "1.1",
       "subcategories": [
         {
           "id": "2.1",
@@ -4042,10 +4041,9 @@
       ]
     },
     {
+      "category_id": "3",
       "category": "CREATION & EXPRESSION",
       "description": "Activities focused on producing something new—art, stories, objects, performances, or digital creations—primarily for self-expression, joy, and bringing ideas into existence.",
-      "created_at": "2026-01-19T11:53:38.829735Z",
-      "version": "1.1",
       "subcategories": [
         {
           "id": "3.1",
@@ -6270,10 +6268,9 @@
       ]
     },
     {
+      "category_id": "4",
       "category": "LEARNING & INTELLECTUAL PLEASURE",
       "description": "Activities pursued primarily for curiosity, understanding, cognitive stimulation, and the pleasure of making sense of the world, ideas, systems, or oneself.",
-      "created_at": "2026-01-19T11:54:39.928916Z",
-      "version": "1.1",
       "subcategories": [
         {
           "id": "4.1",
@@ -8488,10 +8485,9 @@
       ]
     },
     {
+      "category_id": "5",
       "category": "SOCIAL CONNECTION & BELONGING",
       "description": "Activities driven by the need to connect with others, feel accepted, share experiences, build relationships, and belong to groups or communities.",
-      "created_at": "2026-01-19T11:56:07.189545Z",
-      "version": "1.1",
       "subcategories": [
         {
           "id": "5.1",
@@ -10706,10 +10702,9 @@
       ]
     },
     {
+      "category_id": "6",
       "category": "BODY, MOVEMENT & PHYSICAL EXPERIENCE",
       "description": "Activities centered on bodily awareness, movement, physical effort, sensory engagement, and the pleasure of feeling alive through the body.",
-      "created_at": "2026-01-19T11:57:26.489990Z",
-      "version": "1.1",
       "subcategories": [
         {
           "id": "6.1",
@@ -12924,10 +12919,9 @@
       ]
     },
     {
+      "category_id": "7",
       "category": "CHALLENGE, COMPETENCE & ACHIEVEMENT",
       "description": "Activities driven by the desire to test limits, improve skills, overcome difficulty, measure progress, and experience mastery, achievement, and self-efficacy.",
-      "created_at": "2026-01-19T11:58:34.033772Z",
-      "version": "1.1",
       "subcategories": [
         {
           "id": "7.1",
@@ -15142,10 +15136,9 @@
       ]
     },
     {
+      "category_id": "8",
       "category": "RELAXATION & ESCAPISM",
       "description": "Activities focused on resting the mind and nervous system, reducing stress, disengaging from pressure, and temporarily escaping demands through calm, pleasure, or immersion.",
-      "created_at": "2026-01-19T11:59:56.769311Z",
-      "version": "1.1",
       "subcategories": [
         {
           "id": "8.1",
@@ -17360,10 +17353,9 @@
       ]
     },
     {
+      "category_id": "9",
       "category": "IDENTITY, MEANING & SELF-DISCOVERY",
       "description": "Activities focused on understanding who you are, what you value, how you change over time, and how you make meaning—through reflection, philosophy, spirituality, and intentional life design.",
-      "created_at": "2026-01-19T12:01:17.766134Z",
-      "version": "1.1",
       "subcategories": [
         {
           "id": "9.1",
@@ -19578,10 +19570,9 @@
       ]
     },
     {
+      "category_id": "10",
       "category": "CONTRIBUTION & IMPACT",
       "description": "Activities driven by the desire to contribute beyond oneself, help others, improve systems, create positive change, and leave a meaningful impact or legacy.",
-      "created_at": "2026-01-19T12:02:28.844176Z",
-      "version": "1.1",
       "subcategories": [
         {
           "id": "10.1",

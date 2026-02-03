@@ -31,7 +31,7 @@ class PrimaryCategory(str, Enum):
     Primary experience categories from Human Experience Taxonomy:
     """
 
-    PLAY_AND_FUN = "play_and_fun"
+    PLAY_AND_PURE_FUN = "play_and_fun"
     EXPLORATION_AND_ADVENTURE = "exploration_and_adventure"
     CREATION_AND_EXPRESSION = "creation_and_expression"
     LEARNING_AND_INTELLECTUAL = "learning_and_intellectual"
@@ -519,7 +519,7 @@ class EventSchema(BaseModel):
                     "is_sold_out": False,  # whether tickets are sold out
                     "ticket_count_available": 150,  # estimated number of tickets available
                     "going_count": 85,  # number of people marked as going (if available)
-                    "age_restriction": "18+",  # 14+, 18+, 21+, all ages, etc.
+                    "age_restriction": "18+",  # 14+, 18+, 21+, all ages, None, etc.
                 },
                 "organizer": {"name": "Printworks Events"},  # organizer info
                 "source": {

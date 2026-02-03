@@ -110,42 +110,8 @@ sources:
 
     # Taxonomy mapping rules
     taxonomy:
-      default_primary: "play_and_fun"
+      default_primary: "1" # Play & Pure Fun
       default_subcategory: "1.4"  # Music & Rhythm Play
-      rules:
-        # Festivals and outdoor events
-        - match:
-            title_contains: ["festival", "carnival", "outdoor"]
-          assign:
-            primary_category: "exploration_and_adventure"
-            subcategory: "2.4"  # Cultural Discovery
-            confidence: 0.65
-
-        # Workshops and learning events
-        - match:
-            title_contains: ["workshop", "masterclass", "talk", "class"]
-          assign:
-            primary_category: "learning_and_intellectual"
-            subcategory: "4.2"  # Learning New Skills
-            confidence: 0.7
-
-        # Default for music events - Play & Fun dimension
-        - match:
-            always: true
-          assign:
-            primary_category: "play_and_fun"
-            subcategory: "1.4"  # Music & Rhythm Play
-            values: ["expression", "energy", "flow", "rhythm"]
-            confidence: 0.95
-
-        # Default for music events - Social Connection dimension
-        - match:
-            always: true
-          assign:
-            primary_category: "social_connection"
-            subcategory: "5.7"  # Shared Activities
-            values: ["connection", "belonging", "shared joy"]
-            confidence: 0.8
 
     # Event type determination rules
     event_type_rules:
