@@ -17,7 +17,6 @@ from .event_schema import (
     PrimaryCategory,
     EventType,
     EventFormat,
-    DayOfWeek,
     TaxonomyDimension,
     Subcategory,
     Coordinates,
@@ -62,7 +61,6 @@ __all__ = [
     "PrimaryCategory",
     "EventType",
     "EventFormat",
-    "DayOfWeek",
     # Taxonomy
     "TaxonomyDimension",
     "Subcategory",

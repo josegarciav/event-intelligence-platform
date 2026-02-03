@@ -217,20 +217,6 @@ class EventFormat(str, Enum):
     STREAMED = "streamed"
 
 
-class DayOfWeek(str, Enum):
-    """
-    Days of the week.
-    """
-
-    MONDAY = "monday"
-    TUESDAY = "tuesday"
-    WEDNESDAY = "wednesday"
-    THURSDAY = "thursday"
-    FRIDAY = "friday"
-    SATURDAY = "saturday"
-    SUNDAY = "sunday"
-
-
 class EventType(str, Enum):
     """
     High-level event type.
@@ -334,6 +320,7 @@ class TaxonomyDimension(BaseModel):
         default=None,
         description="Repeatability: 'high' | 'medium' | 'low'",
     )
+
 
     @field_validator("subcategory")
     @classmethod
@@ -514,7 +501,6 @@ class SourceInfo(BaseModel):
     ingestion_timestamp: datetime = Field(
         default_factory=datetime.utcnow, description="When we ingested this event"
     )
-    data_freshness_hours: Optional[int] = None
 
 
 # ============================================================================
@@ -572,7 +558,6 @@ class EventSchema(BaseModel):
     )
     title: str
     description: Optional[str] = None
-    long_description: Optional[str] = None
 
     # ---- TAXONOMY & EXPERIENCE DIMENSIONS ----
     primary_category: PrimaryCategory
@@ -599,8 +584,8 @@ class EventSchema(BaseModel):
     age_restriction: Optional[str] = None
 
     # ---- PRICING & TICKETS ----
-    price: PriceInfo = Field(default_factory=PriceInfo)
-    ticket_info: Optional[TicketInfo] = None
+    price: PriceInfo = Field(default_factory=lambda: PriceInfo())
+    ticket_info: TicketInfo = Field(default_factory=lambda: TicketInfo())
 
     # ---- ORGANIZER ----
     organizer: OrganizerInfo
@@ -702,10 +687,6 @@ class EventSchema(BaseModel):
                 "start_datetime": "2026-03-15T23:00:00Z",  # time the event starts
                 "end_datetime": "2026-03-16T06:00:00Z",  # time the event ends
                 "duration_minutes": 420,  # duration in minutes
-                "days_of_week": [
-                    "sunday",
-                    "monday",
-                ],  # day of the week the event occurs
                 "location": {
                     "venue_name": "Printworks",  # venue name if available
                     "city": "London",  # required
