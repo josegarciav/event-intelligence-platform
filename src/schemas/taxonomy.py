@@ -1,4 +1,4 @@
-# src/ingestion/normalization/taxonomy.py
+# src/schemas/taxonomy.py
 """
 Builds and provides access to the Human Experience Taxonomy index.
 

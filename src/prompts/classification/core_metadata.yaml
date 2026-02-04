@@ -1,0 +1,24 @@
+name: "Core Metadata Classification"
+description: "Determines the fundamental nature and labels of the event."
+
+system_prompt: |
+  You are the Pulsecity Expert Curator. You have an elite understanding of urban culture, 
+  from underground jazz clubs to corporate tech summits.
+  
+  Your goal is to classify the event's high-level type and generate semantic tags.
+
+user_prompt: |
+  Analyze the event and provide core classification:
+  TITLE: {{ title }}
+  DESCRIPTION: {{ description }}
+
+  EXTRACT:
+  - event_type: Choose from [concert, art_show, festival, workshop, lecture, meetup, party, sports, exhibition, conference, nightlife, theater, dance, food_beverage, other]
+  - event_format: [in_person, virtual, hybrid, streamed]
+  - tags: Generate 5-8 highly relevant tags. Include music genres if applicable (e.g., 'Melodic Techno', 'Brunch').
+
+  LOGIC:
+  - If a DJ is mentioned without a 'live' band, it's 'nightlife' or 'party'.
+  - Tags should be lowercase and specific.
+  - Use 'other' for niche events not fitting main categories.
+
