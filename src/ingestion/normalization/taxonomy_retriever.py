@@ -147,10 +147,10 @@ class TaxonomyRetriever:
             activities = sub.get("activities", [])
             if activities:
                 lines.append(f"Activities ({len(activities)} total):")
-                for act in activities[:5]:  # Limit to 5 examples
+                for act in activities[:10]:  # Limit to 10 examples
                     lines.append(f"  - {act.get('name')}")
-                if len(activities) > 5:
-                    lines.append(f"  ... and {len(activities) - 5} more")
+                if len(activities) > 10:
+                    lines.append(f"  ... and {len(activities) - 10} more")
 
         return "\n".join(lines)
 

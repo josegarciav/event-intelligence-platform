@@ -495,7 +495,7 @@ def list_all_activities() -> List[Dict[str, Any]]:
 
 def search_activities_by_name(
     query: str,
-    limit: int = 10,
+    limit: int = 50,
 ) -> List[Dict[str, Any]]:
     """
     Search activities by name.
