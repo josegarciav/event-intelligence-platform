@@ -5,7 +5,7 @@ Adapter for fetching data from API-based sources (REST, GraphQL).
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Callable, Dict, List, Optional
 import logging
 import time
@@ -68,7 +68,7 @@ class APIAdapter(BaseSourceAdapter):
     @property
     def api_config(self) -> APIAdapterConfig:
         """Get typed config."""
-        return self.config
+        return self.config  # type: ignore[return-value]
 
     def _validate_config(self) -> None:
         """Validate API configuration."""
@@ -103,7 +103,7 @@ class APIAdapter(BaseSourceAdapter):
         Returns:
             FetchResult with raw data
         """
-        fetch_started = datetime.utcnow()
+        fetch_started = datetime.now(timezone.utc)
         all_data = []
         errors = []
         metadata = {"pages_fetched": 0, "api_calls": 0}
@@ -144,7 +144,7 @@ class APIAdapter(BaseSourceAdapter):
             errors=errors,
             metadata=metadata,
             fetch_started_at=fetch_started,
-            fetch_ended_at=datetime.utcnow(),
+            fetch_ended_at=datetime.now(timezone.utc),
         )
 
     def _make_request(

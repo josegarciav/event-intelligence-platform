@@ -15,7 +15,6 @@ from src.ingestion.adapters.scraper_adapter import (
 )
 from src.ingestion.adapters.base_adapter import SourceType, FetchResult
 
-
 # =============================================================================
 # FIXTURES
 # =============================================================================
@@ -154,7 +153,9 @@ class TestScraperAdapterGetScraper:
         adapter = ScraperAdapter(scraper_config)
 
         # Mock the scraper inside _get_scraper
-        with patch("src.ingestion.pipelines.scrapers.base_scraper.EventScraper") as mock_scraper_class:
+        with patch(
+            "src.ingestion.pipelines.scrapers.base_scraper.EventScraper"
+        ) as mock_scraper_class:
             mock_scraper = MagicMock()
             mock_scraper_class.return_value = mock_scraper
 
@@ -196,7 +197,9 @@ class TestScraperAdapterFetch:
         assert result.total_fetched >= 0
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_with_html_parser(self, mock_get_scraper, scraper_config, mock_fetch_result):
+    def test_fetch_with_html_parser(
+        self, mock_get_scraper, scraper_config, mock_fetch_result
+    ):
         """Should use custom HTML parser."""
         mock_scraper = MagicMock()
         mock_scraper.fetch_listing_pages.return_value = [mock_fetch_result]
@@ -212,15 +215,23 @@ class TestScraperAdapterFetch:
         parser.assert_called()
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_tracks_metadata(self, mock_get_scraper, scraper_config, mock_fetch_result):
+    def test_fetch_tracks_metadata(
+        self, mock_get_scraper, scraper_config, mock_fetch_result
+    ):
         """Should track metadata."""
         mock_scraper = MagicMock()
-        mock_scraper.fetch_listing_pages.return_value = [mock_fetch_result, mock_fetch_result]
+        mock_scraper.fetch_listing_pages.return_value = [
+            mock_fetch_result,
+            mock_fetch_result,
+        ]
         mock_scraper.extract_event_urls.return_value = [
             "https://example.com/events/1",
             "https://example.com/events/2",
         ]
-        mock_scraper.fetch_event_pages.return_value = [mock_fetch_result, mock_fetch_result]
+        mock_scraper.fetch_event_pages.return_value = [
+            mock_fetch_result,
+            mock_fetch_result,
+        ]
         mock_get_scraper.return_value = mock_scraper
 
         adapter = ScraperAdapter(scraper_config)
@@ -241,7 +252,9 @@ class TestScraperAdapterFetch:
         assert "Scraper failed" in result.errors
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_with_kwargs(self, mock_get_scraper, scraper_config, mock_fetch_result):
+    def test_fetch_with_kwargs(
+        self, mock_get_scraper, scraper_config, mock_fetch_result
+    ):
         """Should pass kwargs to scraper."""
         mock_scraper = MagicMock()
         mock_scraper.fetch_listing_pages.return_value = [mock_fetch_result]
@@ -258,10 +271,15 @@ class TestScraperAdapterFetch:
         )
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_dedupes_urls(self, mock_get_scraper, scraper_config, mock_fetch_result):
+    def test_fetch_dedupes_urls(
+        self, mock_get_scraper, scraper_config, mock_fetch_result
+    ):
         """Should deduplicate event URLs."""
         mock_scraper = MagicMock()
-        mock_scraper.fetch_listing_pages.return_value = [mock_fetch_result, mock_fetch_result]
+        mock_scraper.fetch_listing_pages.return_value = [
+            mock_fetch_result,
+            mock_fetch_result,
+        ]
         # Return duplicate URLs
         mock_scraper.extract_event_urls.return_value = [
             "https://example.com/events/1",
@@ -277,7 +295,9 @@ class TestScraperAdapterFetch:
         mock_scraper.fetch_event_pages.assert_called_once()
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_tracks_parse_failures(self, mock_get_scraper, scraper_config, mock_fetch_result):
+    def test_fetch_tracks_parse_failures(
+        self, mock_get_scraper, scraper_config, mock_fetch_result
+    ):
         """Should track parse failures in metadata."""
         mock_scraper = MagicMock()
         mock_scraper.fetch_listing_pages.return_value = [mock_fetch_result]
@@ -313,7 +333,9 @@ class TestScraperAdapterFetch:
         assert result.metadata["pages_fetched"] == 0
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_timestamps(self, mock_get_scraper, scraper_config, mock_fetch_result):
+    def test_fetch_timestamps(
+        self, mock_get_scraper, scraper_config, mock_fetch_result
+    ):
         """Should track fetch timestamps."""
         mock_scraper = MagicMock()
         mock_scraper.fetch_listing_pages.return_value = [mock_fetch_result]

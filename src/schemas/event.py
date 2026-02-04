@@ -11,13 +11,22 @@ The schema serves as the source of truth for all downstream analytics, ML, and a
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from enum import Enum
-from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict, field_serializer
+from pydantic import (
+    BaseModel,
+    Field,
+    field_validator,
+    model_validator,
+    ConfigDict,
+    field_serializer,
+)
 from decimal import Decimal
 
 
 def _utc_now() -> datetime:
     """Return current UTC time as timezone-aware datetime."""
     return datetime.now(timezone.utc)
+
+
 from src.schemas.taxonomy import (
     build_taxonomy_index,
     get_all_subcategory_options,
@@ -423,14 +432,15 @@ class PriceInfo(BaseModel):
     currency: str = Field(default="USD", description="ISO 4217 currency code")
     is_free: bool = False
 
-    minimum_price: Optional[Decimal] = Field(None, ge=0)
-    maximum_price: Optional[Decimal] = Field(None, ge=0)
-    early_bird_price: Optional[Decimal] = Field(None, ge=0)
-    standard_price: Optional[Decimal] = Field(None, ge=0)
-    vip_price: Optional[Decimal] = Field(None, ge=0)
+    minimum_price: Optional[Decimal] = Field(default=None, ge=0)
+    maximum_price: Optional[Decimal] = Field(default=None, ge=0)
+    early_bird_price: Optional[Decimal] = Field(default=None, ge=0)
+    standard_price: Optional[Decimal] = Field(default=None, ge=0)
+    vip_price: Optional[Decimal] = Field(default=None, ge=0)
 
     price_raw_text: Optional[str] = Field(
-        None, description="Original price text from source (for debugging/validation)"
+        default=None,
+        description="Original price text from source (for debugging/validation)",
     )
 
     @field_validator(
@@ -461,9 +471,13 @@ class PriceInfo(BaseModel):
         return self
 
     @field_serializer(
-        "minimum_price", "maximum_price", "early_bird_price", "standard_price", "vip_price"
+        "minimum_price",
+        "maximum_price",
+        "early_bird_price",
+        "standard_price",
+        "vip_price",
     )
-    def serialize_decimal(self, v: Decimal) -> float:
+    def serialize_decimal(self, v: Optional[Decimal]) -> Optional[float]:
         """Serialize Decimal to float for JSON compatibility."""
         if v is None:
             return None
@@ -510,9 +524,6 @@ class SourceInfo(BaseModel):
     )
     source_event_id: str = Field(description="Event ID from the original source")
     source_url: str = Field(description="Direct URL to event on source platform")
-    raw_html: Optional[str] = Field(
-        None, description="Raw HTML or JSON data from source for debugging/validation"
-    )
     last_updated_from_source: datetime
     ingestion_timestamp: datetime = Field(
         default_factory=_utc_now, description="When we ingested this event"

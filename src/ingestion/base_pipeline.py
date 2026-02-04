@@ -14,7 +14,7 @@ Any new data source must:
 """
 
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
@@ -219,7 +219,7 @@ class BasePipeline(ABC):
             PipelineExecutionResult with summary and events
         """
         self.execution_id = self._generate_execution_id()
-        self.execution_start_time = datetime.utcnow()
+        self.execution_start_time = datetime.now(timezone.utc)
 
         self.logger.info(f"Starting pipeline execution: {self.execution_id}")
         self.logger.info(f"Source type: {self.source_type.value}")
@@ -236,7 +236,7 @@ class BasePipeline(ABC):
                     source_type=self.source_type,
                     execution_id=self.execution_id,
                     started_at=self.execution_start_time,
-                    ended_at=datetime.utcnow(),
+                    ended_at=datetime.now(timezone.utc),
                     errors=[
                         {"error": e, "stage": "fetch"} for e in fetch_result.errors
                     ],
@@ -278,7 +278,7 @@ class BasePipeline(ABC):
                 source_type=self.source_type,
                 execution_id=self.execution_id,
                 started_at=self.execution_start_time,
-                ended_at=datetime.utcnow(),
+                ended_at=datetime.now(timezone.utc),
                 total_events_processed=len(fetch_result.raw_data),
                 successful_events=len(normalized_events),
                 failed_events=len(fetch_result.raw_data) - len(normalized_events),
@@ -302,7 +302,7 @@ class BasePipeline(ABC):
                 source_type=self.source_type,
                 execution_id=self.execution_id,
                 started_at=self.execution_start_time,
-                ended_at=datetime.utcnow(),
+                ended_at=datetime.now(timezone.utc),
                 errors=[{"error": str(e), "stage": "execution"}],
             )
 
@@ -387,7 +387,7 @@ class BasePipeline(ABC):
 
     def _generate_execution_id(self) -> str:
         """Generate unique execution identifier."""
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         unique_id = str(uuid.uuid4())[:8]
         return f"{self.config.source_name}_{timestamp}_{unique_id}"
 

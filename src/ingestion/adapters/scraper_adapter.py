@@ -5,7 +5,7 @@ Adapter for fetching data from web scraping sources using Playwright.
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Callable, Dict, Optional
 import logging
 
@@ -61,7 +61,7 @@ class ScraperAdapter(BaseSourceAdapter):
     @property
     def scraper_config(self) -> ScraperAdapterConfig:
         """Get typed config."""
-        return self.config
+        return self.config  # type: ignore[return-value]
 
     def _validate_config(self) -> None:
         """Validate scraper configuration."""
@@ -102,7 +102,7 @@ class ScraperAdapter(BaseSourceAdapter):
         Returns:
             FetchResult with raw data
         """
-        fetch_started = datetime.utcnow()
+        fetch_started = datetime.now(timezone.utc)
         all_data = []
         errors = []
         metadata = {
@@ -173,7 +173,7 @@ class ScraperAdapter(BaseSourceAdapter):
             errors=errors,
             metadata=metadata,
             fetch_started_at=fetch_started,
-            fetch_ended_at=datetime.utcnow(),
+            fetch_ended_at=datetime.now(timezone.utc),
         )
 
     def close(self) -> None:

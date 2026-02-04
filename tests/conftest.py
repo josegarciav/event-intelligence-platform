@@ -23,9 +23,8 @@ from src.schemas.event import (
 @pytest.fixture
 def create_event():
     """
+    Return a function that creates EventSchema objects with sensible defaults.
     Factory fixture to create EventSchema instances for testing.
-
-    Returns a function that creates EventSchema objects with sensible defaults.
     All defaults can be overridden via keyword arguments.
 
     Example:
@@ -64,7 +63,7 @@ def create_event():
         # Merge defaults with provided kwargs
         defaults.update(kwargs)
 
-        return EventSchema(**defaults)
+        return EventSchema(**defaults)  # type: ignore[arg-type]
 
     return _create_event
 
@@ -72,7 +71,7 @@ def create_event():
 @pytest.fixture
 def sample_event(create_event):
     """
-    Returns a single default test event.
+    Return a single default test event.
 
     Useful for tests that need a basic event to work with.
     """
@@ -82,7 +81,7 @@ def sample_event(create_event):
 @pytest.fixture
 def sample_events(create_event):
     """
-    Returns a list of varied test events with different attributes.
+    Return a list of varied test events with different attributes.
 
     Contains 4 unique events at different venues and times.
     """
@@ -113,7 +112,7 @@ def sample_events(create_event):
 @pytest.fixture
 def duplicate_events(create_event):
     """
-    Returns a list of events that contains duplicates.
+    Return a list of events that contains duplicates.
 
     Contains:
     - 2 events with identical (title, venue, datetime) - duplicates

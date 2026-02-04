@@ -11,7 +11,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 
-
 # =============================================================================
 # TEST CONFIG FIXTURES
 # =============================================================================
@@ -50,9 +49,7 @@ def sample_config():
 @pytest.fixture
 def config_file(sample_config):
     """Create a temporary config file."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".yaml", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         yaml.dump(sample_config, f)
         yield f.name
 

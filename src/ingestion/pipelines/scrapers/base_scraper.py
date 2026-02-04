@@ -18,8 +18,11 @@ import time
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 from urllib.parse import urljoin, urlparse
+
+if TYPE_CHECKING:
+    from playwright.sync_api import Browser, Playwright
 
 from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
 from src.ingestion.adapters import ScraperAdapter, SourceType
@@ -228,8 +231,8 @@ class EventScraper:
             config: ScraperConfig instance
         """
         self.config = config
-        self._browser = None
-        self._playwright = None
+        self._browser: Optional[Browser] = None
+        self._playwright: Optional[Playwright] = None
 
     def _ensure_browser(self) -> None:
         """Ensure browser is started."""
@@ -267,6 +270,7 @@ class EventScraper:
     def _fetch_page(self, url: str) -> PageFetchResult:
         """Fetch a single page with stealth settings."""
         self._ensure_browser()
+        assert self._browser is not None  # ensured by _ensure_browser()
 
         start_time = time.time()
         try:

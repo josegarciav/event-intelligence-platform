@@ -24,7 +24,6 @@ from src.ingestion.pipelines.scrapers.base_scraper import (
 )
 from src.ingestion.base_pipeline import PipelineConfig
 
-
 # =============================================================================
 # TEST DATA
 # =============================================================================
@@ -249,7 +248,9 @@ class TestLoadConfigRaw:
         """Should load and parse JSON config."""
         mock_get_path.return_value = Path("/fake/path.json")
 
-        with patch("builtins.open", mock_open(read_data=json.dumps(MOCK_SCRAPER_CONFIG_JSON))):
+        with patch(
+            "builtins.open", mock_open(read_data=json.dumps(MOCK_SCRAPER_CONFIG_JSON))
+        ):
             result = load_config_raw("test_source")
 
         assert result["source_id"] == "test_source"
@@ -468,7 +469,9 @@ class TestBaseScraperPipelineInit:
                 return event
 
         custom_parser = MagicMock(return_value={"custom": True})
-        pipeline = ConcretePipeline(pipeline_config, scraper_config, html_parser=custom_parser)
+        pipeline = ConcretePipeline(
+            pipeline_config, scraper_config, html_parser=custom_parser
+        )
 
         # Access adapter's html_parser
         assert pipeline.adapter.html_parser is custom_parser

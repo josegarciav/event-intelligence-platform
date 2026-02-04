@@ -101,9 +101,21 @@ class TestEventTypeExtraction:
     def test_valid_event_types(self):
         """All valid event types should work."""
         valid_types = [
-            "concert", "festival", "party", "workshop", "lecture",
-            "meetup", "sports", "exhibition", "conference", "nightlife",
-            "theater", "dance", "food_beverage", "art_show", "other",
+            "concert",
+            "festival",
+            "party",
+            "workshop",
+            "lecture",
+            "meetup",
+            "sports",
+            "exhibition",
+            "conference",
+            "nightlife",
+            "theater",
+            "dance",
+            "food_beverage",
+            "art_show",
+            "other",
         ]
         for event_type in valid_types:
             extraction = EventTypeExtraction(event_type=event_type)
@@ -175,9 +187,7 @@ class TestTagsExtraction:
 
     def test_valid_tags(self):
         """Valid tags extraction."""
-        extraction = TagsExtraction(
-            tags=["electronic", "techno", "nightlife", "dance"]
-        )
+        extraction = TagsExtraction(tags=["electronic", "techno", "nightlife", "dance"])
         assert len(extraction.tags) == 4
         assert "electronic" in extraction.tags
 

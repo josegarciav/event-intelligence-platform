@@ -255,9 +255,21 @@ class TestEventTypeOutput:
     def test_valid_event_types(self):
         """All valid event types should work."""
         valid_types = [
-            "concert", "festival", "party", "workshop", "lecture",
-            "meetup", "sports", "exhibition", "conference", "nightlife",
-            "theater", "dance", "food_beverage", "art_show", "other",
+            "concert",
+            "festival",
+            "party",
+            "workshop",
+            "lecture",
+            "meetup",
+            "sports",
+            "exhibition",
+            "conference",
+            "nightlife",
+            "theater",
+            "dance",
+            "food_beverage",
+            "art_show",
+            "other",
         ]
         for event_type in valid_types:
             output = EventTypeOutput(event_type=event_type)
@@ -306,9 +318,7 @@ class TestTagsOutput:
 
     def test_valid_tags(self):
         """Valid tags output."""
-        output = TagsOutput(
-            tags=["electronic", "nightlife", "dance", "barcelona"]
-        )
+        output = TagsOutput(tags=["electronic", "nightlife", "dance", "barcelona"])
         assert len(output.tags) == 4
 
     def test_empty_default(self):

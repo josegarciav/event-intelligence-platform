@@ -4,7 +4,8 @@ Unit tests for the base_pipeline module.
 Tests for BasePipeline, PipelineConfig, and PipelineExecutionResult.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+import uuid
 from unittest.mock import MagicMock, patch
 from typing import Dict, Any, List, Tuple
 
@@ -19,12 +20,14 @@ from src.ingestion.base_pipeline import (
 from src.ingestion.adapters import BaseSourceAdapter, SourceType, FetchResult
 from src.schemas.event import (
     EventSchema,
+    EventFormat,
     LocationInfo,
+    OrganizerInfo,
     PrimaryCategory,
+    SourceInfo,
     TaxonomyDimension,
 )
 from src.schemas.taxonomy import get_all_subcategory_ids
-
 
 # =============================================================================
 # FIXTURES
@@ -106,10 +109,19 @@ class ConcretePipeline(BasePipeline):
         if self._return_events:
             return self._return_events.pop(0)
         return EventSchema(
+            event_id=str(uuid.uuid4()),
             title=parsed_event.get("title", "Test Event"),
             location=LocationInfo(city=parsed_event.get("city", "Test City")),
-            start_datetime=datetime.utcnow() + timedelta(days=1),
+            start_datetime=datetime.now(timezone.utc) + timedelta(days=1),
             primary_category=PrimaryCategory.PLAY_AND_PURE_FUN,
+            format=EventFormat.IN_PERSON,
+            organizer=OrganizerInfo(name="Test Organizer"),
+            source=SourceInfo(
+                source_name="test",
+                source_event_id="test-123",
+                source_url="https://test.com/event",
+                last_updated_from_source=datetime.now(timezone.utc),
+            ),
         )
 
     def validate_event(self, event: EventSchema) -> Tuple[bool, List[str]]:
@@ -344,7 +356,13 @@ class TestCalculateQualityScore:
         pipeline = ConcretePipeline(sample_pipeline_config, mock_adapter)
         event = create_event(
             title="Test Event",
-            normalization_errors=["Error 1", "Error 2", "Error 3", "Error 4", "Error 5"],
+            normalization_errors=[
+                "Error 1",
+                "Error 2",
+                "Error 3",
+                "Error 4",
+                "Error 5",
+            ],
         )
         score = pipeline._calculate_quality_score(event)
         # Penalty is capped at 0.1 (5 * 0.02 = 0.1)
@@ -368,9 +386,7 @@ class TestCalculateQualityScore:
 class TestExecute:
     """Tests for execute method."""
 
-    def test_execute_success(
-        self, sample_pipeline_config, mock_adapter, create_event
-    ):
+    def test_execute_success(self, sample_pipeline_config, mock_adapter, create_event):
         """Should return success status for successful execution."""
         fetch_result = FetchResult(
             success=True,

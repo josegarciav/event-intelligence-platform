@@ -10,8 +10,7 @@ import yaml
 
 import pytest
 
-from src.prompts.loader import PromptLoader
-
+from src.agents.loader import PromptLoader
 
 # =============================================================================
 # TEST DATA
@@ -55,7 +54,9 @@ def mock_taxonomy_retriever():
     retriever = MagicMock()
     retriever.get_subcategory_context_for_prompt.return_value = "Subcategory context"
     retriever.get_all_categories_summary.return_value = "All categories summary"
-    retriever.get_attribute_options_string.return_value = "- energy_level: low | medium | high"
+    retriever.get_attribute_options_string.return_value = (
+        "- energy_level: low | medium | high"
+    )
     return retriever
 
 
@@ -63,7 +64,7 @@ def mock_taxonomy_retriever():
 def loader(mock_taxonomy_retriever):
     """Create PromptLoader with mocked taxonomy."""
     with patch(
-        "src.prompts.loader.get_taxonomy_retriever",
+        "src.agents.loader.get_taxonomy_retriever",
         return_value=mock_taxonomy_retriever,
     ):
         return PromptLoader()
@@ -78,14 +79,14 @@ class TestPromptLoaderInit:
     """Tests for PromptLoader initialization."""
 
     def test_init_sets_root_path(self, loader):
-        """Should set root_path to prompts directory."""
+        """Should set root_path to agents directory."""
         assert loader.root_path is not None
         assert isinstance(loader.root_path, Path)
 
     def test_init_loads_taxonomy_retriever(self, mock_taxonomy_retriever):
         """Should load taxonomy retriever."""
         with patch(
-            "src.prompts.loader.get_taxonomy_retriever",
+            "src.agents.loader.get_taxonomy_retriever",
             return_value=mock_taxonomy_retriever,
         ):
             loader = PromptLoader()
@@ -193,7 +194,7 @@ class TestPromptLoaderGetPrompt:
         assert "Custom context" in result["system"]
 
     def test_renders_jinja_templates(self, loader):
-        """Should render Jinja2 templates in prompts."""
+        """Should render Jinja2 templates in agents."""
         template_yaml = """
 system_prompt: |
   {% if subcategory_id %}
@@ -265,12 +266,12 @@ class TestPromptLoaderIntegration:
 
     def test_load_real_core_metadata_prompt(self):
         """Should load real core_metadata prompt."""
-        # Skip if prompts directory doesn't exist
-        prompts_dir = Path(__file__).parent.parent.parent.parent / "src" / "prompts"
+        # Skip if agents directory doesn't exist
+        prompts_dir = Path(__file__).parent.parent.parent.parent / "src" / "agents"
         if not prompts_dir.exists():
-            pytest.skip("Prompts directory not found")
+            pytest.skip("Agents directory not found")
 
-        with patch("src.prompts.loader.get_taxonomy_retriever") as mock_get:
+        with patch("src.agents.loader.get_taxonomy_retriever") as mock_get:
             mock_retriever = MagicMock()
             mock_retriever.get_all_categories_summary.return_value = "Categories"
             mock_retriever.get_attribute_options_string.return_value = "Options"
@@ -296,11 +297,11 @@ class TestPromptLoaderIntegration:
 
     def test_load_real_experience_pulse_prompt(self):
         """Should load real experience_pulse prompt."""
-        prompts_dir = Path(__file__).parent.parent.parent.parent / "src" / "prompts"
+        prompts_dir = Path(__file__).parent.parent.parent.parent / "src" / "agents"
         if not prompts_dir.exists():
-            pytest.skip("Prompts directory not found")
+            pytest.skip("Agents directory not found")
 
-        with patch("src.prompts.loader.get_taxonomy_retriever") as mock_get:
+        with patch("src.agents.loader.get_taxonomy_retriever") as mock_get:
             mock_retriever = MagicMock()
             mock_retriever.get_subcategory_context_for_prompt.return_value = "Context"
             mock_retriever.get_attribute_options_string.return_value = "Options"

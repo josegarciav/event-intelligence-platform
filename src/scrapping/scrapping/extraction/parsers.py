@@ -74,7 +74,7 @@ def select_attr_bs4(html: str, selector: str, attr: str) -> List[str]:
 
 def xpath_values(html: str, xpath: str) -> List[str]:
     """
-    Returns string values from XPath. Requires lxml.
+    Return string values from XPath. Requires lxml.
     """
     try:
         from lxml import html as lxml_html  # type: ignore

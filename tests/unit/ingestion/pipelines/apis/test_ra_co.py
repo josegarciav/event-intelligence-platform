@@ -4,7 +4,7 @@ Unit tests for the ra_co module.
 Tests for RaCoAdapter and RaCoPipeline classes.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 import uuid
 
@@ -25,7 +25,6 @@ from src.schemas.event import (
     EventFormat,
     PrimaryCategory,
 )
-
 
 # =============================================================================
 # TEST DATA
@@ -627,11 +626,16 @@ class TestRaCoPipelineParseDatetime:
         assert result.day == 15
 
     def test_parse_datetime_object(self, pipeline):
-        """Should return datetime object as-is."""
+        """Should return datetime object with timezone."""
         dt = datetime(2024, 6, 15, 22, 0)
         result = pipeline._parse_datetime(dt)
 
-        assert result == dt
+        # Result should be timezone-aware (UTC)
+        assert result.year == dt.year
+        assert result.month == dt.month
+        assert result.day == dt.day
+        assert result.hour == dt.hour
+        assert result.tzinfo is not None
 
     def test_parse_none_returns_now(self, pipeline):
         """Should return current time for None."""

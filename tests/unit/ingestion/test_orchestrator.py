@@ -25,7 +25,6 @@ from src.ingestion.adapters import SourceType
 from src.schemas.event import EventSchema, LocationInfo
 from src.ingestion.deduplication import ExactMatchDeduplicator
 
-
 # =============================================================================
 # FIXTURES
 # =============================================================================
@@ -65,10 +64,7 @@ def sample_result():
 @pytest.fixture
 def sample_events(create_event):
     """Create sample events for testing."""
-    return [
-        create_event(title=f"Event {i}")
-        for i in range(3)
-    ]
+    return [create_event(title=f"Event {i}") for i in range(3)]
 
 
 # =============================================================================

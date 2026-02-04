@@ -111,11 +111,13 @@ class TestMapEvent:
         # Note: Array indexing (field[0]) must be at the root level of access
         # because the index regex captures all chars before '[' as field name.
         # Use flat structure for array fields.
-        mapper = FieldMapper({
-            "title": "event.title",
-            "city": "event.location.city",
-            "first_artist": "artists[0].name",
-        })
+        mapper = FieldMapper(
+            {
+                "title": "event.title",
+                "city": "event.location.city",
+                "first_artist": "artists[0].name",
+            }
+        )
         raw = {
             "event": {
                 "title": "Test Concert",
@@ -130,10 +132,12 @@ class TestMapEvent:
 
     def test_map_with_missing_fields(self):
         """Should handle missing fields gracefully."""
-        mapper = FieldMapper({
-            "title": "title",
-            "description": "description",
-        })
+        mapper = FieldMapper(
+            {
+                "title": "title",
+                "description": "description",
+            }
+        )
         raw = {"title": "Test Event"}
         result = mapper.map_event(raw)
         assert result["title"] == "Test Event"
@@ -143,9 +147,7 @@ class TestMapEvent:
         """Should apply transformations after extraction."""
         mapper = FieldMapper(
             field_mappings={"title": "title"},
-            transformations={
-                "title_upper": {"type": "uppercase", "source": "title"}
-            },
+            transformations={"title_upper": {"type": "uppercase", "source": "title"}},
         )
         raw = {"title": "test event"}
         result = mapper.map_event(raw)
@@ -180,9 +182,7 @@ class TestTransformations:
         """Should set default value when None."""
         mapper = FieldMapper(
             field_mappings={"status": "status"},
-            transformations={
-                "status": {"type": "default", "value": "pending"}
-            },
+            transformations={"status": {"type": "default", "value": "pending"}},
         )
         raw = {}
         result = mapper.map_event(raw)
@@ -192,9 +192,7 @@ class TestTransformations:
         """Should not override existing value with default."""
         mapper = FieldMapper(
             field_mappings={"status": "status"},
-            transformations={
-                "status": {"type": "default", "value": "pending"}
-            },
+            transformations={"status": {"type": "default", "value": "pending"}},
         )
         raw = {"status": "active"}
         result = mapper.map_event(raw)

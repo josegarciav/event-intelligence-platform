@@ -535,7 +535,7 @@ class BaseAPIPipeline(BasePipeline):
             event_id=event_id,
             title=parsed_event.get("title", "Untitled Event"),
             description=parsed_event.get("description"),
-            primary_category=primary_cat,
+            primary_category=PrimaryCategory(primary_cat),
             taxonomy_dimensions=taxonomy_objs,
             start_datetime=start_dt,
             end_datetime=end_dt,

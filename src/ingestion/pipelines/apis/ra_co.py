@@ -5,7 +5,7 @@ API-based pipeline for ingesting events from ra.co using their GraphQL API.
 """
 
 from typing import Any, Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import uuid
 
@@ -142,7 +142,7 @@ class RaCoAdapter(APIAdapter):
         errors = []
         total_results = 0
 
-        fetch_started = datetime.utcnow()
+        fetch_started = datetime.now(timezone.utc)
 
         while page <= max_pages:
             logger.info(f"Fetching page {page}/{max_pages}...")
@@ -191,7 +191,7 @@ class RaCoAdapter(APIAdapter):
                 "max_pages": max_pages,
             },
             fetch_started_at=fetch_started,
-            fetch_ended_at=datetime.utcnow(),
+            fetch_ended_at=datetime.now(timezone.utc),
         )
 
     def _parse_response(self, response: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -408,7 +408,7 @@ class RaCoPipeline(BasePipeline):
             source_name="ra_co",
             source_event_id=source_event_id,
             source_url=source_url,
-            last_updated_from_source=datetime.utcnow(),
+            last_updated_from_source=datetime.now(timezone.utc),
         )
 
         # Ticket info - ra.co events link to their event page for tickets
@@ -458,7 +458,7 @@ class RaCoPipeline(BasePipeline):
             event_id=event_id,
             title=parsed_event.get("title", "Untitled Event"),
             description=parsed_event.get("description"),
-            primary_category=primary_cat,
+            primary_category=PrimaryCategory(primary_cat),
             taxonomy_dimensions=taxonomy_objs,
             start_datetime=start_dt,
             end_datetime=end_dt,
@@ -477,11 +477,14 @@ class RaCoPipeline(BasePipeline):
         )
 
     def _parse_datetime(self, dt_value: Any) -> datetime:
-        """Parse datetime from various formats."""
+        """Parse datetime from various formats. Always returns timezone-aware datetime."""
         if not dt_value:
-            return datetime.utcnow()
+            return datetime.now(timezone.utc)
 
         if isinstance(dt_value, datetime):
+            # Ensure timezone-aware
+            if dt_value.tzinfo is None:
+                return dt_value.replace(tzinfo=timezone.utc)
             return dt_value
 
         if isinstance(dt_value, str):
@@ -490,20 +493,31 @@ class RaCoPipeline(BasePipeline):
                 if "T" in dt_value:
                     # Remove milliseconds and timezone
                     clean = dt_value.split(".")[0]
-                    return datetime.fromisoformat(clean)
-                return datetime.fromisoformat(dt_value)
+                    parsed = datetime.fromisoformat(clean)
+                    return (
+                        parsed.replace(tzinfo=timezone.utc)
+                        if parsed.tzinfo is None
+                        else parsed
+                    )
+                parsed = datetime.fromisoformat(dt_value)
+                return (
+                    parsed.replace(tzinfo=timezone.utc)
+                    if parsed.tzinfo is None
+                    else parsed
+                )
             except ValueError:
                 pass
 
             # Try common formats
             for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"]:
                 try:
-                    return datetime.strptime(dt_value, fmt)
+                    parsed = datetime.strptime(dt_value, fmt)
+                    return parsed.replace(tzinfo=timezone.utc)
                 except ValueError:
                     continue
 
         logger.warning(f"Could not parse datetime: {dt_value}")
-        return datetime.utcnow()
+        return datetime.now(timezone.utc)
 
     def validate_event(self, event: EventSchema) -> Tuple[bool, List[str]]:
         """Validate ra.co event."""
@@ -515,7 +529,7 @@ class RaCoPipeline(BasePipeline):
         if not event.location.city:
             errors.append("City is required")
 
-        if event.start_datetime < datetime.utcnow():
+        if event.start_datetime < datetime.now(timezone.utc):
             errors.append("Warning: Event start time is in the past")
 
         if event.price.minimum_price and event.price.minimum_price < 0:

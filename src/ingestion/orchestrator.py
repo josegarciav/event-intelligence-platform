@@ -6,7 +6,7 @@ Supports both API and scraper-based sources through the adapter pattern.
 """
 
 from typing import Dict, List, Optional, Callable
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 from dataclasses import dataclass
 import yaml
@@ -221,7 +221,7 @@ class PipelineOrchestrator:
             interval_hours=schedule_config.get("interval_hours"),
             cron_expression=schedule_config.get("cron_expression"),
             enabled=schedule_config.get("enabled", True),
-            next_execution=datetime.utcnow(),
+            next_execution=datetime.now(timezone.utc),
         )
 
         self.scheduled_pipelines[source_name] = scheduled

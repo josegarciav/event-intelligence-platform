@@ -28,11 +28,13 @@ def valid_subcategory_id():
 @pytest.fixture
 def basic_mapper(valid_subcategory_id):
     """Create a basic TaxonomyMapper for testing."""
-    return TaxonomyMapper({
-        "default_primary": "play_and_fun",
-        "default_subcategory": valid_subcategory_id,
-        "rules": [],
-    })
+    return TaxonomyMapper(
+        {
+            "default_primary": "play_and_fun",
+            "default_subcategory": valid_subcategory_id,
+            "rules": [],
+        }
+    )
 
 
 class TestTaxonomyMapperInit:
@@ -40,20 +42,24 @@ class TestTaxonomyMapperInit:
 
     def test_init_with_defaults(self, valid_subcategory_id):
         """Should initialize with defaults."""
-        mapper = TaxonomyMapper({
-            "default_primary": "play_and_fun",
-            "default_subcategory": valid_subcategory_id,
-        })
+        mapper = TaxonomyMapper(
+            {
+                "default_primary": "play_and_fun",
+                "default_subcategory": valid_subcategory_id,
+            }
+        )
         assert mapper.default_primary == "play_and_fun"
         assert mapper.default_subcategory == valid_subcategory_id
         assert mapper.rules == []
 
     def test_init_with_numeric_id(self, valid_subcategory_id):
         """Should accept numeric ID for primary category."""
-        mapper = TaxonomyMapper({
-            "default_primary": "1",
-            "default_subcategory": valid_subcategory_id,
-        })
+        mapper = TaxonomyMapper(
+            {
+                "default_primary": "1",
+                "default_subcategory": valid_subcategory_id,
+            }
+        )
         assert mapper.default_primary == "play_and_fun"
 
     def test_init_with_rules(self, valid_subcategory_id):
@@ -61,11 +67,13 @@ class TestTaxonomyMapperInit:
         rules = [
             {"match": {"always": True}, "assign": {"primary_category": "play_and_fun"}}
         ]
-        mapper = TaxonomyMapper({
-            "default_primary": "play_and_fun",
-            "default_subcategory": valid_subcategory_id,
-            "rules": rules,
-        })
+        mapper = TaxonomyMapper(
+            {
+                "default_primary": "play_and_fun",
+                "default_subcategory": valid_subcategory_id,
+                "rules": rules,
+            }
+        )
         assert len(mapper.rules) == 1
 
     def test_init_invalid_subcategory_primary_mismatch(self):
@@ -80,17 +88,21 @@ class TestTaxonomyMapperInit:
 
         if cat2_sub:
             with pytest.raises(ValueError, match="does not belong to"):
-                TaxonomyMapper({
-                    "default_primary": "play_and_fun",  # Category 1
-                    "default_subcategory": cat2_sub,  # Category 2 subcategory
-                })
+                TaxonomyMapper(
+                    {
+                        "default_primary": "play_and_fun",  # Category 1
+                        "default_subcategory": cat2_sub,  # Category 2 subcategory
+                    }
+                )
 
     def test_init_invalid_primary_fallback(self, valid_subcategory_id):
         """Should fallback to play_and_fun for invalid primary."""
-        mapper = TaxonomyMapper({
-            "default_primary": "invalid_category",
-            "default_subcategory": valid_subcategory_id,
-        })
+        mapper = TaxonomyMapper(
+            {
+                "default_primary": "invalid_category",
+                "default_subcategory": valid_subcategory_id,
+            }
+        )
         assert mapper.default_primary == "play_and_fun"
 
 
@@ -105,79 +117,105 @@ class TestEvaluateMatch:
     def test_title_contains_match(self, basic_mapper):
         """Should match when title contains keyword."""
         event = {"title": "Techno Party Night"}
-        assert basic_mapper._evaluate_match(
-            event, {"title_contains": ["techno", "house"]}
-        ) is True
+        assert (
+            basic_mapper._evaluate_match(event, {"title_contains": ["techno", "house"]})
+            is True
+        )
 
     def test_title_contains_no_match(self, basic_mapper):
         """Should not match when title doesn't contain keyword."""
         event = {"title": "Jazz Concert"}
-        assert basic_mapper._evaluate_match(
-            event, {"title_contains": ["techno", "house"]}
-        ) is False
+        assert (
+            basic_mapper._evaluate_match(event, {"title_contains": ["techno", "house"]})
+            is False
+        )
 
     def test_title_contains_case_insensitive(self, basic_mapper):
         """Should match case-insensitively."""
         event = {"title": "TECHNO PARTY"}
-        assert basic_mapper._evaluate_match(
-            event, {"title_contains": ["techno"]}
-        ) is True
+        assert (
+            basic_mapper._evaluate_match(event, {"title_contains": ["techno"]}) is True
+        )
 
     def test_description_contains_match(self, basic_mapper):
         """Should match when description contains keyword."""
         event = {"description": "Join us for a night of electronic music"}
-        assert basic_mapper._evaluate_match(
-            event, {"description_contains": ["electronic"]}
-        ) is True
+        assert (
+            basic_mapper._evaluate_match(
+                event, {"description_contains": ["electronic"]}
+            )
+            is True
+        )
 
     def test_description_contains_no_match(self, basic_mapper):
         """Should not match when description doesn't contain keyword."""
         event = {"description": "Classical music concert"}
-        assert basic_mapper._evaluate_match(
-            event, {"description_contains": ["electronic"]}
-        ) is False
+        assert (
+            basic_mapper._evaluate_match(
+                event, {"description_contains": ["electronic"]}
+            )
+            is False
+        )
 
     def test_field_equals_match(self, basic_mapper):
         """Should match when field equals value."""
         event = {"event_type": "concert"}
-        assert basic_mapper._evaluate_match(
-            event, {"field_equals": {"event_type": "concert"}}
-        ) is True
+        assert (
+            basic_mapper._evaluate_match(
+                event, {"field_equals": {"event_type": "concert"}}
+            )
+            is True
+        )
 
     def test_field_equals_no_match(self, basic_mapper):
         """Should not match when field doesn't equal value."""
         event = {"event_type": "workshop"}
-        assert basic_mapper._evaluate_match(
-            event, {"field_equals": {"event_type": "concert"}}
-        ) is False
+        assert (
+            basic_mapper._evaluate_match(
+                event, {"field_equals": {"event_type": "concert"}}
+            )
+            is False
+        )
 
     def test_field_in_match(self, basic_mapper):
         """Should match when field value in list."""
         event = {"event_type": "concert"}
-        assert basic_mapper._evaluate_match(
-            event, {"field_in": {"event_type": ["concert", "festival", "party"]}}
-        ) is True
+        assert (
+            basic_mapper._evaluate_match(
+                event, {"field_in": {"event_type": ["concert", "festival", "party"]}}
+            )
+            is True
+        )
 
     def test_field_in_no_match(self, basic_mapper):
         """Should not match when field value not in list."""
         event = {"event_type": "workshop"}
-        assert basic_mapper._evaluate_match(
-            event, {"field_in": {"event_type": ["concert", "festival"]}}
-        ) is False
+        assert (
+            basic_mapper._evaluate_match(
+                event, {"field_in": {"event_type": ["concert", "festival"]}}
+            )
+            is False
+        )
 
     def test_regex_match(self, basic_mapper):
         """Should match with regex pattern."""
         event = {"title": "Festival 2024 - Electronic Music"}
-        assert basic_mapper._evaluate_match(
-            event, {"regex": {"title": r"festival.*\d{4}"}}
-        ) is True
+        assert (
+            basic_mapper._evaluate_match(
+                event, {"regex": {"title": r"festival.*\d{4}"}}
+            )
+            is True
+        )
 
     def test_regex_no_match(self, basic_mapper):
         """Should not match when regex doesn't match."""
         event = {"title": "Regular Party Night"}
-        assert basic_mapper._evaluate_match(
-            event, {"regex": {"title": r"festival.*\d{4}"}}
-        ) is False
+        assert (
+            basic_mapper._evaluate_match(
+                event, {"regex": {"title": r"festival.*\d{4}"}}
+            )
+            is False
+        )
 
     def test_no_conditions(self, basic_mapper):
         """Should match when no specific conditions."""
@@ -214,16 +252,21 @@ class TestCreateDimension:
 
     def test_create_with_category(self, valid_subcategory_id):
         """Should create dimension with primary category."""
-        mapper = TaxonomyMapper({
-            "default_primary": "play_and_fun",
-            "default_subcategory": valid_subcategory_id,
-        })
+        mapper = TaxonomyMapper(
+            {
+                "default_primary": "play_and_fun",
+                "default_subcategory": valid_subcategory_id,
+            }
+        )
         event = {"title": "Test Event"}
-        dim = mapper._create_dimension(event, {
-            "primary_category": "play_and_fun",
-            "subcategory": valid_subcategory_id,
-            "confidence": 0.8,
-        })
+        dim = mapper._create_dimension(
+            event,
+            {
+                "primary_category": "play_and_fun",
+                "subcategory": valid_subcategory_id,
+                "confidence": 0.8,
+            },
+        )
 
         assert dim is not None
         assert dim.primary_category == PrimaryCategory.PLAY_AND_PURE_FUN
@@ -232,45 +275,60 @@ class TestCreateDimension:
 
     def test_create_with_numeric_category_id(self, valid_subcategory_id):
         """Should accept numeric ID for primary category."""
-        mapper = TaxonomyMapper({
-            "default_primary": "1",
-            "default_subcategory": valid_subcategory_id,
-        })
+        mapper = TaxonomyMapper(
+            {
+                "default_primary": "1",
+                "default_subcategory": valid_subcategory_id,
+            }
+        )
         event = {"title": "Test Event"}
-        dim = mapper._create_dimension(event, {
-            "primary_category": "1",
-            "subcategory": valid_subcategory_id,
-        })
+        dim = mapper._create_dimension(
+            event,
+            {
+                "primary_category": "1",
+                "subcategory": valid_subcategory_id,
+            },
+        )
 
         assert dim is not None
         assert dim.primary_category == PrimaryCategory.PLAY_AND_PURE_FUN
 
     def test_create_with_values(self, valid_subcategory_id):
         """Should include provided values."""
-        mapper = TaxonomyMapper({
-            "default_primary": "play_and_fun",
-            "default_subcategory": valid_subcategory_id,
-        })
+        mapper = TaxonomyMapper(
+            {
+                "default_primary": "play_and_fun",
+                "default_subcategory": valid_subcategory_id,
+            }
+        )
         event = {"title": "Test Event"}
-        dim = mapper._create_dimension(event, {
-            "primary_category": "play_and_fun",
-            "subcategory": valid_subcategory_id,
-            "values": ["energy", "excitement"],
-        })
+        dim = mapper._create_dimension(
+            event,
+            {
+                "primary_category": "play_and_fun",
+                "subcategory": valid_subcategory_id,
+                "values": ["energy", "excitement"],
+            },
+        )
 
         assert dim is not None
         assert dim.values == ["energy", "excitement"]
 
     def test_create_invalid_primary_returns_none(self, valid_subcategory_id):
         """Should return None for invalid primary category."""
-        mapper = TaxonomyMapper({
-            "default_primary": "play_and_fun",
-            "default_subcategory": valid_subcategory_id,
-        })
+        mapper = TaxonomyMapper(
+            {
+                "default_primary": "play_and_fun",
+                "default_subcategory": valid_subcategory_id,
+            }
+        )
         event = {"title": "Test Event"}
-        dim = mapper._create_dimension(event, {
-            "primary_category": "not_a_category",
-        })
+        dim = mapper._create_dimension(
+            event,
+            {
+                "primary_category": "not_a_category",
+            },
+        )
 
         assert dim is None
 
@@ -287,15 +345,20 @@ class TestCreateDimension:
                 cat2_sub = sub_id
 
         if cat1_sub and cat2_sub:
-            mapper = TaxonomyMapper({
-                "default_primary": "play_and_fun",
-                "default_subcategory": cat1_sub,
-            })
+            mapper = TaxonomyMapper(
+                {
+                    "default_primary": "play_and_fun",
+                    "default_subcategory": cat1_sub,
+                }
+            )
             event = {"title": "Test Event"}
-            dim = mapper._create_dimension(event, {
-                "primary_category": "play_and_fun",  # Category 1
-                "subcategory": cat2_sub,  # Category 2 subcategory
-            })
+            dim = mapper._create_dimension(
+                event,
+                {
+                    "primary_category": "play_and_fun",  # Category 1
+                    "subcategory": cat2_sub,  # Category 2 subcategory
+                },
+            )
 
             assert dim is None
 
@@ -305,20 +368,22 @@ class TestMapEvent:
 
     def test_map_with_matching_rule(self, valid_subcategory_id):
         """Should apply first matching rule."""
-        mapper = TaxonomyMapper({
-            "default_primary": "play_and_fun",
-            "default_subcategory": valid_subcategory_id,
-            "rules": [
-                {
-                    "match": {"title_contains": ["techno"]},
-                    "assign": {
-                        "primary_category": "play_and_fun",
-                        "subcategory": valid_subcategory_id,
-                        "confidence": 0.9,
+        mapper = TaxonomyMapper(
+            {
+                "default_primary": "play_and_fun",
+                "default_subcategory": valid_subcategory_id,
+                "rules": [
+                    {
+                        "match": {"title_contains": ["techno"]},
+                        "assign": {
+                            "primary_category": "play_and_fun",
+                            "subcategory": valid_subcategory_id,
+                            "confidence": 0.9,
+                        },
                     },
-                },
-            ],
-        })
+                ],
+            }
+        )
 
         event = {"title": "Techno Night"}
         primary, dimensions = mapper.map_event(event)
@@ -329,16 +394,18 @@ class TestMapEvent:
 
     def test_map_no_rules_match_uses_default(self, valid_subcategory_id):
         """Should use defaults when no rules match."""
-        mapper = TaxonomyMapper({
-            "default_primary": "play_and_fun",
-            "default_subcategory": valid_subcategory_id,
-            "rules": [
-                {
-                    "match": {"title_contains": ["techno"]},
-                    "assign": {"primary_category": "play_and_fun"},
-                },
-            ],
-        })
+        mapper = TaxonomyMapper(
+            {
+                "default_primary": "play_and_fun",
+                "default_subcategory": valid_subcategory_id,
+                "rules": [
+                    {
+                        "match": {"title_contains": ["techno"]},
+                        "assign": {"primary_category": "play_and_fun"},
+                    },
+                ],
+            }
+        )
 
         event = {"title": "Jazz Concert"}
         primary, dimensions = mapper.map_event(event)
@@ -356,26 +423,28 @@ class TestMapEvent:
         if len(cat1_subs) >= 2:
             sub1, sub2 = cat1_subs[0], cat1_subs[1]
 
-            mapper = TaxonomyMapper({
-                "default_primary": "play_and_fun",
-                "default_subcategory": sub1,
-                "rules": [
-                    {
-                        "match": {"title_contains": ["music"]},
-                        "assign": {
-                            "primary_category": "play_and_fun",
-                            "subcategory": sub1,
+            mapper = TaxonomyMapper(
+                {
+                    "default_primary": "play_and_fun",
+                    "default_subcategory": sub1,
+                    "rules": [
+                        {
+                            "match": {"title_contains": ["music"]},
+                            "assign": {
+                                "primary_category": "play_and_fun",
+                                "subcategory": sub1,
+                            },
                         },
-                    },
-                    {
-                        "match": {"title_contains": ["party"]},
-                        "assign": {
-                            "primary_category": "play_and_fun",
-                            "subcategory": sub2,
+                        {
+                            "match": {"title_contains": ["party"]},
+                            "assign": {
+                                "primary_category": "play_and_fun",
+                                "subcategory": sub2,
+                            },
                         },
-                    },
-                ],
-            })
+                    ],
+                }
+            )
 
             event = {"title": "Music Party Night"}
             primary, dimensions = mapper.map_event(event)
@@ -385,20 +454,22 @@ class TestMapEvent:
 
     def test_map_always_rule(self, valid_subcategory_id):
         """Should match 'always' rule."""
-        mapper = TaxonomyMapper({
-            "default_primary": "play_and_fun",
-            "default_subcategory": valid_subcategory_id,
-            "rules": [
-                {
-                    "match": {"always": True},
-                    "assign": {
-                        "primary_category": "play_and_fun",
-                        "subcategory": valid_subcategory_id,
-                        "confidence": 0.95,
+        mapper = TaxonomyMapper(
+            {
+                "default_primary": "play_and_fun",
+                "default_subcategory": valid_subcategory_id,
+                "rules": [
+                    {
+                        "match": {"always": True},
+                        "assign": {
+                            "primary_category": "play_and_fun",
+                            "subcategory": valid_subcategory_id,
+                            "confidence": 0.95,
+                        },
                     },
-                },
-            ],
-        })
+                ],
+            }
+        )
 
         event = {"title": "Any Event"}
         primary, dimensions = mapper.map_event(event)
@@ -412,19 +483,21 @@ class TestGetFullTaxonomyData:
 
     def test_returns_full_data(self, valid_subcategory_id):
         """Should return full taxonomy dimension data."""
-        mapper = TaxonomyMapper({
-            "default_primary": "play_and_fun",
-            "default_subcategory": valid_subcategory_id,
-            "rules": [
-                {
-                    "match": {"always": True},
-                    "assign": {
-                        "primary_category": "play_and_fun",
-                        "subcategory": valid_subcategory_id,
+        mapper = TaxonomyMapper(
+            {
+                "default_primary": "play_and_fun",
+                "default_subcategory": valid_subcategory_id,
+                "rules": [
+                    {
+                        "match": {"always": True},
+                        "assign": {
+                            "primary_category": "play_and_fun",
+                            "subcategory": valid_subcategory_id,
+                        },
                     },
-                },
-            ],
-        })
+                ],
+            }
+        )
 
         event = {"title": "Test Event", "description": "A fun event"}
         primary, full_dims = mapper.get_full_taxonomy_data(event)

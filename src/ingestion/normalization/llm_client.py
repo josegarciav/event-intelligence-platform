@@ -71,14 +71,13 @@ class LangChainLLMClient(BaseLLMClient):
         self.max_tokens = max_tokens
 
         # Get API key
+        self.api_key: Optional[str] = None
         if api_key:
             self.api_key = api_key
         elif provider == "openai":
             self.api_key = os.getenv("OPENAI_API_KEY")
         elif provider == "anthropic":
             self.api_key = os.getenv("ANTHROPIC_API_KEY")
-        else:
-            self.api_key = None
 
         self._llm = None
         self._initialized = False

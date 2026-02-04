@@ -16,7 +16,6 @@ from src.ingestion.adapters.api_adapter import (
 )
 from src.ingestion.adapters.base_adapter import SourceType, FetchResult
 
-
 # =============================================================================
 # TEST DATA
 # =============================================================================
@@ -233,7 +232,9 @@ class TestAPIAdapterFetch:
 
     @patch.object(APIAdapter, "_get_session")
     @patch.object(APIAdapter, "_make_request")
-    def test_fetch_with_custom_query_builder(self, mock_request, mock_get_session, api_config):
+    def test_fetch_with_custom_query_builder(
+        self, mock_request, mock_get_session, api_config
+    ):
         """Should use custom query builder."""
         mock_session = MagicMock()
         mock_get_session.return_value = mock_session
@@ -247,7 +248,9 @@ class TestAPIAdapterFetch:
 
     @patch.object(APIAdapter, "_get_session")
     @patch.object(APIAdapter, "_make_request")
-    def test_fetch_with_custom_response_parser(self, mock_request, mock_get_session, api_config):
+    def test_fetch_with_custom_response_parser(
+        self, mock_request, mock_get_session, api_config
+    ):
         """Should use custom response parser."""
         mock_session = MagicMock()
         mock_get_session.return_value = mock_session
@@ -395,9 +398,7 @@ class TestAPIAdapterDefaultParsers:
     def test_default_response_parser_with_data_list(self, api_config):
         """Should extract data list from response."""
         adapter = APIAdapter(api_config)
-        result = adapter._default_response_parser(
-            {"data": [{"id": 1}, {"id": 2}]}
-        )
+        result = adapter._default_response_parser({"data": [{"id": 1}, {"id": 2}]})
 
         assert result == [{"id": 1}, {"id": 2}]
 

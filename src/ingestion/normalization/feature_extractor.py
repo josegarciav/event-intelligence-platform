@@ -13,7 +13,7 @@ to ensure accurate classification and attribute selection.
 import logging
 import os
 import re
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Literal, Optional, TYPE_CHECKING, cast
 
 from src.ingestion.normalization.taxonomy_retriever import (
     get_taxonomy_retriever,
@@ -36,6 +36,9 @@ if TYPE_CHECKING:
     from src.schemas.event import TaxonomyDimension
 
 logger = logging.getLogger(__name__)
+
+# Type alias for primary category IDs
+CategoryID = Literal["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
 
 
 class FeatureExtractor:
@@ -89,10 +92,7 @@ class FeatureExtractor:
         self.max_tokens = max_tokens
 
         # Get API key
-        if api_key:
-            self._api_key = api_key
-        else:
-            self._api_key = os.getenv("OPENAI_API_KEY")
+        self._api_key: Optional[str] = api_key or os.getenv("OPENAI_API_KEY")
 
         # Initialize Instructor client (lazy)
         self._client = None
@@ -155,7 +155,7 @@ class FeatureExtractor:
             # Fallback to rule-based
             category_id = self._infer_primary_category_rules(event_context)
             return PrimaryCategoryExtraction(
-                category_id=category_id,
+                category_id=cast(CategoryID, category_id),
                 reasoning="Rule-based classification",
                 confidence=0.5,
             )
@@ -184,7 +184,7 @@ class FeatureExtractor:
             logger.warning(f"Primary category extraction failed: {e}")
             category_id = self._infer_primary_category_rules(event_context)
             return PrimaryCategoryExtraction(
-                category_id=category_id,
+                category_id=cast(CategoryID, category_id),
                 reasoning=f"Fallback due to error: {e}",
                 confidence=0.3,
             )
@@ -362,7 +362,7 @@ Extract the requested fields based on the event information."""
         self, event_context: Dict[str, Any], fields: List[str]
     ) -> Dict[str, Any]:
         """Rule-based fallback for missing field extraction."""
-        result = {}
+        result: Dict[str, Any] = {}
         title = (event_context.get("title") or "").lower()
         description = (event_context.get("description") or "").lower()
         text = f"{title} {description}"
@@ -525,7 +525,7 @@ Extract the requested fields based on the event information."""
         enriched_data["cost_level"] = self._infer_cost_level(event_context)
         enriched_data["time_scale"] = self._infer_time_scale(event_context)
 
-        return TaxonomyDimension(**enriched_data)
+        return TaxonomyDimension(**enriched_data)  # type: ignore[arg-type]
 
     # =========================================================================
     # LLM-BASED ENRICHMENT
@@ -661,7 +661,7 @@ Also suggest relevant emotional outputs (e.g., "joy", "excitement", "connection"
         description = (event_context.get("description") or "").lower()
         text = f"{title} {description}"
 
-        result = {}
+        result: Dict[str, Any] = {}
 
         # Energy level
         if any(

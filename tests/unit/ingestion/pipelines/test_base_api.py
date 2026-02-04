@@ -25,7 +25,6 @@ from src.schemas.event import (
     PrimaryCategory,
 )
 
-
 # =============================================================================
 # FIXTURES
 # =============================================================================
@@ -489,9 +488,7 @@ class TestBaseAPIPipelineEnrichEvent:
 
     def test_enrich_uses_default_timezone(self, sample_source_config, create_event):
         """Should use config default timezone."""
-        sample_source_config.defaults = {
-            "location": {"timezone": "Europe/Madrid"}
-        }
+        sample_source_config.defaults = {"location": {"timezone": "Europe/Madrid"}}
 
         pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
         pipeline.source_config = sample_source_config
