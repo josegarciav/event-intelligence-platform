@@ -511,16 +511,25 @@ class BaseAPIPipeline(BasePipeline):
         event_type = self._determine_event_type(parsed_event)
 
         # Use feature extractor for missing fields
+        extracted_fields = {}
         if self.feature_extractor:
             missing_fields = self.source_config.feature_extraction.get(
                 "fill_missing", []
             )
             if missing_fields:
-                extracted = self.feature_extractor.extract_missing_fields(
+                extracted_fields = self.feature_extractor.fill_missing_fields(
                     parsed_event, missing_fields
                 )
-                if "event_type" in extracted and not event_type:
-                    event_type = EventType(extracted["event_type"])
+
+                # Apply extracted event_type
+                if "event_type" in extracted_fields and not event_type:
+                    try:
+                        event_type = EventType(extracted_fields["event_type"])
+                    except ValueError:
+                        pass
+
+        # Get tags from extracted fields or parsed event
+        tags = extracted_fields.get("tags") or parsed_event.get("tags", [])
 
         return EventSchema(
             event_id=event_id,
@@ -537,7 +546,7 @@ class BaseAPIPipeline(BasePipeline):
             organizer=organizer,
             image_url=parsed_event.get("image_url"),
             source=source,
-            tags=parsed_event.get("tags", []),
+            tags=tags,
             custom_fields={
                 "artists": parsed_event.get("artists", []),
             },

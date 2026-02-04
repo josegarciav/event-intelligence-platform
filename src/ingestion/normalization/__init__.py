@@ -52,6 +52,14 @@ from .taxonomy import (
 )
 from .feature_extractor import FeatureExtractor, create_feature_extractor_from_config
 from .field_mapper import FieldMapper, create_field_mapper_from_config
+from .extraction_models import (
+    PrimaryCategoryExtraction,
+    SubcategoryExtraction,
+    EventTypeExtraction,
+    TaxonomyAttributesExtraction,
+    TagsExtraction,
+    MissingFieldsExtraction,
+)
 
 __all__ = [
     # Event Schema
@@ -106,4 +114,11 @@ __all__ = [
     # Field Mapper
     "FieldMapper",
     "create_field_mapper_from_config",
+    # Extraction Models (Instructor-based)
+    "PrimaryCategoryExtraction",
+    "SubcategoryExtraction",
+    "EventTypeExtraction",
+    "TaxonomyAttributesExtraction",
+    "TagsExtraction",
+    "MissingFieldsExtraction",
 ]

@@ -239,6 +239,24 @@ class TaxonomyRetriever:
             lines.append(f"- {attr}: {' | '.join(vals)}")
         return "\n".join(lines)
 
+    def get_all_categories_summary(self) -> str:
+        """
+        Get summary of all 10 categories for classification prompt.
+
+        This method provides a concise overview of all primary categories
+        to help the LLM classify events into the correct category.
+
+        Returns:
+            Formatted string with category IDs, names, and descriptions
+        """
+        lines = ["## Primary Categories (select ONE):"]
+        for cat_id in ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]:
+            cat = self.get_category_by_id(cat_id)
+            if cat:
+                description = cat.get("description", "")[:100]
+                lines.append(f"- ID {cat_id}: {cat.get('category')} - {description}")
+        return "\n".join(lines)
+
     def find_best_matching_activity(
         self,
         subcategory_id: str,

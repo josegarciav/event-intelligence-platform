@@ -1,9 +1,9 @@
 """
 Feature Extractor for LLM-based taxonomy enrichment.
 
-Uses LangChain with RAG (Retrieval Augmented Generation) to:
+Uses Instructor with OpenAI for structured LLM outputs to:
 1. Classify events into taxonomy categories
-2. Match activities from the taxonomy
+2. Extract event type, tags, and other fields
 3. Select appropriate attribute values based on event context
 
 The extractor injects filtered taxonomy context into prompts
@@ -11,13 +11,10 @@ to ensure accurate classification and attribute selection.
 """
 
 import logging
+import os
 import re
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from src.ingestion.normalization.llm_client import (
-    LangChainLLMClient,
-    create_llm_client,
-)
 from src.ingestion.normalization.taxonomy_retriever import (
     get_taxonomy_retriever,
 )
@@ -26,6 +23,13 @@ from src.ingestion.normalization.feature_models import (
     EventTypeOutput,
     MusicGenresOutput,
     TagsOutput,
+)
+from src.ingestion.normalization.extraction_models import (
+    PrimaryCategoryExtraction,
+    SubcategoryExtraction,
+    EventTypeExtraction,
+    TaxonomyAttributesExtraction,
+    MissingFieldsExtraction,
 )
 
 if TYPE_CHECKING:
@@ -38,11 +42,12 @@ class FeatureExtractor:
     """
     LLM-based feature extractor for event taxonomy enrichment.
 
-    Uses LangChain with structured output to:
+    Uses Instructor with OpenAI for structured output to:
     - Classify events into primary categories and subcategories
     - Match events to specific activities from the taxonomy
     - Select appropriate attribute values (energy_level, social_intensity, etc.)
     - Extract event type, music genres, and tags
+    - Fill missing fields based on config
 
     The extractor supports both LLM-based extraction and rule-based fallbacks
     when the LLM is unavailable.
@@ -51,6 +56,13 @@ class FeatureExtractor:
         >>> extractor = FeatureExtractor()
         >>> event = {"title": "Techno Party", "description": "Underground techno night"}
         >>> enriched_dim = extractor.enrich_taxonomy_dimension(basic_dim, event)
+
+        # Extract specific fields
+        >>> cat = extractor.extract_primary_category(event)
+        >>> print(f"Category: {cat.category_id}")
+
+        # Fill missing fields from config
+        >>> fields = extractor.fill_missing_fields(event, ["event_type", "tags"])
     """
 
     def __init__(
@@ -65,33 +77,381 @@ class FeatureExtractor:
         Initialize the feature extractor.
 
         Args:
-            provider: LLM provider ("openai" or "anthropic")
-            model_name: Model to use (defaults based on provider)
-            api_key: API key (defaults to env var)
+            provider: LLM provider ("openai" supported via Instructor)
+            model_name: Model to use (defaults to "gpt-4o-mini")
+            api_key: API key (defaults to OPENAI_API_KEY env var)
             temperature: Temperature for generation (0.0-1.0)
             max_tokens: Maximum tokens in response
         """
         self.provider = provider
-        self.model_name = model_name
+        self.model_name = model_name or "gpt-4o-mini"
         self.temperature = temperature
         self.max_tokens = max_tokens
 
-        # Initialize LLM client (with fallback to rules)
-        self._llm_client = create_llm_client(
-            provider=provider,
-            model_name=model_name,
-            api_key=api_key,
-            temperature=temperature,
-            fallback_to_rules=True,
-        )
+        # Get API key
+        if api_key:
+            self._api_key = api_key
+        else:
+            self._api_key = os.getenv("OPENAI_API_KEY")
+
+        # Initialize Instructor client (lazy)
+        self._client = None
+        self._llm_available = None
 
         # Initialize taxonomy retriever
         self._taxonomy = get_taxonomy_retriever()
 
+    def _get_client(self):
+        """Lazy initialization of Instructor client."""
+        if self._client is not None:
+            return self._client
+
+        if not self._api_key:
+            logger.warning("No API key found for OpenAI")
+            self._llm_available = False
+            return None
+
+        try:
+            import instructor
+            from openai import OpenAI
+
+            openai_client = OpenAI(api_key=self._api_key)
+            self._client = instructor.from_openai(openai_client)
+            self._llm_available = True
+            return self._client
+        except ImportError as e:
+            logger.warning(f"Instructor or OpenAI package not installed: {e}")
+            self._llm_available = False
+            return None
+        except Exception as e:
+            logger.warning(f"Failed to initialize Instructor client: {e}")
+            self._llm_available = False
+            return None
+
     @property
     def is_llm_available(self) -> bool:
         """Check if LLM is available."""
-        return isinstance(self._llm_client, LangChainLLMClient)
+        if self._llm_available is None:
+            self._get_client()
+        return self._llm_available or False
+
+    # =========================================================================
+    # PRIMARY CATEGORY CLASSIFICATION
+    # =========================================================================
+
+    def extract_primary_category(
+        self, event_context: Dict[str, Any]
+    ) -> PrimaryCategoryExtraction:
+        """
+        Classify event into one of 10 primary categories.
+
+        Args:
+            event_context: Event dict with title, description, etc.
+
+        Returns:
+            PrimaryCategoryExtraction with category_id, reasoning, confidence
+        """
+        if not self.is_llm_available:
+            # Fallback to rule-based
+            category_id = self._infer_primary_category_rules(event_context)
+            return PrimaryCategoryExtraction(
+                category_id=category_id,
+                reasoning="Rule-based classification",
+                confidence=0.5,
+            )
+
+        client = self._get_client()
+        context = self._format_event_context(event_context)
+        categories_context = self._taxonomy.get_all_categories_summary()
+
+        try:
+            return client.chat.completions.create(
+                model=self.model_name,
+                response_model=PrimaryCategoryExtraction,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"Classify events into primary categories:\n{categories_context}",
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Classify this event into ONE primary category:\n{context}",
+                    },
+                ],
+                temperature=self.temperature,
+            )
+        except Exception as e:
+            logger.warning(f"Primary category extraction failed: {e}")
+            category_id = self._infer_primary_category_rules(event_context)
+            return PrimaryCategoryExtraction(
+                category_id=category_id,
+                reasoning=f"Fallback due to error: {e}",
+                confidence=0.3,
+            )
+
+    def _infer_primary_category_rules(self, event_context: Dict[str, Any]) -> str:
+        """Rule-based primary category inference."""
+        title = (event_context.get("title") or "").lower()
+        description = (event_context.get("description") or "").lower()
+        text = f"{title} {description}"
+
+        # Category mapping based on keywords
+        if any(
+            w in text for w in ["concert", "music", "dj", "live", "techno", "house"]
+        ):
+            return "1"  # PLAY & PURE FUN
+        elif any(w in text for w in ["workshop", "class", "learn", "masterclass"]):
+            return "2"  # LEARN & DISCOVER
+        elif any(w in text for w in ["meetup", "community", "network"]):
+            return "3"  # CONNECT & BELONG
+        elif any(w in text for w in ["art", "exhibition", "gallery", "museum"]):
+            return "4"  # CREATE & EXPRESS
+        elif any(w in text for w in ["fitness", "yoga", "sports", "run"]):
+            return "5"  # MOVE & THRIVE
+        elif any(w in text for w in ["food", "wine", "culinary", "tasting"]):
+            return "6"  # TASTE & SAVOR
+        elif any(w in text for w in ["nature", "outdoor", "hiking", "garden"]):
+            return "7"  # EXPLORE & WANDER
+        elif any(w in text for w in ["meditation", "wellness", "spa", "retreat"]):
+            return "8"  # REST & RECHARGE
+        elif any(w in text for w in ["charity", "volunteer", "cause"]):
+            return "9"  # GIVE & IMPACT
+        elif any(w in text for w in ["festival", "celebration", "carnival"]):
+            return "10"  # CELEBRATE & COMMEMORATE
+        else:
+            return "1"  # Default to PLAY & PURE FUN
+
+    # =========================================================================
+    # SUBCATEGORY CLASSIFICATION
+    # =========================================================================
+
+    def extract_subcategory(
+        self, event_context: Dict[str, Any], category_id: str
+    ) -> SubcategoryExtraction:
+        """
+        Classify into subcategory within a category using RAG context.
+
+        Args:
+            event_context: Event dict with title, description, etc.
+            category_id: Primary category ID (e.g., "1")
+
+        Returns:
+            SubcategoryExtraction with subcategory_id, name, confidence
+        """
+        if not self.is_llm_available:
+            # Fallback - use first subcategory of category
+            return SubcategoryExtraction(
+                subcategory_id=f"{category_id}.1",
+                subcategory_name="Default subcategory",
+                confidence=0.3,
+            )
+
+        client = self._get_client()
+        context = self._format_event_context(event_context)
+        subcategory_context = self._taxonomy.get_category_context_for_prompt(
+            category_id
+        )
+
+        try:
+            return client.chat.completions.create(
+                model=self.model_name,
+                response_model=SubcategoryExtraction,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"Select the best subcategory for the event:\n{subcategory_context}",
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Classify this event into the most appropriate subcategory:\n{context}",
+                    },
+                ],
+                temperature=self.temperature,
+            )
+        except Exception as e:
+            logger.warning(f"Subcategory extraction failed: {e}")
+            return SubcategoryExtraction(
+                subcategory_id=f"{category_id}.1",
+                subcategory_name="Fallback subcategory",
+                confidence=0.3,
+            )
+
+    # =========================================================================
+    # FILL MISSING FIELDS
+    # =========================================================================
+
+    def fill_missing_fields(
+        self, event_context: Dict[str, Any], fields: List[str]
+    ) -> Dict[str, Any]:
+        """
+        Extract multiple missing fields in one call.
+
+        This method is called by base_api.py when the config specifies
+        a `fill_missing` list of fields to extract.
+
+        Args:
+            event_context: Event dict with title, description, etc.
+            fields: List of field names to extract (e.g., ["event_type", "tags"])
+
+        Returns:
+            Dict with extracted field values (only requested fields)
+        """
+        if not fields:
+            return {}
+
+        if not self.is_llm_available:
+            return self._fill_missing_fields_rules(event_context, fields)
+
+        client = self._get_client()
+        prompt = self._build_missing_fields_prompt(event_context, fields)
+
+        try:
+            result = client.chat.completions.create(
+                model=self.model_name,
+                response_model=MissingFieldsExtraction,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=self.temperature,
+            )
+
+            # Return only the requested fields with non-None values
+            extracted = result.model_dump()
+            return {
+                k: v
+                for k, v in extracted.items()
+                if k in fields and v is not None and v != []
+            }
+
+        except Exception as e:
+            logger.warning(f"Fill missing fields failed: {e}, using rules")
+            return self._fill_missing_fields_rules(event_context, fields)
+
+    def _build_missing_fields_prompt(
+        self, event_context: Dict[str, Any], fields: List[str]
+    ) -> str:
+        """Build prompt for extracting missing fields."""
+        event_str = self._format_event_context(event_context)
+
+        field_descriptions = {
+            "event_type": "Event type (concert, festival, party, workshop, etc.)",
+            "tags": "5-10 relevant search tags",
+            "energy_level": "Energy level (low, medium, high)",
+            "social_intensity": "Social scale (solo, small_group, large_group)",
+            "cognitive_load": "Mental effort (low, medium, high)",
+            "physical_involvement": "Physical activity (none, light, moderate)",
+            "environment": "Environment (indoor, outdoor, digital, mixed)",
+            "emotional_output": "Expected emotional outcomes (list of emotions)",
+            "risk_level": "Risk level (none, very_low, low, medium)",
+            "age_accessibility": "Age appropriateness (all, teens+, adults)",
+            "repeatability": "Repeat frequency (high, medium, low)",
+        }
+
+        fields_to_extract = "\n".join(
+            f"- {f}: {field_descriptions.get(f, f)}" for f in fields
+        )
+
+        return f"""Analyze this event and extract the following fields:
+
+{fields_to_extract}
+
+Event:
+{event_str}
+
+Extract the requested fields based on the event information."""
+
+    def _fill_missing_fields_rules(
+        self, event_context: Dict[str, Any], fields: List[str]
+    ) -> Dict[str, Any]:
+        """Rule-based fallback for missing field extraction."""
+        result = {}
+        title = (event_context.get("title") or "").lower()
+        description = (event_context.get("description") or "").lower()
+        text = f"{title} {description}"
+
+        if "event_type" in fields:
+            result["event_type"] = self._infer_event_type_rules(event_context)
+
+        if "tags" in fields:
+            result["tags"] = self._infer_tags_rules(event_context)
+
+        if "energy_level" in fields:
+            if any(w in text for w in ["festival", "rave", "party", "techno"]):
+                result["energy_level"] = "high"
+            elif any(w in text for w in ["workshop", "exhibition", "gallery"]):
+                result["energy_level"] = "medium"
+            else:
+                result["energy_level"] = "medium"
+
+        if "social_intensity" in fields:
+            if any(w in text for w in ["festival", "party", "concert"]):
+                result["social_intensity"] = "large_group"
+            elif any(w in text for w in ["workshop", "meetup"]):
+                result["social_intensity"] = "small_group"
+            else:
+                result["social_intensity"] = "large_group"
+
+        if "environment" in fields:
+            if any(w in text for w in ["outdoor", "garden", "park", "beach"]):
+                result["environment"] = "outdoor"
+            elif any(w in text for w in ["online", "virtual", "stream"]):
+                result["environment"] = "digital"
+            else:
+                result["environment"] = "indoor"
+
+        if "age_accessibility" in fields:
+            if any(w in text for w in ["club", "bar", "nightlife", "18+"]):
+                result["age_accessibility"] = "adults"
+            elif any(w in text for w in ["family", "kids", "all ages"]):
+                result["age_accessibility"] = "all"
+            else:
+                result["age_accessibility"] = "adults"
+
+        return result
+
+    # =========================================================================
+    # HIERARCHY PROPAGATION
+    # =========================================================================
+
+    def propagate_hierarchy(self, subcategory_id: str) -> Dict[str, Any]:
+        """
+        Get full hierarchy from subcategory ID.
+
+        When a subcategory is set or changed, this method returns
+        the complete hierarchy data including primary_category.
+
+        Args:
+            subcategory_id: Subcategory ID (e.g., "1.4")
+
+        Returns:
+            Dict with primary_category, subcategory_name, values, etc.
+        """
+        sub = self._taxonomy.get_subcategory_by_id(subcategory_id)
+        if not sub:
+            return {}
+
+        category_id = subcategory_id.split(".")[0]
+        return {
+            "primary_category": self._get_category_value(category_id),
+            "subcategory": subcategory_id,
+            "subcategory_name": sub.get("name"),
+            "subcategory_values": sub.get("values", []),
+            "_category_id": category_id,
+        }
+
+    def _get_category_value(self, category_id: str) -> str:
+        """Map category ID to category enum value."""
+        category_map = {
+            "1": "play_and_pure_fun",
+            "2": "learn_and_discover",
+            "3": "connect_and_belong",
+            "4": "create_and_express",
+            "5": "move_and_thrive",
+            "6": "taste_and_savor",
+            "7": "explore_and_wander",
+            "8": "rest_and_recharge",
+            "9": "give_and_impact",
+            "10": "celebrate_and_commemorate",
+        }
+        return category_map.get(category_id, "play_and_pure_fun")
 
     # =========================================================================
     # MAIN ENRICHMENT METHOD
@@ -182,6 +542,10 @@ class FeatureExtractor:
 
         Injects filtered taxonomy context into the prompt.
         """
+        client = self._get_client()
+        if not client:
+            return self._enrich_with_rules(event_context)
+
         try:
             # Build context string
             event_str = self._format_event_context(event_context)
@@ -198,15 +562,19 @@ class FeatureExtractor:
             else:
                 taxonomy_context = self._taxonomy.get_attribute_options_string()
 
-            # Build the prompt
+            # Build the prompts
             system_prompt = self._build_enrichment_system_prompt(taxonomy_context)
             user_prompt = self._build_enrichment_user_prompt(event_str)
 
-            # Call LLM with structured output
-            result = self._llm_client.invoke_with_context(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                output_schema=FullTaxonomyEnrichmentOutput,
+            # Call LLM with structured output using Instructor
+            result = client.chat.completions.create(
+                model=self.model_name,
+                response_model=FullTaxonomyEnrichmentOutput,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=self.temperature,
             )
 
             return result.model_dump()
@@ -402,18 +770,27 @@ Also suggest relevant emotional outputs (e.g., "joy", "excitement", "connection"
             Event type string or None
         """
         if self.is_llm_available:
+            client = self._get_client()
             try:
                 event_str = self._format_event_context(event_context)
-                prompt = f"""Classify this event into one of these types:
+                result = client.chat.completions.create(
+                    model=self.model_name,
+                    response_model=EventTypeOutput,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"""Classify this event into one of these types:
 concert, festival, party, workshop, lecture, meetup, sports, exhibition,
 conference, nightlife, theater, dance, food_beverage, art_show, other
 
 Event:
 {event_str}
 
-Select the single most appropriate event type."""
-
-                result = self._llm_client.invoke_structured(prompt, EventTypeOutput)
+Select the single most appropriate event type.""",
+                        }
+                    ],
+                    temperature=self.temperature,
+                )
                 return result.event_type
             except Exception as e:
                 logger.warning(f"Event type extraction failed: {e}")
@@ -451,17 +828,26 @@ Select the single most appropriate event type."""
             List of music genres
         """
         if self.is_llm_available:
+            client = self._get_client()
             try:
                 event_str = self._format_event_context(event_context)
-                prompt = f"""Identify the music genres for this event.
+                result = client.chat.completions.create(
+                    model=self.model_name,
+                    response_model=MusicGenresOutput,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"""Identify the music genres for this event.
 If this is not a music event, return an empty list.
 
 Event:
 {event_str}
 
-Return a list of relevant music genres (e.g., electronic, techno, house, ambient, jazz, etc.)."""
-
-                result = self._llm_client.invoke_structured(prompt, MusicGenresOutput)
+Return a list of relevant music genres (e.g., electronic, techno, house, ambient, jazz, etc.).""",
+                        }
+                    ],
+                    temperature=self.temperature,
+                )
                 return result.genres
             except Exception as e:
                 logger.warning(f"Genre extraction failed: {e}")
@@ -503,17 +889,26 @@ Return a list of relevant music genres (e.g., electronic, techno, house, ambient
             List of tags
         """
         if self.is_llm_available:
+            client = self._get_client()
             try:
                 event_str = self._format_event_context(event_context)
-                prompt = f"""Generate relevant search tags for this event.
+                result = client.chat.completions.create(
+                    model=self.model_name,
+                    response_model=TagsOutput,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"""Generate relevant search tags for this event.
 Include genre tags, activity tags, and atmosphere tags.
 
 Event:
 {event_str}
 
-Return 5-10 relevant tags for search and filtering."""
-
-                result = self._llm_client.invoke_structured(prompt, TagsOutput)
+Return 5-10 relevant tags for search and filtering.""",
+                        }
+                    ],
+                    temperature=self.temperature,
+                )
                 return result.tags
             except Exception as e:
                 logger.warning(f"Tag extraction failed: {e}")
@@ -647,6 +1042,7 @@ def create_feature_extractor_from_config(
           enabled: true
           provider: "openai"
           model_name: "gpt-4o-mini"
+          fill_missing: ["event_type", "tags"]
     """
     return FeatureExtractor(
         provider=config.get("provider", "openai"),
