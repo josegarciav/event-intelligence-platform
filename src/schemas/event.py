@@ -8,11 +8,16 @@ capturing multi-dimensional aspects of human activities and experiences.
 The schema serves as the source of truth for all downstream analytics, ML, and application logic.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from enum import Enum
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict, field_serializer
 from decimal import Decimal
+
+
+def _utc_now() -> datetime:
+    """Return current UTC time as timezone-aware datetime."""
+    return datetime.now(timezone.utc)
 from src.schemas.taxonomy import (
     build_taxonomy_index,
     get_all_subcategory_options,
@@ -133,8 +138,7 @@ class PrimaryCategory(str, Enum):
 
 class Subcategory:
     """
-    Helper for subcategories defined in the Human Experience Taxonomy (JSON).
-
+    Subcategories from Human Experience Taxonomy.
     Reads dynamically from the taxonomy file. Use `Subcategory.all_options()` for
     the full list of {id, name, primary_category}; use `Subcategory.all_ids()` to
     validate that a subcategory id is one of the available options; use
@@ -379,19 +383,8 @@ class LocationInfo(BaseModel):
     Normalized location information.
     """
 
-    venue_name: Optional[str] = None
-    street_address: Optional[str] = None
-    city: str
-    state_or_region: Optional[str] = None
-    postal_code: Optional[str] = None
-    country_code: str = Field(
-        default="US", description="ISO 3166-1 alpha-2 country code"
-    )
-    coordinates: Optional[Coordinates] = None
-    timezone: Optional[str] = None  # e.g., 'America/New_York'
-
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "venue_name": "Electric Zoo Festival",
                 "street_address": "Pier 97",
@@ -403,6 +396,18 @@ class LocationInfo(BaseModel):
                 "timezone": "America/New_York",
             }
         }
+    )
+
+    venue_name: Optional[str] = None
+    street_address: Optional[str] = None
+    city: str
+    state_or_region: Optional[str] = None
+    postal_code: Optional[str] = None
+    country_code: str = Field(
+        default="US", description="ISO 3166-1 alpha-2 country code"
+    )
+    coordinates: Optional[Coordinates] = None
+    timezone: Optional[str] = None  # e.g., 'America/New_York'
 
 
 # ============================================================================
@@ -455,6 +460,15 @@ class PriceInfo(BaseModel):
             raise ValueError("maximum_price cannot be less than minimum_price")
         return self
 
+    @field_serializer(
+        "minimum_price", "maximum_price", "early_bird_price", "standard_price", "vip_price"
+    )
+    def serialize_decimal(self, v: Decimal) -> float:
+        """Serialize Decimal to float for JSON compatibility."""
+        if v is None:
+            return None
+        return float(v)
+
 
 class TicketInfo(BaseModel):
     """
@@ -501,7 +515,7 @@ class SourceInfo(BaseModel):
     )
     last_updated_from_source: datetime
     ingestion_timestamp: datetime = Field(
-        default_factory=datetime.utcnow, description="When we ingested this event"
+        default_factory=_utc_now, description="When we ingested this event"
     )
 
 
@@ -553,6 +567,31 @@ class EventSchema(BaseModel):
     It captures the multi-dimensional nature of human experiences through the
     Human Experience Taxonomy while accommodating source-specific metadata.
     """
+
+    model_config = ConfigDict(
+        use_enum_values=True,
+        json_schema_extra={
+            "example": {
+                "event_id": "550e8400-e29b-41d4-a716-446655440000",
+                "title": "Floating Points DJ Set",
+                "description": "Electronic music performance",
+                "start_datetime": "2026-03-15T23:00:00Z",
+                "end_datetime": "2026-03-16T06:00:00Z",
+                "location": {
+                    "venue_name": "Printworks",
+                    "city": "London",
+                    "country_code": "GB",
+                },
+                "event_type": "concert",
+                "price": {"currency": "GBP", "minimum_price": 35.0, "is_free": False},
+                "source": {
+                    "source_name": "ra_co",
+                    "source_event_id": "12345",
+                    "source_url": "https://ra.co/events/12345",
+                },
+            }
+        },
+    )
 
     # ---- CORE EVENT INFORMATION ----
     event_id: str = Field(
@@ -622,134 +661,8 @@ class EventSchema(BaseModel):
     )
 
     # ---- PLATFORM TIMESTAMPS ----
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-
-    class Config:
-        """
-        Docstring for example schema.
-        All these fields are illustrative of the schema structure.
-        The available options for each field must be defined according to the
-        Human Experience Taxonomy and the specific event data being normalized.
-        Each field will have either a fixed set of options (enums) or free text
-        depending on the nature of the data.
-        TODO: define classes for music genres, artist enrichment, etc., so that
-        all fields have a predefined data contract.
-        Each feature should have a thorough description so that the context feature
-        extraction from an LLM is clear on what to extract and how to format/reason
-        through it. Sometimes an event could have multiple event types for example,
-        in these cases each event type should have a thorough description to capture
-        its context properly.
-        """
-
-        json_encoders = {
-            datetime: lambda v: v.isoformat(),
-            Decimal: lambda v: float(v),
-        }
-        use_enum_values = True
-        json_schema_extra = {
-            "example": {
-                "event_id": "550e8400-e29b-41d4-a716-446655440000",  # platform-generated UUID (pulsecity), source ID is in source.source_event_id
-                "title": "Floating Points DJ Set",  # the event title
-                "description": "Electronic music performance",  # the description including artist name
-                "taxonomy_dimensions": [
-                    {
-                        "primary_category": "play_and_fun",  # to be retrieved from the taxonomy, this will also be defined in the source but is subjective, can be changed with another major category from the taxonomy
-                        "subcategory_id": "1.4",  # to be retrieved from the taxonomy, the most matching one
-                        "subcategory_name": "social_fun_and_playful_interaction",  # to be retrieved from the taxonomy, the most matching one to the event context itself
-                        "subcategory_values": [
-                            "expression",
-                            "energy",
-                            "flow",
-                        ],  # to be retrieved from the taxonomy subcategory values
-                        "activity_id": "6729b1d1-0621-431b-92a0-85c58a18da6f",  # to be retrieved from the taxonomy, the most matching one to the event context itself
-                        "activity_name": "Helping with daily tasks",  # to be retrieved from the taxonomy activity chosen
-                        "energy_level": "low | medium | high",  # to be retrieved from the taxonomy activity chosen
-                        "social_intensity": "solo | small_group | large_group",  # to be retrieved from the taxonomy activity chosen
-                        "cognitive_load": "low | medium | high",  # to be retrieved from the taxonomy activity chosen
-                        "physical_involvement": "none | light | moderate",  # to be retrieved from the taxonomy activity chosen
-                        "cost_level": "free | low | medium | high",  # to be retrieved from the taxonomy activity chosen, taking price into consideration. define simple thresholds for each category for now
-                        "time_scale": "short | long | recurring | multi_year",  # to be retrieved from the taxonomy activity chosen, taking duration into consideration
-                        "environment": "indoor | outdoor | digital | mixed",  # to be retrieved from the taxonomy activity chosen
-                        "emotional_output": [
-                            "purpose",
-                            "usefulness",
-                            "connection",
-                            "fulfillment",
-                        ],  # to be retrieved from the taxonomy activity chosen
-                        "risk_level": "none | very_low | low",  # to be retrieved from the taxonomy activity chosen
-                        "age_accessibility": "teens+ | adults",  # to be retrieved from the taxonomy activity chosen
-                        "repeatability": "medium | low",  # to be retrieved from the taxonomy, how often this event can be repeated
-                    },
-                    {
-                        "primary_category": "social_connection",  # to be retrieved from the taxonomy, this will also be defined in the source but is subjective, can be changed with another major category from the taxonomy
-                        # ...
-                    },
-                ],
-                "start_datetime": "2026-03-15T23:00:00Z",  # time the event starts
-                "end_datetime": "2026-03-16T06:00:00Z",  # time the event ends
-                "duration_minutes": 420,  # duration in minutes
-                "location": {
-                    "venue_name": "Printworks",  # venue name if available
-                    "city": "London",  # required
-                    "street_address": "1 Surrey Quays Rd",  # street address if available
-                    "country_code": "GB",  # ISO 3166-1 alpha-2 country code
-                    "coordinates": {
-                        "latitude": 51.5074,
-                        "longitude": -0.0759,
-                    },  # validated through the class above: Coordinates. we need to get this probably with reverse geocoding if not provided by the source.
-                    "timezone": "Europe/London",  # local timezone of the event
-                },
-                "event_type": "concert",  # EventType enum
-                "music_genres": [
-                    "electronic",
-                    "house",
-                    "techno",
-                ],  # or None if its not music, implement a class in the future for music genre identification, and to define the hierarchy/availability of genres
-                "artist_name": [
-                    "David Guetta",
-                    "Calvin Harris",
-                ],  # or None if its not music, implement a class in the future for artist enrichment with SoundCloud/Spotify/Discogs/etc.
-                "capacity": 4000,  # max capacity of the venue
-                "event_format": "in_person",  # EventFormat enum
-                "is_recurring": False,  # whether its a recurring event or one-time
-                "recurrence_pattern": None,  # e.g., 'weekly', 'monthly', 'one_time'
-                "price": {
-                    "currency": "GBP",  # ISO 4217 currency code
-                    "minimum_price": 35.0,  # minimum ticket price
-                    "maximum_price": 50.0,  # maximum ticket price
-                    "is_free": False,  # whether the event is free
-                    "price_raw_text": "Tickets from £35 to £50",  # original price text from source
-                },
-                "ticket_info": {
-                    "url": "https://ra.co/events/12345/tickets",  # direct link to ticket purchase
-                    "is_sold_out": False,  # whether tickets are sold out
-                    "ticket_count_available": 150,  # estimated number of tickets available
-                    "going_count": 85,  # number of people marked as going (if available)
-                    "age_restriction": "18+",  # 14+, 18+, 21+, all ages, None, etc.
-                },
-                "organizer_name": "Printworks Events",  # organizer info
-                "source": {
-                    "source_name": "ra_co",  # name of the source platform
-                    "source_event_id": "12345",  # original event ID from source
-                    "source_url": "https://ra.co/events/12345",  # direct URL to event on source platform
-                    "raw_html": "<html>...</html>",  # raw HTML or JSON data from source for debugging
-                },
-                "image_url": "https://ra.co/images/events/12345/main.jpg",  # main event image
-                "media_assets": None,  # could include videos, flyers, etc. None for now
-                "data_quality_score": 0.9,  # 0.0 to 1.0, Quality assessment of normalized data (0.0-1.0)
-                "normalization_errors": [],  # Warnings/errors encountered during normalization, None otherwise
-                "tags": [
-                    "electronic",
-                    "dj_set",
-                    "nightlife",
-                    "artist_name",
-                ],  # free-text tags for search/filtering, LLM-generated could be improved in the future
-                "custom_fields": {},  # Source-specific fields that don't fit standard schema, links to youtube pages, spotify profiles, venue website, etc., could be anything, to be defined as we get more context from sources, None for now
-                "created_at": "2026-01-27T12:00:00Z",  # when we created this record
-                "updated_at": "2026-01-27T12:00:00Z",  # when we last updated this record
-            }
-        }
+    created_at: datetime = Field(default_factory=_utc_now)
+    updated_at: datetime = Field(default_factory=_utc_now)
 
 
 # ============================================================================
@@ -765,7 +678,7 @@ class EventBatch(BaseModel):
     source_name: str
     batch_id: str = Field(description="Unique identifier for this batch")
     events: List[EventSchema]
-    ingestion_timestamp: datetime = Field(default_factory=datetime.utcnow)
+    ingestion_timestamp: datetime = Field(default_factory=_utc_now)
     total_count: int
     successful_count: int = 0
     failed_count: int = 0
