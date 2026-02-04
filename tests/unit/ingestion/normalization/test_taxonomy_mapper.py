@@ -11,7 +11,7 @@ from src.ingestion.normalization.taxonomy_mapper import (
     create_taxonomy_mapper_from_config,
 )
 from src.ingestion.normalization.event_schema import PrimaryCategory
-from src.ingestion.normalization.taxonomy import get_all_subcategory_ids
+from src.schemas.taxonomy import get_all_subcategory_ids
 
 
 @pytest.fixture

@@ -20,8 +20,7 @@ class Config:
     TAXONOMY_DATA_PATH = (
         PROJECT_ROOT
         / "src"
-        / "ingestion"
-        / "normalization"
+        / "assets"
         / "human_experience_taxonomy_master.json"
     )
 

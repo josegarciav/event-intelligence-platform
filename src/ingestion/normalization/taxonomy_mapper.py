@@ -13,7 +13,7 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 import logging
 
-from src.ingestion.normalization.taxonomy import (
+from src.schemas.taxonomy import (
     get_full_taxonomy_dimension,
     get_subcategory_by_id,
     find_best_activity_match,

@@ -13,7 +13,7 @@ from typing import Optional, List, Dict, Any
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, model_validator
 from decimal import Decimal
-from src.ingestion.normalization.taxonomy import (
+from src.schemas.taxonomy import (
     build_taxonomy_index,
     get_all_subcategory_options,
     get_all_subcategory_ids,
