@@ -21,7 +21,7 @@ from enum import Enum
 import logging
 import uuid
 
-from src.ingestion.normalization.event_schema import EventSchema
+from src.schemas.event import EventSchema
 from src.ingestion.adapters import BaseSourceAdapter, SourceType
 
 

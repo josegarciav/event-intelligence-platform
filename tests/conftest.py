@@ -10,7 +10,7 @@ from typing import List, Optional
 
 import pytest
 
-from src.ingestion.normalization.event_schema import (
+from src.schemas.event import (
     EventSchema,
     EventFormat,
     LocationInfo,

@@ -13,7 +13,7 @@ from src.ingestion.normalization.feature_extractor import (
     FeatureExtractor,
     create_feature_extractor_from_config,
 )
-from src.ingestion.normalization.event_schema import (
+from src.schemas.event import (
     PrimaryCategory,
     TaxonomyDimension,
 )

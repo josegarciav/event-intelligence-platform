@@ -18,7 +18,7 @@ from src.ingestion.pipelines.apis.base_api import (
 )
 from src.ingestion.base_pipeline import PipelineConfig
 from src.ingestion.adapters import SourceType
-from src.ingestion.normalization.event_schema import (
+from src.schemas.event import (
     EventSchema,
     EventType,
     LocationInfo,

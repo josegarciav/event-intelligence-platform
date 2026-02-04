@@ -7,7 +7,7 @@ Tests for LangChain-based feature extraction model schemas.
 import pytest
 from pydantic import ValidationError
 
-from src.ingestion.normalization.feature_models import (
+from src.schemas.features import (
     ActivityMatchOutput,
     EmotionalOutputExtraction,
     EventEnrichmentOutput,

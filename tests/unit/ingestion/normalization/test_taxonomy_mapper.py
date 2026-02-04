@@ -10,7 +10,7 @@ from src.ingestion.normalization.taxonomy_mapper import (
     TaxonomyMapper,
     create_taxonomy_mapper_from_config,
 )
-from src.ingestion.normalization.event_schema import PrimaryCategory
+from src.schemas.event import PrimaryCategory
 from src.schemas.taxonomy import get_all_subcategory_ids
 
 

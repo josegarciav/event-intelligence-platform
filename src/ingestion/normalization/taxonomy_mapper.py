@@ -18,7 +18,7 @@ from src.schemas.taxonomy import (
     get_subcategory_by_id,
     find_best_activity_match,
 )
-from src.ingestion.normalization.event_schema import (
+from src.schemas.event import (
     TaxonomyDimension,
     PrimaryCategory,
     Subcategory,

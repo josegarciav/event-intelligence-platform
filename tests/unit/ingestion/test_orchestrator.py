@@ -22,7 +22,7 @@ from src.ingestion.base_pipeline import (
     PipelineStatus,
 )
 from src.ingestion.adapters import SourceType
-from src.ingestion.normalization.event_schema import EventSchema, LocationInfo
+from src.schemas.event import EventSchema, LocationInfo
 from src.ingestion.deduplication import ExactMatchDeduplicator
 
 

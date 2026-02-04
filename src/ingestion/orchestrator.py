@@ -20,7 +20,7 @@ from src.ingestion.base_pipeline import (
     PipelineExecutionResult,
     PipelineStatus,
 )
-from src.ingestion.normalization.event_schema import EventSchema
+from src.schemas.event import EventSchema
 
 logger = logging.getLogger(__name__)
 

@@ -17,7 +17,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from src.ingestion.normalization.event_schema import (
+from src.schemas.event import (
     Coordinates,
     EngagementMetrics,
     EventBatch,

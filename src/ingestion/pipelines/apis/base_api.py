@@ -20,7 +20,7 @@ import uuid
 from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
 from src.ingestion.adapters import SourceType, FetchResult
 from src.ingestion.adapters.api_adapter import APIAdapter, APIAdapterConfig
-from src.ingestion.normalization.event_schema import (
+from src.schemas.event import (
     EventSchema,
     EventType,
     EventFormat,

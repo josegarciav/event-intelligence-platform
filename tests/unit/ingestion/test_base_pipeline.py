@@ -17,7 +17,7 @@ from src.ingestion.base_pipeline import (
     PipelineStatus,
 )
 from src.ingestion.adapters import BaseSourceAdapter, SourceType, FetchResult
-from src.ingestion.normalization.event_schema import (
+from src.schemas.event import (
     EventSchema,
     LocationInfo,
     PrimaryCategory,
@@ -300,7 +300,7 @@ class TestCalculateQualityScore:
         self, sample_pipeline_config, mock_adapter, create_event
     ):
         """Should add bonus for enrichment fields."""
-        from src.ingestion.normalization.event_schema import Coordinates
+        from src.schemas.event import Coordinates
 
         pipeline = ConcretePipeline(sample_pipeline_config, mock_adapter)
         event = create_event(
@@ -640,7 +640,7 @@ class TestToDataFrame:
         self, sample_pipeline_config, mock_adapter, create_event
     ):
         """Should flatten location fields."""
-        from src.ingestion.normalization.event_schema import Coordinates
+        from src.schemas.event import Coordinates
 
         event = create_event(
             title="Test Event",
@@ -664,7 +664,7 @@ class TestToDataFrame:
         self, sample_pipeline_config, mock_adapter, create_event
     ):
         """Should flatten price fields."""
-        from src.ingestion.normalization.event_schema import PriceInfo
+        from src.schemas.event import PriceInfo
         from decimal import Decimal
 
         event = create_event(

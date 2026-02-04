@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from src.ingestion.normalization.taxonomy_retriever import (
     get_taxonomy_retriever,
 )
-from src.ingestion.normalization.feature_models import (
+from src.schemas.features import (
     FullTaxonomyEnrichmentOutput,
     EventTypeOutput,
     MusicGenresOutput,
@@ -33,7 +33,7 @@ from src.ingestion.normalization.extraction_models import (
 )
 
 if TYPE_CHECKING:
-    from src.ingestion.normalization.event_schema import TaxonomyDimension
+    from src.schemas.event import TaxonomyDimension
 
 logger = logging.getLogger(__name__)
 
@@ -479,7 +479,7 @@ Extract the requested fields based on the event information."""
         Returns:
             New TaxonomyDimension with all fields populated
         """
-        from src.ingestion.normalization.event_schema import TaxonomyDimension
+        from src.schemas.event import TaxonomyDimension
 
         # Build enriched data starting with existing values
         enriched_data = {
