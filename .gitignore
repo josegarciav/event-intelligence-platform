@@ -1,4 +1,7 @@
-.env
+services/api/.env
+infra/postgres/.env
+!.env.example
+
 .DS_Store
 Thumbs.db
 desktop.ini
@@ -14,3 +17,4 @@ __pycache__/
 .pytest_cache/
 data/
 .mypy_cache/
+.vscode/

@@ -1,0 +1,29 @@
+{
+  "name": "event-intelligence-platform",
+  "private": true,
+  "version": "1.0.0",
+
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+
+  "scripts": {
+
+    "dev": "turbo run dev",
+
+    "build": "turbo run build",
+
+    "lint": "turbo run lint",
+
+    "test": "turbo run test",
+
+    "dev:web": "turbo run dev --filter=web",
+
+    "dev:mobile": "turbo run dev --filter=mobile"
+  },
+
+  "devDependencies": {
+    "turbo": "^2.0.0"
+  }
+}
