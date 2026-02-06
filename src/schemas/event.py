@@ -1,3 +1,4 @@
+# src/schemas/event.py
 """
 Canonical Event Schema for the Event Intelligence Platform.
 
@@ -276,7 +277,6 @@ class TaxonomyDimension(BaseModel):
         description="Human-readable subcategory name (e.g. 'Music & Rhythm Play')",
     )
     values: List[str] = Field(default_factory=list)
-    confidence: float = Field(0.5, ge=0.0, le=1.0)
 
     # Activity identification
     activity_id: Optional[str] = Field(
@@ -550,7 +550,9 @@ class MediaAsset(BaseModel):
     type: str = Field(description="Type of media (image, video, flyer, etc.)")
     url: str
     title: Optional[str] = None
-    description: Optional[str] = None  # could be implemented with a model in the future
+    description: Optional[str] = (
+        None  # could be implemented with a model in the future, analyzing image/video content to extract features.
+    )
     width: Optional[int] = None
     height: Optional[int] = None
 
@@ -635,7 +637,7 @@ class EventSchema(BaseModel):
 
     # ---- EVENT DETAILS ----
     event_type: EventType = EventType.OTHER
-    format: EventFormat
+    format: EventFormat = EventFormat.IN_PERSON
     capacity: Optional[int] = None
     age_restriction: Optional[str] = None
 

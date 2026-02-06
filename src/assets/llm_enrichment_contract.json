@@ -1,0 +1,72 @@
+{
+  "contract_name": "experience_enrichment_contract",
+  "version": "1.1",
+  "description": "Defines the expected structured output for enriching events or entities using the Human Experience Taxonomy.",
+
+  "inputs": {
+    "entity_type": "event | place | activity",
+    "entity_name": "string",
+    "entity_description": "string",
+    "artist_lineup": "string[] (optional)",
+    "location": "string (optional)"
+  },
+
+  "context_documents": [
+    "human_experience_taxonomy_master_filtered.json",
+    "experience_enrichment_contract.json"
+  ],
+
+  "outputs": {
+
+    "category_classification": {
+      "type": "object",
+      "properties": {
+        "category_id": "string",
+        "category_name": "string",
+        "subcategory_id": "string",
+        "subcategory_name": "string",
+        "activity_ids": "string[]"
+      },
+      "constraints": {
+        "must_exist_in_taxonomy": true,
+        "max_activities": 5
+      }
+    },
+
+    "activity_attribute_inference": {
+      "type": "object",
+      "description": "Infer experiential attributes when not explicitly provided.",
+      "properties": {
+        "energy_level": "low | medium | high",
+        "social_intensity": "solo | small_group | large_group",
+        "cognitive_load": "low | medium | high",
+        "physical_involvement": "none | light | moderate",
+        "cost_level": "free | low | medium | high",
+        "time_scale": "micro | short | long",
+        "environment": "indoor | outdoor | digital | mixed",
+        "risk_level": "none | very_low | low",
+        "age_accessibility": "all | teens+ | adults",
+        "repeatability": "high | medium | low"
+      }
+    },
+
+    "emotional_outputs": {
+      "type": "string[]",
+      "description": "Select emotions defined in the taxonomy. Allow yourself to be creative and consider the full range of human emotional experiences that could be associated with this event or entity. The option does not have to be strictly from the taxonomy, but must be a valid emotion."
+    },
+
+    "experience_summary": {
+      "type": "string",
+      "max_length": 250
+    }
+  },
+
+  "validation_rules": {
+    "enforce_taxonomy_alignment": true,
+    "reject_unknown_ids": true,
+    "require_minimum_fields": [
+      "category_classification",
+      "experience_summary"
+    ]
+  }
+}
