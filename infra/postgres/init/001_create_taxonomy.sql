@@ -153,11 +153,12 @@ CREATE TABLE IF NOT EXISTS price_snapshots (
     currency CHAR(3) REFERENCES currency_codes(currency_code),
     is_free BOOLEAN,
 
-    minimum_price FLOAT,
-    maximum_price FLOAT,
-    early_bird_price FLOAT,
-    standard_price FLOAT,
-    vip_price FLOAT,
+    -- Using NUMERIC for exact decimal precision
+    minimum_price NUMERIC(12, 2),
+    maximum_price NUMERIC(12, 2),
+    early_bird_price NUMERIC(12, 2),
+    standard_price NUMERIC(12, 2),
+    vip_price NUMERIC(12, 2),
 
     price_raw_text TEXT,
 
