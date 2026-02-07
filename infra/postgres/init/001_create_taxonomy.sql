@@ -3,7 +3,7 @@ CREATE TABLE experience_categories (
     name TEXT NOT NULL,
     description TEXT,
     taxonomy_version TEXT,
-    created_at TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE experience_subcategories (
