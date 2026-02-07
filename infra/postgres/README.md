@@ -39,20 +39,13 @@ docker compose up -d
 ### List DBs
 
 ```bash
-docker exec -it experience_postgres psql -U experience_user -l
+docker exec -it experience_postgres psql -U experience -l
 ```
 
 ### List tables
 
 ```bash
-docker exec -it experience_postgres psql -U experience_user -d event_intelligence -c "\dt"
-```
-
-Expect:
-```text
-experience_categories
-experience_subcategories
-experience_activities
+docker exec -it experience_postgres psql -U experience -d event_intelligence -c "\dt"
 ```
 
 
@@ -64,8 +57,15 @@ When there is a new version of the taxonomy:
 # Start DB
 docker compose up -d
 # Export env (if running locally)
-export $(cat services/api/.env | xargs)
+export $(grep -v '^#' services/api/.env | xargs)
 # Run ETL
 uv run python -m services.api.src.ingestion.taxonomy_loader
 # Expect: ✅ Taxonomy successfully loaded.
+```
+
+
+Using the Terminal (pSQL):
+
+```bash
+psql -h localhost -p 5433 -U experience -d event_intelligence
 ```

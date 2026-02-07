@@ -1,17 +1,22 @@
 """
 taxonomy_loader.py
 
-ETL pipeline to load the Human Experience Taxonomy JSON
-into Postgres relational tables.
+Loads Human Experience Taxonomy into relational ontology tables.
 
-Usage:
-    python -m ingestion.taxonomy_loader
+Tables populated:
+
+• primary_categories
+• subcategories
+• activities_metadata
+• subcategory_values
+• activity_emotional_outputs
 """
 
 from __future__ import annotations
 
 import json
 import os
+import uuid
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -20,7 +25,7 @@ from dotenv import load_dotenv
 
 
 # ---------------------------------------------------------------------------
-# ENV LOADING
+# ENV
 # ---------------------------------------------------------------------------
 
 load_dotenv()
@@ -30,15 +35,15 @@ load_dotenv()
 # PATHS
 # ---------------------------------------------------------------------------
 
-BASE_DIR: Path = Path(__file__).resolve().parents[2]
+BASE_DIR = Path(__file__).resolve().parents[2]
 
-TAXONOMY_PATH: Path = (
+TAXONOMY_PATH = (
     BASE_DIR / "src/assets/human_experience_taxonomy_master.json"
 )
 
 
 # ---------------------------------------------------------------------------
-# DATABASE CONNECTION
+# DB CONNECTION
 # ---------------------------------------------------------------------------
 
 def parse_database_url(database_url: str) -> dict:
@@ -68,44 +73,29 @@ def parse_database_url(database_url: str) -> dict:
 
 def get_connection() -> psycopg2.extensions.connection:
     """
-    Create PostgreSQL connection using DATABASE_URL.
-
-    Returns
-    -------
-    psycopg2.extensions.connection
-        Active database connection.
+    Establish a new database connection using DATABASE_URL.
     """
+
     database_url = os.getenv("DATABASE_URL")
 
     if not database_url:
-        raise ValueError(
-            "DATABASE_URL not found in environment variables."
-        )
+        raise ValueError("DATABASE_URL not set")
 
-    conn_params = parse_database_url(database_url)
-
-    return psycopg2.connect(**conn_params)
+    return psycopg2.connect(
+        **parse_database_url(database_url)
+    )
 
 
 # ---------------------------------------------------------------------------
-# TAXONOMY LOADING
+# LOAD JSON
 # ---------------------------------------------------------------------------
 
 def load_taxonomy() -> dict:
-    """
-    Load taxonomy JSON file.
-
-    Returns
-    -------
-    dict
-        Parsed taxonomy structure.
-    """
+    """Load taxonomy JSON file."""
     if not TAXONOMY_PATH.exists():
-        raise FileNotFoundError(
-            f"Taxonomy file not found at: {TAXONOMY_PATH}"
-        )
+        raise FileNotFoundError(TAXONOMY_PATH)
 
-    with open(TAXONOMY_PATH, "r", encoding="utf-8") as f:
+    with open(TAXONOMY_PATH, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -113,25 +103,14 @@ def load_taxonomy() -> dict:
 # INSERT FUNCTIONS
 # ---------------------------------------------------------------------------
 
-def insert_category(cur, category: dict, meta: dict) -> None:
-    """
-    Insert top-level experience category.
-
-    Parameters
-    ----------
-    cur : psycopg2.cursor
-        Active database cursor.
-    category : dict
-        Category payload.
-    meta : dict
-        Taxonomy metadata.
-    """
+def insert_primary_category(cur: psycopg2.extensions.cursor, category: dict, meta: dict) -> None:
+    """Insert top-level experience category."""
     cur.execute(
         """
-        INSERT INTO experience_categories
-        (category_id, name, description, taxonomy_version, created_at)
+        INSERT INTO primary_categories
+        (primary_category_id, name, description, taxonomy_version, created_at)
         VALUES (%s, %s, %s, %s, %s)
-        ON CONFLICT (category_id) DO NOTHING;
+        ON CONFLICT (primary_category_id) DO NOTHING;
         """,
         (
             category["category_id"],
@@ -143,27 +122,12 @@ def insert_category(cur, category: dict, meta: dict) -> None:
     )
 
 
-def insert_subcategory(
-    cur,
-    sub: dict,
-    category_id: str,
-) -> None:
-    """
-    Insert experience subcategory.
-
-    Parameters
-    ----------
-    cur : psycopg2.cursor
-        Active database cursor.
-    sub : dict
-        Subcategory payload.
-    category_id : str
-        Parent category identifier.
-    """
+def insert_subcategory(cur: psycopg2.extensions.cursor, sub: dict, category_id: str) -> None:
+    """Insert subcategory metadata."""
     cur.execute(
         """
-        INSERT INTO experience_subcategories
-        (subcategory_id, category_id, name)
+        INSERT INTO subcategories
+        (subcategory_id, primary_category_id, name)
         VALUES (%s, %s, %s)
         ON CONFLICT (subcategory_id) DO NOTHING;
         """,
@@ -175,27 +139,18 @@ def insert_subcategory(
     )
 
 
-def insert_activity(
-    cur,
+def insert_activity_metadata(
+    cur: psycopg2.extensions.cursor,
     activity: dict,
+    category_id: str,
     subcategory_id: str,
 ) -> None:
-    """
-    Insert experience activity and attributes.
-
-    Parameters
-    ----------
-    cur : psycopg2.cursor
-        Active database cursor.
-    activity : dict
-        Activity payload.
-    subcategory_id : str
-        Parent subcategory identifier.
-    """
+    """Insert activity metadata."""
     cur.execute(
         """
-        INSERT INTO experience_activities (
+        INSERT INTO activities_metadata (
             activity_id,
+            primary_category_id,
             subcategory_id,
             name,
             energy_level,
@@ -210,11 +165,12 @@ def insert_activity(
             repeatability,
             notes
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (activity_id) DO NOTHING;
         """,
         (
             activity["activity_id"],
+            category_id,
             subcategory_id,
             activity["name"],
             activity.get("energy_level"),
@@ -232,23 +188,52 @@ def insert_activity(
     )
 
 
+def insert_subcategory_value(cur: psycopg2.extensions.cursor, subcategory_id: str, value: str) -> None:
+    """Insert subcategory psychological value."""
+    cur.execute(
+        """
+        INSERT INTO subcategory_values (
+            value_id,
+            subcategory_id,
+            value_name
+        )
+        VALUES (%s, %s, %s)
+        ON CONFLICT DO NOTHING;
+        """,
+        (
+            str(uuid.uuid4()),
+            subcategory_id,
+            value,
+        ),
+    )
+
+
+def insert_activity_emotion(cur: psycopg2.extensions.cursor, activity_id: str, emotion: str) -> None:
+    """Insert emotional output associated with an activity."""
+    cur.execute(
+        """
+        INSERT INTO activity_emotional_outputs (
+            emotional_output_id,
+            activity_id,
+            emotion_name
+        )
+        VALUES (%s, %s, %s)
+        ON CONFLICT DO NOTHING;
+        """,
+        (
+            str(uuid.uuid4()),
+            activity_id,
+            emotion,
+        ),
+    )
+
+
 # ---------------------------------------------------------------------------
-# ETL PIPELINE
+# ETL
 # ---------------------------------------------------------------------------
 
-def run_etl() -> None:
-    """
-    Execute taxonomy ingestion pipeline.
+def run_etl():
 
-    Steps
-    -----
-    1. Load taxonomy JSON
-    2. Connect to Postgres
-    3. Insert categories
-    4. Insert subcategories
-    5. Insert activities
-    6. Commit transaction
-    """
     print("Loading taxonomy...")
     data = load_taxonomy()
 
@@ -258,7 +243,7 @@ def run_etl() -> None:
 
     for category in data["categories"]:
 
-        insert_category(cur, category, data)
+        insert_primary_category(cur, category, data)
 
         for sub in category["subcategories"]:
 
@@ -268,23 +253,53 @@ def run_etl() -> None:
                 category["category_id"],
             )
 
+            # ---------------------------
+            # Subcategory values
+            # ---------------------------
+
+            for value in sub.get("values", []):
+
+                insert_subcategory_value(
+                    cur,
+                    sub["id"],
+                    value,
+                )
+
+            # ---------------------------
+            # Activities
+            # ---------------------------
+
             for activity in sub["activities"]:
 
-                insert_activity(
+                insert_activity_metadata(
                     cur,
                     activity,
+                    category["category_id"],
                     sub["id"],
                 )
+
+                # Emotional outputs
+
+                for emotion in activity.get(
+                    "emotional_output", []
+                ):
+
+                    insert_activity_emotion(
+                        cur,
+                        activity["activity_id"],
+                        emotion,
+                    )
 
     conn.commit()
     cur.close()
     conn.close()
 
-    print("✅ Taxonomy successfully loaded.")
+    print("✅ Full taxonomy ontology loaded.")
 
 
 # ---------------------------------------------------------------------------
 # ENTRYPOINT
 # ---------------------------------------------------------------------------
+
 if __name__ == "__main__":
     run_etl()

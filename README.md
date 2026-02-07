@@ -164,6 +164,11 @@ This project is pinned to **Python 3.11**. Run the following to set up your loca
 # Force uv to use Python 3.11 and create the .venv
 uv venv --python 3.11
 
+# change wd
+cd services/api
+uv venv
+uv sync
+
 # Activate it
 source .venv/bin/activate
 
