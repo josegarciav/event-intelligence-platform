@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS sources (
     source_name TEXT NOT NULL,
     source_event_id TEXT NOT NULL,
     source_url TEXT,
-
+    raw_html TEXT,
     last_updated_from_source TIMESTAMP,
     ingestion_timestamp TIMESTAMP DEFAULT NOW(),
 
@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS events (
 
     data_quality_score FLOAT,
 
-    raw_html TEXT,
+    
 
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
@@ -236,8 +236,8 @@ CREATE TABLE IF NOT EXISTS event_taxonomy_mappings (
     mapping_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 
     event_id UUID NOT NULL,
-        -- REFERENCES events(event_id)
-        -- ON DELETE CASCADE,
+        REFERENCES events(event_id)
+        ON DELETE CASCADE,
 
     subcategory_id TEXT
         REFERENCES subcategories(subcategory_id)
