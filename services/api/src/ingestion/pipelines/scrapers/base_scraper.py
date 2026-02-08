@@ -18,15 +18,15 @@ import time
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 from urllib.parse import urljoin, urlparse
 
 if TYPE_CHECKING:
     from playwright.sync_api import Browser, Playwright
 
-from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
 from src.ingestion.adapters import ScraperAdapter, SourceType
 from src.ingestion.adapters.scraper_adapter import ScraperAdapterConfig
+from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
 
 logger = logging.getLogger(__name__)
 

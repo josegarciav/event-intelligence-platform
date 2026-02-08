@@ -10,37 +10,32 @@ The pipeline uses:
 - FeatureExtractor for LLM-based field filling
 """
 
+import logging
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
-import logging
-import uuid
 
-
-from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
-from src.ingestion.adapters import SourceType, FetchResult
+from src.ingestion.adapters import FetchResult, SourceType
 from src.ingestion.adapters.api_adapter import APIAdapter, APIAdapterConfig
-from src.schemas.event import (
-    EventSchema,
-    EventType,
-    EventFormat,
-    LocationInfo,
-    PriceInfo,
-    OrganizerInfo,
-    SourceInfo,
-    TaxonomyDimension,
-    PrimaryCategory,
-)
+from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
 from src.ingestion.normalization.currency import CurrencyParser
-from src.ingestion.normalization.field_mapper import (
-    FieldMapper,
-)
-from src.ingestion.normalization.taxonomy_mapper import (
-    TaxonomyMapper,
-)
 from src.ingestion.normalization.feature_extractor import (
     FeatureExtractor,
     create_feature_extractor_from_config,
+)
+from src.ingestion.normalization.field_mapper import FieldMapper
+from src.ingestion.normalization.taxonomy_mapper import TaxonomyMapper
+from src.schemas.event import (
+    EventFormat,
+    EventSchema,
+    EventType,
+    LocationInfo,
+    OrganizerInfo,
+    PriceInfo,
+    PrimaryCategory,
+    SourceInfo,
+    TaxonomyDimension,
 )
 
 logger = logging.getLogger(__name__)

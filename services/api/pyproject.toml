@@ -38,6 +38,7 @@ dev = [
     "ruff>=0.2",
     "black>=24.1",
     "pydocstyle>=6.3",
+    "isort>=5.13.2",
 
     # Typing
     "mypy>=1.8",

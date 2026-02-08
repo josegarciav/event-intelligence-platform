@@ -23,7 +23,6 @@ from urllib.parse import urlparse
 import psycopg2
 from dotenv import load_dotenv
 
-
 # ---------------------------------------------------------------------------
 # ENV
 # ---------------------------------------------------------------------------
@@ -37,14 +36,13 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 
-TAXONOMY_PATH = (
-    BASE_DIR / "src/assets/human_experience_taxonomy_master.json"
-)
+TAXONOMY_PATH = BASE_DIR / "src/assets/human_experience_taxonomy_master.json"
 
 
 # ---------------------------------------------------------------------------
 # DB CONNECTION
 # ---------------------------------------------------------------------------
+
 
 def parse_database_url(database_url: str) -> dict:
     """
@@ -81,14 +79,13 @@ def get_connection() -> psycopg2.extensions.connection:
     if not database_url:
         raise ValueError("DATABASE_URL not set")
 
-    return psycopg2.connect(
-        **parse_database_url(database_url)
-    )
+    return psycopg2.connect(**parse_database_url(database_url))
 
 
 # ---------------------------------------------------------------------------
 # LOAD JSON
 # ---------------------------------------------------------------------------
+
 
 def load_taxonomy() -> dict:
     """Load taxonomy JSON file."""
@@ -103,7 +100,10 @@ def load_taxonomy() -> dict:
 # INSERT FUNCTIONS
 # ---------------------------------------------------------------------------
 
-def insert_primary_category(cur: psycopg2.extensions.cursor, category: dict, meta: dict) -> None:
+
+def insert_primary_category(
+    cur: psycopg2.extensions.cursor, category: dict, meta: dict
+) -> None:
     """Insert top-level experience category."""
     cur.execute(
         """
@@ -122,7 +122,9 @@ def insert_primary_category(cur: psycopg2.extensions.cursor, category: dict, met
     )
 
 
-def insert_subcategory(cur: psycopg2.extensions.cursor, sub: dict, category_id: str) -> None:
+def insert_subcategory(
+    cur: psycopg2.extensions.cursor, sub: dict, category_id: str
+) -> None:
     """Insert subcategory metadata."""
     cur.execute(
         """
@@ -188,7 +190,9 @@ def insert_activity_metadata(
     )
 
 
-def insert_subcategory_value(cur: psycopg2.extensions.cursor, subcategory_id: str, value: str) -> None:
+def insert_subcategory_value(
+    cur: psycopg2.extensions.cursor, subcategory_id: str, value: str
+) -> None:
     """Insert subcategory psychological value."""
     cur.execute(
         """
@@ -208,7 +212,9 @@ def insert_subcategory_value(cur: psycopg2.extensions.cursor, subcategory_id: st
     )
 
 
-def insert_activity_emotion(cur: psycopg2.extensions.cursor, activity_id: str, emotion: str) -> None:
+def insert_activity_emotion(
+    cur: psycopg2.extensions.cursor, activity_id: str, emotion: str
+) -> None:
     """Insert emotional output associated with an activity."""
     cur.execute(
         """
@@ -231,6 +237,7 @@ def insert_activity_emotion(cur: psycopg2.extensions.cursor, activity_id: str, e
 # ---------------------------------------------------------------------------
 # ETL
 # ---------------------------------------------------------------------------
+
 
 def run_etl():
 
@@ -280,9 +287,7 @@ def run_etl():
 
                 # Emotional outputs
 
-                for emotion in activity.get(
-                    "emotional_output", []
-                ):
+                for emotion in activity.get("emotional_output", []):
 
                     insert_activity_emotion(
                         cur,

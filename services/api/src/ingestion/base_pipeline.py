@@ -13,16 +13,16 @@ Any new data source must:
 2. Inherit from BasePipeline and implement abstract methods
 """
 
-from abc import ABC, abstractmethod
-from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional, Tuple
-from dataclasses import dataclass, field
-from enum import Enum
 import logging
 import uuid
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
-from src.schemas.event import EventSchema
 from src.ingestion.adapters import BaseSourceAdapter, SourceType
+from src.schemas.event import EventSchema
 
 
 class PipelineStatus(str, Enum):
@@ -251,8 +251,8 @@ class BasePipeline(ABC):
             # Step 7: Deduplication
             if self.config.deduplicate and normalized_events:
                 from src.ingestion.deduplication import (
-                    get_deduplicator,
                     DeduplicationStrategy,
+                    get_deduplicator,
                 )
 
                 deduplicator = get_deduplicator(
@@ -404,8 +404,9 @@ class BasePipeline(ABC):
 
         Includes ALL fields from EventSchema with proper flattening of nested objects.
         """
-        import pandas as pd
         import json
+
+        import pandas as pd
 
         rows = []
         for event in events:

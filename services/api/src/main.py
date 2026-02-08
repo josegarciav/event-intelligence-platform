@@ -21,13 +21,12 @@ from __future__ import annotations
 
 import os
 from typing import Generator
+from urllib.parse import urlparse
 
 import psycopg2
 from fastapi import Depends, FastAPI, HTTPException
 from psycopg2.extensions import connection as _connection
 from pydantic import BaseModel
-from urllib.parse import urlparse
-
 
 # ---------------------------------------------------------------------------
 # APP INITIALIZATION
@@ -43,6 +42,7 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 # DATABASE CONFIGURATION
 # ---------------------------------------------------------------------------
+
 
 def parse_database_url(database_url: str) -> dict:
     """
@@ -86,9 +86,7 @@ def get_connection() -> _connection:
     database_url: str | None = os.getenv("DATABASE_URL")
 
     if not database_url:
-        raise RuntimeError(
-            "DATABASE_URL environment variable is not set."
-        )
+        raise RuntimeError("DATABASE_URL environment variable is not set.")
 
     conn_params = parse_database_url(database_url)
 
@@ -118,6 +116,7 @@ def get_db() -> Generator[_connection, None, None]:
 # RESPONSE MODELS
 # ---------------------------------------------------------------------------
 
+
 class Category(BaseModel):
     """
     Experience category response model.
@@ -131,6 +130,7 @@ class Category(BaseModel):
 # ---------------------------------------------------------------------------
 # HEALTH ENDPOINT
 # ---------------------------------------------------------------------------
+
 
 @app.get("/health", tags=["Monitoring"])
 def health_check() -> dict[str, str]:
@@ -148,6 +148,7 @@ def health_check() -> dict[str, str]:
 # ---------------------------------------------------------------------------
 # TAXONOMY ENDPOINTS
 # ---------------------------------------------------------------------------
+
 
 @app.get(
     "/categories",
@@ -178,16 +179,14 @@ def list_categories(
     try:
         cur = db.cursor()
 
-        cur.execute(
-            """
+        cur.execute("""
             SELECT
                 category_id,
                 name,
                 description
             FROM experience_categories
             ORDER BY name;
-            """
-        )
+            """)
 
         rows = cur.fetchall()
 

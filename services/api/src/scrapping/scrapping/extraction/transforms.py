@@ -16,7 +16,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 from typing import Any, Dict, Optional, Sequence
-from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 _WS = re.compile(r"\s+")
 

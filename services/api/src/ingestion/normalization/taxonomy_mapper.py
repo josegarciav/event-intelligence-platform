@@ -9,19 +9,15 @@ Supports:
 - Multiple taxonomy dimensions per event
 """
 
+import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple
-import logging
 
+from src.schemas.event import PrimaryCategory, Subcategory, TaxonomyDimension
 from src.schemas.taxonomy import (
+    find_best_activity_match,
     get_full_taxonomy_dimension,
     get_subcategory_by_id,
-    find_best_activity_match,
-)
-from src.schemas.event import (
-    TaxonomyDimension,
-    PrimaryCategory,
-    Subcategory,
 )
 
 logger = logging.getLogger(__name__)

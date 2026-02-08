@@ -10,8 +10,8 @@ Provides functions to:
 """
 
 import json
-from typing import Dict, Set, List, Any, Optional, Tuple
 from functools import lru_cache
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from src.configs.config import Config
 

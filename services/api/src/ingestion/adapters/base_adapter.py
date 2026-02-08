@@ -5,12 +5,12 @@ Abstract base class defining the interface for all source adapters.
 Implements the Strategy pattern for different data fetching strategies.
 """
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
-from datetime import datetime
-import logging
 
 
 class SourceType(str, Enum):

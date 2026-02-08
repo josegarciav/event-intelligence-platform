@@ -10,17 +10,18 @@ The schema serves as the source of truth for all downstream analytics, ML, and a
 """
 
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+from decimal import Decimal
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
 from pydantic import (
     BaseModel,
+    ConfigDict,
     Field,
+    field_serializer,
     field_validator,
     model_validator,
-    ConfigDict,
-    field_serializer,
 )
-from decimal import Decimal
 
 
 def _utc_now() -> datetime:
@@ -30,11 +31,11 @@ def _utc_now() -> datetime:
 
 from src.schemas.taxonomy import (
     build_taxonomy_index,
-    get_all_subcategory_options,
     get_all_subcategory_ids,
-    get_subcategory_by_id,
+    get_all_subcategory_options,
     get_primary_category_id_map,
     get_primary_category_value_to_id_map,
+    get_subcategory_by_id,
     validate_subcategory_for_primary,
 )
 

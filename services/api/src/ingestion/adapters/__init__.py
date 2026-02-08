@@ -17,8 +17,8 @@ Usage:
     raw_data = adapter.fetch(max_pages=2)
 """
 
-from .base_adapter import BaseSourceAdapter, SourceType, FetchResult
 from .api_adapter import APIAdapter
+from .base_adapter import BaseSourceAdapter, FetchResult, SourceType
 from .scraper_adapter import ScraperAdapter
 
 __all__ = [

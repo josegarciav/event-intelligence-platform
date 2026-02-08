@@ -18,9 +18,9 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from scrapping.extraction.parsers import (
+    extract_structured_trafilatura,
     get_text_bs4,
     select_text_bs4,
-    extract_structured_trafilatura,
 )
 from scrapping.extraction.transforms import normalize_ws, strip_or_none
 

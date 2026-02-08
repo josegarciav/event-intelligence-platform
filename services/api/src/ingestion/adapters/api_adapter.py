@@ -4,15 +4,15 @@ API Source Adapter.
 Adapter for fetching data from API-based sources (REST, GraphQL).
 """
 
+import logging
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Callable, Dict, List, Optional
-import logging
-import time
 
 import requests
 
-from .base_adapter import BaseSourceAdapter, AdapterConfig, FetchResult, SourceType
+from .base_adapter import AdapterConfig, BaseSourceAdapter, FetchResult, SourceType
 
 logger = logging.getLogger(__name__)
 

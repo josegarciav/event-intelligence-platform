@@ -17,9 +17,9 @@ This is engine-agnostic and config-driven.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from scrapping.engines.base import BaseEngine, EngineContext, FetchResult
 from scrapping.extraction.link_extractors import LinkExtractRequest, extract_links
@@ -29,8 +29,8 @@ from scrapping.extraction.parsers import (
     select_text_bs4,
 )
 from scrapping.extraction.transforms import normalize_item_fields
-from scrapping.pipeline.validators import validate_item
 from scrapping.pipeline.dedupe import DedupeStore, InMemoryDedupeStore, dedupe_items
+from scrapping.pipeline.validators import validate_item
 
 
 @dataclass

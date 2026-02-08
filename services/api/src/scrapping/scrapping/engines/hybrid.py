@@ -16,8 +16,8 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional, Sequence
 
 from .base import BaseEngine, EngineContext, FetchResult
-from .http import HttpEngine, HttpEngineOptions
 from .browser import BrowserEngine, BrowserEngineOptions
+from .http import HttpEngine, HttpEngineOptions
 
 
 @dataclass

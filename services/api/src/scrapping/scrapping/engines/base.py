@@ -11,8 +11,8 @@ Goals:
 
 from __future__ import annotations
 
-import time
 import random
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Sequence

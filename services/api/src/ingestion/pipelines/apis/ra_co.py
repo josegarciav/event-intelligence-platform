@@ -4,31 +4,31 @@ Ra.co Event Pipeline.
 API-based pipeline for ingesting events from ra.co using their GraphQL API.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
-from datetime import datetime, timedelta, timezone
 import logging
 import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Tuple
 
-from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
-from src.ingestion.adapters import APIAdapter, SourceType, FetchResult
+from src.ingestion.adapters import APIAdapter, FetchResult, SourceType
 from src.ingestion.adapters.api_adapter import APIAdapterConfig
-from src.schemas.event import (
-    EventSchema,
-    EventType,
-    EventFormat,
-    LocationInfo,
-    PriceInfo,
-    TicketInfo,
-    OrganizerInfo,
-    SourceInfo,
-    TaxonomyDimension,
-    PrimaryCategory,
-    Subcategory,
-)
+from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
 from src.ingestion.normalization.currency import CurrencyParser
 from src.ingestion.normalization.feature_extractor import (
     FeatureExtractor,
     create_feature_extractor_from_config,
+)
+from src.schemas.event import (
+    EventFormat,
+    EventSchema,
+    EventType,
+    LocationInfo,
+    OrganizerInfo,
+    PriceInfo,
+    PrimaryCategory,
+    SourceInfo,
+    Subcategory,
+    TaxonomyDimension,
+    TicketInfo,
 )
 
 logger = logging.getLogger(__name__)

@@ -29,10 +29,9 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from scrapping.engines.http import HttpEngine, HttpEngineOptions
 from scrapping.engines.browser import BrowserEngine, BrowserEngineOptions
+from scrapping.engines.http import HttpEngine, HttpEngineOptions
 from scrapping.engines.hybrid import HybridEngine, HybridEngineOptions
-
 from scrapping.extraction.link_extractors import LinkExtractRequest, extract_links
 from scrapping.processing.html_to_structured import html_to_structured
 from scrapping.processing.quality_filters import evaluate_quality

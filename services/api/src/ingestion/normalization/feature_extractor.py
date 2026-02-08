@@ -13,23 +13,21 @@ to ensure accurate classification and attribute selection.
 import logging
 import os
 import re
-from typing import Any, Dict, List, Literal, Optional, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, cast
 
-from src.ingestion.normalization.taxonomy_retriever import (
-    get_taxonomy_retriever,
-)
-from src.schemas.features import (
-    FullTaxonomyEnrichmentOutput,
-    EventTypeOutput,
-    MusicGenresOutput,
-    TagsOutput,
-)
 from src.ingestion.normalization.extraction_models import (
+    EventTypeExtraction,
+    MissingFieldsExtraction,
     PrimaryCategoryExtraction,
     SubcategoryExtraction,
-    EventTypeExtraction,
     TaxonomyAttributesExtraction,
-    MissingFieldsExtraction,
+)
+from src.ingestion.normalization.taxonomy_retriever import get_taxonomy_retriever
+from src.schemas.features import (
+    EventTypeOutput,
+    FullTaxonomyEnrichmentOutput,
+    MusicGenresOutput,
+    TagsOutput,
 )
 
 if TYPE_CHECKING:

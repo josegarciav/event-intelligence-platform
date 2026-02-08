@@ -1,7 +1,8 @@
 # src/configs/config.py
-import yaml
-from pathlib import Path
 from functools import lru_cache
+from pathlib import Path
+
+import yaml
 
 
 class Config:

@@ -37,7 +37,7 @@ _PREFECT_IMPORT_ERROR: Optional[str] = None
 
 try:
     # Prefect 2.x
-    from prefect import flow, task, get_run_logger  # type: ignore
+    from prefect import flow, get_run_logger, task  # type: ignore
 except Exception as e:
     _PREFECT_AVAILABLE = False
     _PREFECT_IMPORT_ERROR = f"{type(e).__name__}: {e}"

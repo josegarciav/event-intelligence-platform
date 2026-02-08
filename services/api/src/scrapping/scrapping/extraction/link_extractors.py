@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from typing import Iterable, List, Optional, Sequence, Set, Tuple
-from urllib.parse import urljoin, urlparse, urlunparse, parse_qsl, urlencode
+from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
 
 @dataclass(frozen=True)

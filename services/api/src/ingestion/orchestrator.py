@@ -1,25 +1,28 @@
 """
 Pipeline Orchestrator.
 
-Coordinates execution, scheduling, and management of all event ingestion pipelines.
+Coordinates execution, scheduling, persistence, and management of all event ingestion pipelines.
 Supports both API and scraper-based sources through the adapter pattern.
 """
 
-from typing import Dict, List, Optional, Callable
-from datetime import datetime, timezone
 import logging
 from dataclasses import dataclass
-import yaml
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
+
+import yaml
 
 from src.ingestion.adapters import SourceType
-from src.ingestion.deduplication import EventDeduplicator, ExactMatchDeduplicator
 from src.ingestion.base_pipeline import (
     BasePipeline,
     PipelineConfig,
     PipelineExecutionResult,
     PipelineStatus,
 )
+from src.ingestion.deduplication import EventDeduplicator, ExactMatchDeduplicator
+from src.ingestion.persist import EventDataWriter
+from src.ingestion.taxonomy_loader import get_connection
 from src.schemas.event import EventSchema
 
 logger = logging.getLogger(__name__)
@@ -271,6 +274,69 @@ class PipelineOrchestrator:
         self.logger.info(
             f"Storing {result.successful_events} events from {result.source_name}"
         )
+
+    # ========================================================================
+    # END-TO-END EXECUTION & PERSISTENCE
+    # ========================================================================
+    def run_full_ingestion(self, **kwargs) -> Dict[str, Any]:
+        """
+        Executes all registered pipelines, deduplicates the results,
+        and persists the unique events to the database.
+
+        Returns:
+            Dict containing stats about the ingestion run.
+        """
+        self.logger.info("Starting full ingestion run...")
+        start_time = datetime.now(timezone.utc)
+
+        # 1. Execute all pipelines
+        # This returns Dict[source_name, PipelineExecutionResult]
+        pipeline_results = self.execute_all_pipelines(**kwargs)
+
+        # 2. Extract and Deduplicate
+        # Uses the logic defined in deduplicate_results (title + venue + date)
+        unique_events = self.deduplicate_results(pipeline_results)
+        total_raw_events = sum(
+            r.total_events_processed for r in pipeline_results.values()
+        )
+
+        self.logger.info(
+            f"Deduplication complete: {len(unique_events)} unique events "
+            f"found from {total_raw_events} raw results."
+        )
+
+        # 3. Persist to Database
+        saved_count = 0
+        if unique_events:
+            try:
+                # Use the connection utility and the EventDataWriter class
+                conn = get_connection()
+                writer = EventDataWriter(conn)
+
+                self.logger.info(
+                    f"Persisting {len(unique_events)} events to Postgres..."
+                )
+                saved_count = writer.persist_batch(unique_events)
+
+                # Close connection after work is done
+                conn.close()
+                self.logger.info(f"Successfully saved {saved_count} events.")
+            except Exception as e:
+                self.logger.error(f"Critical error during persistence: {e}")
+                # We don't raise here so we can return the status of the fetch
+        else:
+            self.logger.warning("No unique events found to persist.")
+
+        duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+
+        return {
+            "timestamp": start_time.isoformat(),
+            "duration_seconds": duration,
+            "total_raw_fetched": total_raw_events,
+            "total_unique_found": len(unique_events),
+            "total_saved_to_db": saved_count,
+            "pipelines_executed": list(pipeline_results.keys()),
+        }
 
 
 def load_orchestrator_from_config(config_path: str) -> PipelineOrchestrator:

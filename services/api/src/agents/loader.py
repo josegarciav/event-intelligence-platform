@@ -2,11 +2,13 @@
 Loads and renders prompt templates from YAML files using Jinja2.
 """
 
-import yaml
 import logging
-from jinja2 import Template
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
+import yaml
+from jinja2 import Template
+
 from src.ingestion.normalization.taxonomy_retriever import get_taxonomy_retriever
 
 logger = logging.getLogger(__name__)
