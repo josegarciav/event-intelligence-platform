@@ -54,9 +54,9 @@ const capabilities = [
 
 const techStack = [
   { layer: "Ingestion", tools: "Python, Playwright, Airflow" },
-  { layer: "Processing", tools: "FastAPI, Pydantic, spaCy, LLM assist" },
-  { layer: "Storage", tools: "Postgres, S3, pgvector, Weaviate" },
-  { layer: "Intelligence", tools: "Python ML, embeddings, implicit feedback" },
+  { layer: "Processing", tools: "Pydantic, spaCy, LLM assist" },
+  { layer: "Storage", tools: "Postgres, S3, pgvector" },
+  { layer: "Intelligence", tools: "ML, embeddings, implicit feedback" },
   { layer: "Serving", tools: "FastAPI, GraphQL, Redis, CDN" },
   { layer: "Clients", tools: "Next.js, Flutter, React Native" },
   { layer: "DevOps", tools: "Docker, Terraform, GitHub Actions" },

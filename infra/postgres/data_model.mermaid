@@ -1,0 +1,356 @@
+erDiagram
+
+    %% ============================================================
+    %% CENTRAL ENTITY
+    %% ============================================================
+
+    events {
+        UUID event_id PK
+        TEXT title
+        TEXT description
+        TEXT primary_category_id FK
+        TEXT event_type
+        TEXT event_format
+        INT capacity
+        TEXT age_restriction
+        TIMESTAMP start_datetime
+        TIMESTAMP end_datetime
+        INT duration_minutes
+        BOOLEAN is_all_day
+        BOOLEAN is_recurring
+        TEXT recurrence_pattern
+        UUID location_id FK
+        UUID organizer_id FK
+        UUID source_id FK
+        FLOAT data_quality_score
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+        BOOLEAN is_deleted
+        TIMESTAMP deleted_at
+    }
+
+    %% ============================================================
+    %% NORMALIZATION TABLES
+    %% ============================================================
+
+    country_codes {
+        CHAR2 country_code PK
+        TEXT country_name
+        CHAR3 iso3_code
+        INT numeric_code
+        TEXT region
+        TEXT subregion
+        TIMESTAMP created_at
+    }
+
+    currency_codes {
+        CHAR3 currency_code PK
+        TEXT currency_name
+        TEXT symbol
+        INT numeric_code
+        INT minor_unit
+        TIMESTAMP created_at
+    }
+
+    %% ============================================================
+    %% USERS
+    %% ============================================================
+
+    users {
+        UUID user_id PK
+        TEXT email
+        TEXT password_hash
+        TEXT first_name
+        TEXT last_name
+        TEXT display_name
+        TEXT profile_image_url
+        BOOLEAN is_active
+        BOOLEAN is_verified
+        BOOLEAN is_admin
+        TIMESTAMP last_login_at
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+        BOOLEAN is_deleted
+        TIMESTAMP deleted_at
+    }
+
+    %% ============================================================
+    %% CORE SUPPORTING ENTITIES
+    %% ============================================================
+
+    locations {
+        UUID location_id PK
+        TEXT venue_name
+        TEXT street_address
+        TEXT city
+        TEXT state_or_region
+        TEXT postal_code
+        CHAR2 country_code FK
+        DOUBLE latitude
+        DOUBLE longitude
+        TEXT timezone
+    }
+
+    organizers {
+        UUID organizer_id PK
+        TEXT name
+        TEXT url
+        TEXT email
+        TEXT phone
+        TEXT image_url
+        INT follower_count
+        BOOLEAN verified
+        UUID created_by_user_id FK
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+
+    organizer_users {
+        UUID organizer_id PK
+        UUID user_id PK
+        TEXT role
+        TIMESTAMP created_at
+    }
+
+    sources {
+        UUID source_id PK
+        TEXT source_name
+        TEXT source_event_id
+        TEXT source_url
+        TEXT compressed_html
+        TIMESTAMP ingestion_timestamp
+        TIMESTAMP updated_at
+    }
+
+    %% ============================================================
+    %% TAXONOMY
+    %% ============================================================
+
+    primary_categories {
+        TEXT primary_category_id PK
+        TEXT name
+        TEXT description
+        TEXT taxonomy_version
+        TIMESTAMP created_at
+    }
+
+    subcategories {
+        TEXT subcategory_id PK
+        TEXT primary_category_id FK
+        TEXT name
+    }
+
+    activities_metadata {
+        UUID activity_id PK
+        TEXT primary_category_id FK
+        TEXT subcategory_id FK
+        TEXT name
+        TEXT energy_level
+        TEXT social_intensity
+        TEXT cognitive_load
+        TEXT physical_involvement
+        TEXT cost_level
+        TEXT time_scale
+        TEXT environment
+        TEXT risk_level
+        TEXT age_accessibility
+        TEXT repeatability
+        TEXT notes
+    }
+
+    event_taxonomy_mappings {
+        UUID mapping_id PK
+        UUID event_id FK
+        TEXT subcategory_id FK
+        UUID activity_id FK
+        TEXT activity_name
+        TEXT energy_level
+        TEXT social_intensity
+        TEXT cognitive_load
+        TEXT physical_involvement
+        TEXT cost_level
+        TEXT time_scale
+        TEXT environment
+        TEXT risk_level
+        TEXT age_accessibility
+        TEXT repeatability
+    }
+
+    subcategory_values {
+        UUID value_id PK
+        TEXT subcategory_id FK
+        TEXT value_name
+    }
+
+    activity_emotional_outputs {
+        UUID emotional_output_id PK
+        UUID activity_id FK
+        TEXT emotion_name
+    }
+
+    event_emotional_outputs {
+        UUID mapping_id PK
+        UUID emotional_output_id PK
+    }
+
+    %% ============================================================
+    %% EVENT SATELLITE TABLES
+    %% ============================================================
+
+    event_attendees {
+        UUID event_id PK
+        UUID user_id PK
+        TEXT attendance_status
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+
+    price_snapshots {
+        UUID price_snapshot_id PK
+        UUID event_id FK
+        CHAR3 currency FK
+        BOOLEAN is_free
+        NUMERIC minimum_price
+        NUMERIC maximum_price
+        NUMERIC early_bird_price
+        NUMERIC standard_price
+        NUMERIC vip_price
+        TEXT price_raw_text
+        TIMESTAMP valid_from_timestamp
+        TIMESTAMP ingested_at
+    }
+
+    engagement_snapshots {
+        UUID engagement_snapshot_id PK
+        UUID event_id FK
+        INT going_count
+        INT interested_count
+        INT views_count
+        INT shares_count
+        INT comments_count
+        INT likes_count
+        TIMESTAMP captured_at
+    }
+
+    ticket_info {
+        UUID ticket_id PK
+        UUID event_id FK
+        TEXT url
+        BOOLEAN is_sold_out
+        INT ticket_count_available
+        TIMESTAMP early_bird_deadline
+        TIMESTAMP updated_at
+    }
+
+    media_assets {
+        UUID media_asset_id PK
+        UUID event_id FK
+        TEXT type
+        TEXT url
+        TEXT title
+        TEXT description
+        INT width
+        INT height
+    }
+
+    %% ============================================================
+    %% TAGS
+    %% ============================================================
+
+    tags {
+        UUID tag_id PK
+        TEXT tag_name
+    }
+
+    event_tags {
+        UUID event_id PK
+        UUID tag_id PK
+        TIMESTAMP created_at
+    }
+
+    %% ============================================================
+    %% ARTISTS
+    %% ============================================================
+
+    artists {
+        UUID artist_id PK
+        TEXT name
+        TEXT soundcloud_url
+        TEXT spotify_url
+        TEXT instagram_url
+        TEXT genre
+        TIMESTAMP created_at
+    }
+
+    event_artists {
+        UUID event_id PK
+        UUID artist_id PK
+    }
+
+    %% ============================================================
+    %% ERRORS
+    %% ============================================================
+
+    normalization_errors {
+        SERIAL error_id PK
+        UUID event_id FK
+        TEXT error_type
+        TEXT error_message
+        TIMESTAMP created_at
+    }
+
+    %% ============================================================
+    %% RELATIONSHIPS
+    %% ============================================================
+
+    %% -- Core event relationships --
+    events ||--|| locations : "held at"
+    events }o--|| organizers : "organized by"
+    events }o--|| sources : "ingested from"
+    events }o--o| primary_categories : "classified as"
+
+    %% -- Location normalization --
+    locations }o--o| country_codes : "in country"
+
+    %% -- Organizer relationships --
+    organizers }o--o| users : "created by"
+    organizer_users }o--|| organizers : "manages"
+    organizer_users }o--|| users : "has access"
+
+    %% -- Taxonomy hierarchy --
+    subcategories }o--|| primary_categories : "belongs to"
+    activities_metadata }o--|| primary_categories : "under category"
+    activities_metadata }o--|| subcategories : "under subcategory"
+
+    %% -- Event taxonomy mapping --
+    event_taxonomy_mappings }o--|| events : "maps event"
+    event_taxonomy_mappings }o--o| subcategories : "to subcategory"
+    event_taxonomy_mappings }o--|| activities_metadata : "to activity"
+
+    %% -- Values and emotions --
+    subcategory_values }o--|| subcategories : "expresses value"
+    activity_emotional_outputs }o--|| activities_metadata : "produces emotion"
+    event_emotional_outputs }o--|| event_taxonomy_mappings : "via mapping"
+    event_emotional_outputs }o--|| activity_emotional_outputs : "emotional output"
+
+    %% -- Event satellites (snapshot / detail tables) --
+    price_snapshots }o--|| events : "pricing for"
+    price_snapshots }o--o| currency_codes : "denominated in"
+    engagement_snapshots }o--|| events : "engagement for"
+    ticket_info |o--|| events : "ticketing for"
+    media_assets }o--|| events : "media for"
+
+    %% -- Attendees --
+    event_attendees }o--|| events : "attending"
+    event_attendees }o--|| users : "attendee"
+
+    %% -- Tags --
+    event_tags }o--|| events : "tagged"
+    event_tags }o--|| tags : "with tag"
+
+    %% -- Artists --
+    event_artists }o--|| events : "performing at"
+    event_artists }o--|| artists : "artist"
+
+    %% -- Errors --
+    normalization_errors }o--o| events : "error for"
