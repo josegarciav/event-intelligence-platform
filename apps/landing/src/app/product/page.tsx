@@ -11,6 +11,7 @@ import {
   Users,
   Shield,
 } from "lucide-react";
+import PulseLine from "@/components/PulseLine";
 
 const capabilities = [
   {
@@ -204,6 +205,8 @@ export default function ProductPage() {
         </div>
       </section>
 
+      <PulseLine />
+
       {/* For Business */}
       <section id="business" className="py-32 px-6">
         <div className="max-w-5xl mx-auto">
@@ -251,6 +254,8 @@ export default function ProductPage() {
           </div>
         </div>
       </section>
+
+      <PulseLine />
 
       {/* Capabilities */}
       <section className="py-32 px-6 bg-[#0a0a0a]">

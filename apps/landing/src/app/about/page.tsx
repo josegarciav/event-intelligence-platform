@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import PulseLine from "@/components/PulseLine";
 
 const valuesList = [
   {
@@ -145,6 +146,8 @@ export default function AboutPage() {
         </div>
       </section>
 
+      <PulseLine />
+
       {/* Values */}
       <section className="py-32 px-6">
         <div className="max-w-5xl mx-auto">
@@ -218,6 +221,8 @@ export default function AboutPage() {
           </div>
         </div>
       </section>
+
+      <PulseLine />
 
       {/* Team */}
       <section className="py-32 px-6">

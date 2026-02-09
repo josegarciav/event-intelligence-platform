@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import PulseLine from "@/components/PulseLine";
 
 const roles = [
   {
@@ -102,6 +103,8 @@ export default function CareersPage() {
           </div>
         </div>
       </section>
+
+      <PulseLine />
 
       {/* Open Roles */}
       <section className="py-32 px-6">
