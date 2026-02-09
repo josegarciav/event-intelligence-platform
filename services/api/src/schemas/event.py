@@ -525,11 +525,11 @@ class SourceInfo(BaseModel):
     )
     source_event_id: str = Field(description="Event ID from the original source")
     source_url: str = Field(description="Direct URL to event on source platform")
-    raw_html: Optional[str] = Field(
+    compressed_html: Optional[str] = Field(
         default=None,
-        description="Raw HTML or JSON data from source for debugging/validation",
+        description="Parsed HTML or JSON data from source for debugging/validation",
     )
-    last_updated_from_source: datetime
+    updated_at: datetime
     ingestion_timestamp: datetime = Field(
         default_factory=_utc_now, description="When we ingested this event"
     )
