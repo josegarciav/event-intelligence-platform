@@ -1,105 +1,119 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { ChevronRight } from "lucide-react";
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.2,
-      delayChildren: 0.3,
-    },
-  },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.8 },
-  },
-};
+import { motion, useScroll, useTransform } from "framer-motion";
+import { useRef } from "react";
 
 export default function Hero() {
+  const ref = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start start", "end start"],
+  });
+
+  const y = useTransform(scrollYProgress, [0, 1], [0, 200]);
+  const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
+
   return (
-    <section className="min-h-screen flex items-center justify-center pt-20 px-6 relative overflow-hidden">
-      {/* Gradient orbs */}
-      <motion.div
-        animate={{
-          y: [0, 50, 0],
-          x: [0, 30, 0],
-        }}
-        transition={{ duration: 8, repeat: Infinity }}
-        className="absolute top-20 left-10 w-72 h-72 bg-purple-600/20 rounded-full blur-3xl"
-      />
-      <motion.div
-        animate={{
-          y: [0, -50, 0],
-          x: [0, -30, 0],
-        }}
-        transition={{ duration: 10, repeat: Infinity }}
-        className="absolute bottom-20 right-10 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl"
-      />
+    <section
+      ref={ref}
+      className="relative min-h-screen flex items-center justify-center overflow-hidden"
+    >
+      {/* Animated gradient orbs */}
+      <div className="absolute inset-0 overflow-hidden">
+        <motion.div
+          animate={{
+            scale: [1, 1.2, 1],
+            x: [0, 30, 0],
+            y: [0, -20, 0],
+          }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full bg-indigo-600/[0.08] blur-[120px]"
+        />
+        <motion.div
+          animate={{
+            scale: [1.2, 1, 1.2],
+            x: [0, -40, 0],
+            y: [0, 30, 0],
+          }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] rounded-full bg-purple-600/[0.07] blur-[120px]"
+        />
+        <motion.div
+          animate={{
+            scale: [1, 1.3, 1],
+            y: [0, -40, 0],
+          }}
+          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full bg-pink-600/[0.04] blur-[100px]"
+        />
+      </div>
 
       <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className="text-center max-w-4xl relative z-10"
+        style={{ y, opacity }}
+        className="relative z-10 text-center px-6"
       >
-        <motion.div variants={itemVariants} className="mb-6">
-          <span className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/30 rounded-full text-indigo-300 text-sm">
-            ✨ Real-time Event Intelligence
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+          className="mb-8"
+        >
+          <span className="inline-block px-4 py-1.5 text-xs font-medium text-[#888] border border-white/[0.08] rounded-full">
+            Event Intelligence Platform
           </span>
         </motion.div>
 
         <motion.h1
-          variants={itemVariants}
-          className="text-6xl md:text-7xl font-bold gradient-text mb-6"
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.4 }}
+          className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-[0.95] mb-8"
         >
-          Discover What's Happening
+          Help humans spend
+          <br />
+          their free time
+          <br />
+          <span className="gradient-text">better.</span>
         </motion.h1>
 
         <motion.p
-          variants={itemVariants}
-          className="text-xl text-slate-300 mb-8 leading-relaxed"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.6 }}
+          className="text-lg md:text-xl text-[#666] max-w-2xl mx-auto mb-12 leading-relaxed"
         >
-          Pulsecity ingests, normalizes, and analyzes real-time event data from
-          multiple sources. Make intelligent decisions about your city's
-          cultural pulse.
+          A city-scale intelligence platform that transforms fragmented event
+          data into personalized, real-time recommendations.
         </motion.p>
 
         <motion.div
-          variants={itemVariants}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.8 }}
           className="flex gap-4 justify-center flex-wrap"
         >
-          <button className="px-8 py-4 bg-indigo-600 rounded-lg font-semibold hover:bg-indigo-500 transition flex items-center gap-2 glow-box">
-            Launch Demo <ChevronRight className="w-4 h-4" />
+          <button className="px-8 py-4 bg-white text-black font-medium rounded-full hover:bg-white/90 transition-all duration-300 text-sm">
+            Get Early Access
           </button>
-          <button className="px-8 py-4 border border-indigo-500/50 rounded-lg font-semibold hover:bg-indigo-500/10 transition">
-            View Docs
+          <button className="px-8 py-4 border border-white/[0.12] rounded-full font-medium hover:bg-white/[0.04] transition-all duration-300 text-sm">
+            Learn More
           </button>
         </motion.div>
+      </motion.div>
 
+      {/* Scroll indicator */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.5, duration: 1 }}
+        className="absolute bottom-10 left-1/2 -translate-x-1/2"
+      >
         <motion.div
-          variants={itemVariants}
-          className="mt-16 grid grid-cols-3 gap-8 text-left"
+          animate={{ y: [0, 8, 0] }}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+          className="w-5 h-8 rounded-full border border-white/[0.15] flex items-start justify-center pt-2"
         >
-          {[
-            { number: "50+", label: "Event Sources" },
-            { number: "Real-time", label: "Data Ingestion" },
-            { number: "10x", label: "Faster Analysis" },
-          ].map((stat) => (
-            <div key={stat.label} className="p-4 borders border-indigo-500/20 rounded-lg bg-indigo-500/5">
-              <div className="text-2xl font-bold text-indigo-400">
-                {stat.number}
-              </div>
-              <div className="text-sm text-slate-400">{stat.label}</div>
-            </div>
-          ))}
+          <motion.div className="w-1 h-1.5 rounded-full bg-white/40" />
         </motion.div>
       </motion.div>
     </section>

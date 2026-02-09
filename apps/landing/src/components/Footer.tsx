@@ -1,74 +1,86 @@
 "use client";
 
+import Link from "next/link";
+
+const footerLinks = {
+  Product: [
+    { label: "Features", href: "/product" },
+    { label: "For People", href: "/product#people" },
+    { label: "For Business", href: "/product#business" },
+    { label: "API", href: "#" },
+  ],
+  Company: [
+    { label: "About", href: "/about" },
+    { label: "Careers", href: "/careers" },
+    // { label: "Blog", href: "#" },
+    // { label: "Press", href: "#" },
+  ],
+  Resources: [
+    { label: "Documentation", href: "/docs" },
+  ],
+  Legal: [
+    { label: "Privacy", href: "/privacy" },
+    { label: "Terms", href: "/terms" },
+    { label: "Cookies", href: "/cookies" },
+  ],
+};
+
 export default function Footer() {
   return (
-    <footer className="py-12 px-6 bg-slate-900 border-t border-indigo-500/20">
-      <div className="max-w-6xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-          <div>
-            <h3 className="font-semibold mb-4">Pulsecity</h3>
-            <p className="text-slate-400 text-sm">
-              Event intelligence for your city.
+    <footer className="border-t border-white/[0.06] bg-[#050505]">
+      <div className="max-w-7xl mx-auto px-6 md:px-12">
+        <div className="py-16 grid grid-cols-2 md:grid-cols-5 gap-10">
+          {/* Brand */}
+          <div className="col-span-2 md:col-span-1">
+            <Link href="/" className="flex items-center gap-2 mb-4">
+              <div className="w-7 h-7 rounded-md gradient-bg flex items-center justify-center">
+                <span className="text-white font-bold text-xs">P</span>
+              </div>
+              <span className="font-semibold tracking-tight">Pulsecity</span>
+            </Link>
+            <p className="text-sm text-[#555] leading-relaxed">
+              Help humans spend their free time better.
             </p>
           </div>
-          <div>
-            <h4 className="font-semibold mb-4">Product</h4>
-            <ul className="space-y-2 text-slate-400 text-sm">
-              <li>
-                <a href="#" className="hover:text-indigo-400 transition">
-                  Features
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-indigo-400 transition">
-                  Pricing
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-indigo-400 transition">
-                  Docs
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold mb-4">Company</h4>
-            <ul className="space-y-2 text-slate-400 text-sm">
-              <li>
-                <a href="#" className="hover:text-indigo-400 transition">
-                  About
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-indigo-400 transition">
-                  Blog
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-indigo-400 transition">
-                  Contact
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold mb-4">Legal</h4>
-            <ul className="space-y-2 text-slate-400 text-sm">
-              <li>
-                <a href="#" className="hover:text-indigo-400 transition">
-                  Privacy
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-indigo-400 transition">
-                  Terms
-                </a>
-              </li>
-            </ul>
-          </div>
+
+          {/* Link columns */}
+          {Object.entries(footerLinks).map(([category, links]) => (
+            <div key={category}>
+              <h4 className="text-xs font-medium text-[#888] uppercase tracking-wider mb-4">
+                {category}
+              </h4>
+              <ul className="space-y-3">
+                {links.map((link) => (
+                  <li key={link.label}>
+                    <Link
+                      href={link.href}
+                      className="text-sm text-[#555] hover:text-white transition-colors duration-300"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
-        <div className="border-t border-indigo-500/20 pt-8 text-center text-slate-400 text-sm">
-          <p>&copy; 2026 Pulsecity. All rights reserved.</p>
+
+        {/* Bottom bar */}
+        <div className="py-6 border-t border-white/[0.06] flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-xs text-[#444]">
+            &copy; {new Date().getFullYear()} Pulsecity. All rights reserved.
+          </p>
+          <div className="flex items-center gap-6">
+            {["Twitter", "LinkedIn", "GitHub"].map((social) => (
+              <a
+                key={social}
+                href="#"
+                className="text-xs text-[#444] hover:text-white transition-colors duration-300"
+              >
+                {social}
+              </a>
+            ))}
+          </div>
         </div>
       </div>
     </footer>

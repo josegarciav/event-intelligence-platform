@@ -1,19 +1,28 @@
-import Navigation from "@/components/Navigation";
 import Hero from "@/components/Hero";
-import Features from "@/components/Features";
-import HowItWorks from "@/components/HowItWorks";
-import CTA from "@/components/CTA";
-import Footer from "@/components/Footer";
+import ProblemStatement from "@/components/ProblemStatement";
+import PulseLine from "@/components/PulseLine";
+import BentoGrid from "@/components/BentoGrid";
+import ForPeople from "@/components/ForPeople";
+import ForBusiness from "@/components/ForBusiness";
+import Pipeline from "@/components/Pipeline";
+import Metrics from "@/components/Metrics";
+import Values from "@/components/Values";
+import CallToAction from "@/components/CallToAction";
 
 export default function Home() {
   return (
     <main>
-      <Navigation />
       <Hero />
-      <Features />
-      <HowItWorks />
-      <CTA />
-      <Footer />
+      <ProblemStatement />
+      <PulseLine />
+      <BentoGrid />
+      <ForPeople />
+      <PulseLine />
+      <ForBusiness />
+      <Pipeline />
+      <Metrics />
+      <Values />
+      <CallToAction />
     </main>
   );
 }
