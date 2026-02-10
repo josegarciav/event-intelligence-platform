@@ -7,7 +7,7 @@ const footerLinks = {
     { label: "Features", href: "/product" },
     { label: "For People", href: "/product#people" },
     { label: "For Business", href: "/product#business" },
-    { label: "API", href: "#" },
+    { label: "API", href: "/product#business" },
   ],
   Company: [
     { label: "About", href: "/about" },

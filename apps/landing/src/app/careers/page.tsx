@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Link from "next/link";
 import PulseLine from "@/components/PulseLine";
 
 const roles = [
@@ -162,9 +163,9 @@ export default function CareersPage() {
               Don&apos;t see your role? We&apos;re always looking for
               exceptional people.
             </p>
-            <button className="px-8 py-4 bg-white text-black font-medium rounded-full hover:bg-white/90 transition-all duration-300 text-sm">
+            <Link href="/early-access" className="inline-block px-8 py-4 bg-white text-black font-medium rounded-full hover:bg-white/90 transition-all duration-300 text-sm">
               Send Open Application
-            </button>
+            </Link>
           </motion.div>
         </div>
       </section>

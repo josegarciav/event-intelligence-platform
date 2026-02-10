@@ -55,9 +55,9 @@ export default function Navigation() {
           </div>
 
           <div className="hidden md:block">
-            <button className="px-5 py-2.5 text-sm font-medium bg-white text-black rounded-full hover:bg-white/90 transition-all duration-300">
+            <Link href="/early-access" className="px-5 py-2.5 text-sm font-medium bg-white text-black rounded-full hover:bg-white/90 transition-all duration-300">
               Get Early Access
-            </button>
+            </Link>
           </div>
 
           {/* Mobile menu button */}
@@ -116,9 +116,9 @@ export default function Navigation() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.2 }}
               >
-                <button className="mt-8 px-8 py-4 text-lg font-medium bg-white text-black rounded-full w-full">
+                <Link href="/early-access" onClick={() => setMobileOpen(false)} className="mt-8 px-8 py-4 text-lg font-medium bg-white text-black rounded-full w-full block text-center">
                   Get Early Access
-                </button>
+                </Link>
               </motion.div>
             </div>
           </motion.div>

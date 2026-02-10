@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Link from "next/link";
 
 export default function CallToAction() {
   return (
@@ -35,12 +36,12 @@ export default function CallToAction() {
           intelligent event discovery.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button className="px-10 py-4 bg-white text-black font-medium rounded-full hover:bg-white/90 transition-all duration-300 text-sm">
+          <Link href="/early-access" className="px-10 py-4 bg-white text-black font-medium rounded-full hover:bg-white/90 transition-all duration-300 text-sm">
             Join Waitlist
-          </button>
-          <button className="px-10 py-4 border border-white/[0.12] rounded-full font-medium hover:bg-white/[0.04] transition-all duration-300 text-sm">
+          </Link>
+          <Link href="/early-access" className="px-10 py-4 border border-white/[0.12] rounded-full font-medium hover:bg-white/[0.04] transition-all duration-300 text-sm">
             Talk to Us
-          </button>
+          </Link>
         </div>
       </motion.div>
     </section>

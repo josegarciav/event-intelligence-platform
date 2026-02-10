@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Link from "next/link";
 
 export default function DocsPage() {
   return (
@@ -35,9 +36,9 @@ export default function DocsPage() {
             transition={{ duration: 0.8, delay: 0.4 }}
             className="mt-12"
           >
-            <button className="px-8 py-4 bg-white text-black font-medium rounded-full hover:bg-white/90 transition-all duration-300 text-sm">
+            <Link href="/early-access" className="inline-block px-8 py-4 bg-white text-black font-medium rounded-full hover:bg-white/90 transition-all duration-300 text-sm">
               Get Notified When Ready
-            </button>
+            </Link>
           </motion.div>
         </div>
       </section>

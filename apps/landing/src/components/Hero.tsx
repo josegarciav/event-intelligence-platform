@@ -2,6 +2,7 @@
 
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
+import Link from "next/link";
 
 export default function Hero() {
   const ref = useRef(null);
@@ -92,12 +93,12 @@ export default function Hero() {
           transition={{ duration: 0.8, delay: 0.8 }}
           className="flex gap-4 justify-center flex-wrap"
         >
-          <button className="px-8 py-4 bg-white text-black font-medium rounded-full hover:bg-white/90 transition-all duration-300 text-sm">
+          <Link href="/early-access" className="px-8 py-4 bg-white text-black font-medium rounded-full hover:bg-white/90 transition-all duration-300 text-sm">
             Get Early Access
-          </button>
-          <button className="px-8 py-4 border border-white/[0.12] rounded-full font-medium hover:bg-white/[0.04] transition-all duration-300 text-sm">
+          </Link>
+          <Link href="/early-access" className="px-8 py-4 border border-white/[0.12] rounded-full font-medium hover:bg-white/[0.04] transition-all duration-300 text-sm">
             Learn More
-          </button>
+          </Link>
         </motion.div>
       </motion.div>
 
