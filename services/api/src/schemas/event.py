@@ -558,6 +558,19 @@ class MediaAsset(BaseModel):
     height: Optional[int] = None
 
 
+class ArtistInfo(BaseModel):
+    """
+    Artist information associated with an event.
+    Maps to the artists and event_artists SQL tables.
+    """
+
+    name: str
+    soundcloud_url: Optional[str] = None
+    spotify_url: Optional[str] = None
+    instagram_url: Optional[str] = None
+    genre: Optional[str] = None
+
+
 class EngagementMetrics(BaseModel):
     """
     Engagement metrics from the source.
@@ -648,6 +661,9 @@ class EventSchema(BaseModel):
 
     # ---- ORGANIZER ----
     organizer: OrganizerInfo
+
+    # ---- ARTISTS ----
+    artists: List[ArtistInfo] = Field(default_factory=list)
 
     # ---- MEDIA & VISUAL ----
     image_url: Optional[str] = None

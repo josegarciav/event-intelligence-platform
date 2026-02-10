@@ -582,7 +582,6 @@ CREATE TABLE IF NOT EXISTS normalization_errors (
 
     event_id UUID,
 
-    error_type TEXT NOT NULL,
     error_message TEXT NOT NULL,
 
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
