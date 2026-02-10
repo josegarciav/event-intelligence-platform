@@ -8,10 +8,7 @@ Supports both API and scraper-based sources through the adapter pattern.
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
-
-import yaml
 
 from src.ingestion.adapters import SourceType
 from src.ingestion.base_pipeline import (
@@ -343,53 +340,28 @@ def load_orchestrator_from_config(config_path: str) -> PipelineOrchestrator:
     """
     Factory function to create orchestrator from YAML config.
 
+    Uses PipelineFactory to create all enabled pipelines from configuration.
+    No hardcoded source names — fully config-driven.
+
     Args:
         config_path: Path to ingestion.yaml
 
     Returns:
         Configured PipelineOrchestrator
     """
-    from src.ingestion.pipelines.apis.ra_co import create_ra_co_pipeline
+    from src.ingestion.factory import PipelineFactory
 
-    config_file = Path(config_path)
-    if not config_file.exists():
-        raise FileNotFoundError(f"Config not found: {config_path}")
-
-    with open(config_file) as f:
-        config = yaml.safe_load(f)
-
+    factory = PipelineFactory(config_path)
     orchestrator = PipelineOrchestrator()
 
-    sources_config = config.get("sources", {})
+    pipelines = factory.create_all_enabled_pipelines()
+    for source_name, pipeline in pipelines.items():
+        orchestrator.register_pipeline(source_name, pipeline)
 
-    for source_name, source_config in sources_config.items():
-        if not source_config.get("enabled", True):
-            continue
-
-        source_type_str = source_config.get("type", "api")
-        source_type = SourceType(source_type_str)
-
-        pipeline_config = PipelineConfig(
-            source_name=source_name,
-            source_type=source_type,
-            request_timeout=source_config.get("request_timeout", 30),
-            max_retries=source_config.get("max_retries", 3),
-            batch_size=source_config.get("batch_size", 100),
-            rate_limit_per_second=source_config.get("rate_limit_per_second", 1.0),
-            custom_config=source_config,
-        )
-
-        # Create pipeline based on source name
-        pipeline = None
-        if source_name == "ra_co":
-            pipeline = create_ra_co_pipeline(pipeline_config, source_config)
-
-        if pipeline:
-            orchestrator.register_pipeline(source_name, pipeline)
-
-            # Schedule if configured
-            schedule_config = source_config.get("schedule")
-            if schedule_config and schedule_config.get("enabled", True):
-                orchestrator.schedule_pipeline(source_name, schedule_config)
+        # Schedule if configured
+        source_config = factory.get_source_config(source_name) or {}
+        schedule_config = source_config.get("schedule")
+        if schedule_config and schedule_config.get("enabled", True):
+            orchestrator.schedule_pipeline(source_name, schedule_config)
 
     return orchestrator

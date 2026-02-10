@@ -251,6 +251,15 @@ class FieldMapper:
                     values = [str(result.get(s, "")) for s in sources if result.get(s)]
                     result[field_name] = separator.join(values)
 
+                elif transform_type == "strip_html":
+                    # Strip HTML tags and normalize whitespace
+                    source = transform_config.get("source", field_name)
+                    value = result.get(source)
+                    if isinstance(value, str):
+                        cleaned = re.sub(r"<[^>]+>", " ", value)
+                        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+                        result[field_name] = cleaned
+
             except Exception as e:
                 logger.warning(
                     f"Failed to apply transformation {transform_type} to {field_name}: {e}"

@@ -18,9 +18,14 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from src.ingestion.adapters import FetchResult, SourceType
 from src.ingestion.adapters.api_adapter import APIAdapter, APIAdapterConfig
-from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
+from src.ingestion.base_pipeline import (
+    BasePipeline,
+    PipelineConfig,
+    PipelineExecutionResult,
+    PipelineStatus,
+)
 from src.ingestion.normalization.currency import CurrencyParser
-from src.ingestion.normalization.feature_extractor import (
+from src.agents.feature_extractor import (
     FeatureExtractor,
     create_feature_extractor_from_config,
 )
@@ -362,6 +367,209 @@ class BaseAPIPipeline(BasePipeline):
 
         return ConfigDrivenAPIAdapter(api_config, self.source_config)
 
+    # ========================================================================
+    # MULTI-CITY + DATE-WINDOW EXECUTION
+    # ========================================================================
+
+    def execute(self, **kwargs) -> PipelineExecutionResult:
+        """
+        Execute pipeline with multi-city support.
+
+        If config has defaults.areas (dict of city_name: area_id),
+        iterates over each city. Otherwise falls back to single-area execution.
+        """
+        areas = self.source_config.defaults.get("areas", {})
+        if not areas:
+            return super().execute(**kwargs)
+
+        self.execution_id = self._generate_execution_id()
+        self.execution_start_time = datetime.now(timezone.utc)
+        self.logger.info(
+            f"Starting multi-city execution: {self.execution_id} "
+            f"({len(areas)} cities)"
+        )
+
+        all_raw_events = []
+        fetch_errors = []
+
+        for city_name, area_id in areas.items():
+            self.logger.info(f"Fetching events for {city_name} (area_id={area_id})...")
+            try:
+                raw_events = self._fetch_with_date_splitting(
+                    area_id=area_id, city_name=city_name, **kwargs
+                )
+                self.logger.info(
+                    f"  {city_name}: {len(raw_events)} raw events fetched"
+                )
+                all_raw_events.extend(raw_events)
+            except Exception as e:
+                self.logger.error(f"  {city_name}: fetch failed: {e}")
+                fetch_errors.append({"error": str(e), "city": city_name})
+
+        self.logger.info(
+            f"Total raw events across all cities: {len(all_raw_events)}"
+        )
+
+        # Process all events through pipeline stages
+        normalized_events = self._process_events_batch(all_raw_events)
+
+        # Deduplication
+        if self.config.deduplicate and normalized_events:
+            from src.ingestion.deduplication import (
+                DeduplicationStrategy,
+                get_deduplicator,
+            )
+
+            deduplicator = get_deduplicator(
+                DeduplicationStrategy(self.config.deduplication_strategy)
+            )
+            before_count = len(normalized_events)
+            normalized_events = deduplicator.deduplicate(normalized_events)
+            self.logger.info(
+                f"Deduplication: {before_count} -> {len(normalized_events)} events"
+            )
+
+        status = (
+            PipelineStatus.SUCCESS if normalized_events else PipelineStatus.FAILED
+        )
+        if normalized_events and len(normalized_events) < len(all_raw_events):
+            status = PipelineStatus.PARTIAL_SUCCESS
+
+        result = PipelineExecutionResult(
+            status=status,
+            source_name=self.config.source_name,
+            source_type=self.source_type,
+            execution_id=self.execution_id,
+            started_at=self.execution_start_time,
+            ended_at=datetime.now(timezone.utc),
+            total_events_processed=len(all_raw_events),
+            successful_events=len(normalized_events),
+            failed_events=len(all_raw_events) - len(normalized_events),
+            events=normalized_events,
+            errors=fetch_errors,
+            metadata={
+                "cities": list(areas.keys()),
+                "total_raw_fetched": len(all_raw_events),
+            },
+        )
+
+        self.logger.info(
+            f"Multi-city pipeline completed: "
+            f"{result.successful_events}/{result.total_events_processed} successful"
+        )
+        return result
+
+    def _fetch_with_date_splitting(
+        self,
+        area_id: int,
+        city_name: str,
+        **kwargs,
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch events for a single area using a sliding date window.
+
+        Walks through the full date range in fixed-size windows (default 7 days).
+        Each window fetches up to max_pages of results. If a window is saturated
+        (total_available > fetched), the window size is halved for denser periods.
+        After a non-saturated window, the size is gradually restored.
+
+        This guarantees we retrieve as much data as the API allows, regardless
+        of how events are distributed across dates.
+
+        Args:
+            area_id: The area/city ID for the API
+            city_name: Human-readable city name (for logging)
+            **kwargs: Additional params passed to adapter.fetch()
+
+        Returns:
+            List of raw event dicts
+        """
+        days_ahead = self.source_config.defaults.get("days_ahead", 30)
+        range_start = datetime.strptime(
+            kwargs.pop("date_from", None)
+            or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "%Y-%m-%d",
+        )
+        range_end = datetime.strptime(
+            kwargs.pop("date_to", None)
+            or (datetime.now(timezone.utc) + timedelta(days=days_ahead)).strftime(
+                "%Y-%m-%d"
+            ),
+            "%Y-%m-%d",
+        )
+
+        # Compute the capacity of a single fetch call (pages * page_size)
+        page_size = self.source_config.default_page_size
+        max_pages = self.source_config.max_pages
+        fetch_capacity = page_size * max_pages
+
+        # Start with a 7-day window; shrink/grow adaptively
+        initial_window = 7
+        window_days = initial_window
+        min_window = 1  # never go below 1 day
+
+        all_events: List[Dict[str, Any]] = []
+        cursor = range_start
+
+        self.logger.info(
+            f"  {city_name}: sliding window fetch "
+            f"[{range_start.date()}..{range_end.date()}] "
+            f"(capacity={fetch_capacity}/call, window={window_days}d)"
+        )
+
+        while cursor < range_end:
+            window_end = min(cursor + timedelta(days=window_days), range_end)
+            date_from_str = cursor.strftime("%Y-%m-%d")
+            date_to_str = window_end.strftime("%Y-%m-%d")
+
+            fetch_result = self.adapter.fetch(
+                area_id=area_id,
+                date_from=date_from_str,
+                date_to=date_to_str,
+                **kwargs,
+            )
+
+            if fetch_result.success and fetch_result.raw_data:
+                fetched = len(fetch_result.raw_data)
+                total_available = fetch_result.metadata.get("total_available", fetched)
+                all_events.extend(fetch_result.raw_data)
+
+                saturated = total_available > fetched
+                self.logger.info(
+                    f"  {city_name}: [{date_from_str}..{date_to_str}] "
+                    f"{fetched}/{total_available} events"
+                    f"{' (SATURATED — shrinking window)' if saturated else ''}"
+                )
+
+                if saturated and window_days > min_window:
+                    # Window too big for this density — halve it and re-try
+                    # the SAME cursor position with a smaller window
+                    window_days = max(window_days // 2, min_window)
+                    continue
+                else:
+                    # Window was fine — advance cursor past this window
+                    cursor = window_end
+                    # Gradually restore window size toward initial
+                    if window_days < initial_window:
+                        window_days = min(window_days * 2, initial_window)
+            else:
+                # Fetch failed or empty — advance anyway to avoid infinite loop
+                self.logger.warning(
+                    f"  {city_name}: [{date_from_str}..{date_to_str}] "
+                    f"no results or fetch failed, advancing"
+                )
+                cursor = window_end
+
+        self.logger.info(
+            f"  {city_name}: sliding window complete — "
+            f"{len(all_events)} total raw events"
+        )
+        return all_events
+
+    # ========================================================================
+    # PIPELINE STAGES
+    # ========================================================================
+
     def parse_raw_event(self, raw_event: Dict[str, Any]) -> Dict[str, Any]:
         """
         Parse raw API event using FieldMapper.
@@ -442,22 +650,36 @@ class BaseAPIPipeline(BasePipeline):
             timezone=loc_defaults.get("timezone"),
         )
 
-        # Parse price
-        price_str = parsed_event.get("cost") or ""
-        min_price, max_price, currency = CurrencyParser.parse_price_string(
-            str(price_str)
-        )
+        # Parse price — supports both string (ra.co) and pre-parsed numeric fields (Ticketmaster)
+        cost_min = parsed_event.get("cost_min")
+        cost_max = parsed_event.get("cost_max")
+        cost_currency = parsed_event.get("cost_currency")
 
-        is_free = (min_price is None and max_price is None) or str(
-            price_str
-        ).lower() in ["free", "0", "gratis"]
+        if cost_min is not None or cost_max is not None:
+            # Pre-parsed numeric price fields
+            min_price = float(cost_min) if cost_min is not None else None
+            max_price = float(cost_max) if cost_max is not None else None
+            currency = cost_currency or loc_defaults.get("currency", "EUR")
+            price_raw = f"{min_price}-{max_price} {currency}" if max_price else str(min_price)
+            is_free = min_price == 0 and (max_price is None or max_price == 0)
+        else:
+            # String price (e.g. "10€", "Free")
+            price_str = parsed_event.get("cost") or ""
+            min_price, max_price, currency = CurrencyParser.parse_price_string(
+                str(price_str)
+            )
+            is_free = (min_price is None and max_price is None) or str(
+                price_str
+            ).lower() in ["free", "0", "gratis"]
+            currency = currency or "EUR"
+            price_raw = str(price_str) if price_str else None
 
         price = PriceInfo(
-            currency=currency or "EUR",
+            currency=currency,
             is_free=is_free,
             minimum_price=min_price,
             maximum_price=max_price,
-            price_raw_text=str(price_str) if price_str else None,
+            price_raw_text=price_raw,
         )
 
         # Build organizer
@@ -473,7 +695,7 @@ class BaseAPIPipeline(BasePipeline):
             source_name=self.source_config.source_name,
             source_event_id=source_event_id,
             source_url=source_url,
-            last_updated_from_source=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
 
         # Build taxonomy dimensions
@@ -713,11 +935,13 @@ def create_api_pipeline_from_config(
         ),
         field_mappings=source_config_dict.get("field_mappings", {}),
         transformations=source_config_dict.get("transformations", {}),
-        taxonomy_config=source_config_dict.get("taxonomy", {}),
+        taxonomy_config=source_config_dict.get("taxonomy_suggestions", {}),
         event_type_rules=source_config_dict.get("event_type_rules", []),
         defaults=source_config_dict.get("defaults", {}),
         validation=source_config_dict.get("validation", {}),
-        feature_extraction=source_config_dict.get("feature_extraction", {}),
+        feature_extraction=source_config_dict.get("enrichment", {}).get(
+            "feature_extraction", source_config_dict.get("feature_extraction", {})
+        ),
     )
 
     # Create pipeline config if not provided

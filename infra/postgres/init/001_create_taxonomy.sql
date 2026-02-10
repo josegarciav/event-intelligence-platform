@@ -418,7 +418,7 @@ CREATE TABLE IF NOT EXISTS event_taxonomy_mappings (
         REFERENCES subcategories(subcategory_id)
         ON DELETE CASCADE,
 
-    activity_id UUID NOT NULL,
+    activity_id UUID,
     activity_name TEXT,
 
     energy_level TEXT, 

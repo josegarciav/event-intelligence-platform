@@ -34,6 +34,7 @@ sources:
               event {
                 id
                 title
+                content
                 date
                 startTime
                 endTime
@@ -83,6 +84,7 @@ sources:
     field_mappings:
       source_event_id: "event.id"
       title: "event.title"
+      description: "event.content"
       date: "event.date"
       start_time: "event.startTime"
       end_time: "event.endTime"
@@ -98,6 +100,9 @@ sources:
 
     # Transformations applied after field extraction
     transformations:
+      description:
+        type: "strip_html"
+        source: "description"
       image_url:
         type: "template"
         template: "https://ra.co/images/events/flyer/{{image_filename}}"
@@ -109,7 +114,7 @@ sources:
         type: "uppercase"
 
     # Taxonomy mapping rules
-    taxonomy:
+    taxonomy_suggestions:
       default_primary: "1" # Play & Pure Fun
       default_subcategory: "1.4"  # Music & Rhythm Play
 
@@ -132,11 +137,13 @@ sources:
 
     # Default values
     defaults:
-      area_id: 20  # Barcelona
-      page_size: 1000
+      page_size: 100
       days_ahead: 120
+      areas:
+        Barcelona: 20
+        Madrid: 28
       location:
-        city: "Barcelona"
+        cities: [ "Barcelona", "Madrid" ]
         country_code: "ES"
         timezone: "Europe/Madrid"
 
@@ -150,7 +157,7 @@ sources:
       geocoding: true
       # Feature extraction (LLM-based)
       feature_extraction:
-        enabled: true
+        enabled: false
         provider: "openai"
         model_name: "gpt-4o-mini"
         fill_missing:
@@ -179,6 +186,125 @@ sources:
       type: "cron" # cron | interval | manual
       interval_hours: 6
       cron_expression: "0 */6 * * *"  # Every 6 hours
+      enabled: false
+
+  # =========================================================================
+  # TICKETMASTER - REST API-based ingestion
+  # =========================================================================
+  ticketmaster:
+    enabled: false
+    pipeline_type: "api"
+
+    # Connection settings
+    connection:
+      endpoint: "https://app.ticketmaster.com/discovery/v2/events.json"
+      protocol: "rest"
+      timeout_seconds: 30
+
+    max_retries: 3
+    rate_limit_per_second: 5.0
+
+    # REST Query Configuration
+    query:
+      params:
+        apikey: "${TICKETMASTER_API_KEY}"
+        city: "{{city}}"
+        countryCode: "{{country_code}}"
+        startDateTime: "{{date_from}}T00:00:00Z"
+        endDateTime: "{{date_to}}T23:59:59Z"
+        size: "{{page_size}}"
+        page: "{{page}}"
+        sort: "date,asc"
+      response_path: "_embedded.events"
+      total_results_path: "page.totalElements"
+
+    # Pagination
+    pagination:
+      type: "page_number"
+      max_pages: 5
+      default_page_size: 50
+
+    # Field mappings: target_field -> source_path
+    field_mappings:
+      source_event_id: "id"
+      title: "name"
+      description: "info"
+      date: "dates.start.localDate"
+      start_time: "dates.start.dateTime"
+      end_time: "dates.end.dateTime"
+      venue_name: "_embedded.venues[0].name"
+      venue_address: "_embedded.venues[0].address.line1"
+      city: "_embedded.venues[0].city.name"
+      country_code: "_embedded.venues[0].country.countryCode"
+      content_url: "url"
+      image_url_raw: "images[0].url"
+      cost_min: "priceRanges[0].min"
+      cost_max: "priceRanges[0].max"
+      cost_currency: "priceRanges[0].currency"
+
+    # Transformations applied after field extraction
+    transformations:
+      source_url:
+        type: "template"
+        template: "{{content_url}}"
+      image_url:
+        type: "template"
+        template: "{{image_url_raw}}"
+        when: "image_url_raw"
+      description:
+        type: "strip_html"
+        source: "description"
+
+    # Taxonomy mapping rules
+    taxonomy_suggestions:
+      default_primary: "1"  # Play & Pure Fun
+      default_subcategory: "1.4"  # Music & Rhythm Play
+
+    # Event type determination rules
+    event_type_rules:
+      - match:
+          title_contains: ["festival"]
+        type: "festival"
+      - match:
+          title_contains: ["concert", "live", "tour"]
+        type: "concert"
+      - match:
+          title_contains: ["workshop", "masterclass"]
+        type: "workshop"
+      - match:
+          title_contains: ["comedy", "stand-up"]
+        type: "theater"
+      - match:
+          title_contains: ["exhibition", "exhibit"]
+        type: "exhibition"
+      - default: true
+        type: "other"
+
+    # Default values
+    defaults:
+      page_size: 50
+      days_ahead: 120
+      country_code: "ES"
+      cities: ["Barcelona", "Madrid"]
+      location:
+        country_code: "ES"
+        timezone: "Europe/Madrid"
+
+    # Validation rules
+    validation:
+      required_fields: ["title", "source_event_id"]
+      future_events_only: true
+
+    # Enrichment options
+    enrichment:
+      feature_extraction:
+        enabled: false
+
+    # Scheduling
+    schedule:
+      type: "cron"
+      interval_hours: 12
+      cron_expression: "0 */12 * * *"  # Every 12 hours
       enabled: false
 
 # =========================================================================
@@ -220,8 +346,8 @@ global:
       timeout: 5
       check_accessibility: true
 
-  # Monitoring & alerts
-  monitoring:
+  # Monitoring & alerts (observability)
+  observability:
     sentry_enabled: false
     sentry_dsn: "${SENTRY_DSN}"
 
