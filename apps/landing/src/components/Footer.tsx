@@ -45,7 +45,7 @@ export default function Footer() {
               <span className="font-semibold tracking-tight">Pulsecity</span>
             </Link>
             <p className="text-sm text-[#555] leading-relaxed">
-              Help humans spend their free time better.
+              Fly through your city. Feel its pulse.
             </p>
           </div>
 

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Check } from "lucide-react";
 import Link from "next/link";
+import PulseBee from "@/components/PulseBee";
 
 const FORMSPREE_URL = "https://formspree.io/f/mbdalven";
 
@@ -61,6 +62,33 @@ export default function EarlyAccess() {
           transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
           className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] rounded-full bg-purple-600/[0.07] blur-[120px]"
         />
+
+        {/* Bee flythrough */}
+        <motion.div
+          initial={{ x: "-10vw", y: "40vh", opacity: 0 }}
+          animate={{
+            x: ["-10vw", "20vw", "40vw", "60vw", "80vw", "110vw"],
+            y: ["40vh", "32vh", "45vh", "30vh", "38vh", "34vh"],
+            opacity: [0, 0.25, 0.25, 0.25, 0.25, 0],
+            rotate: [0, -4, 6, -5, 3, 0],
+          }}
+          transition={{
+            duration: 20,
+            delay: 1,
+            ease: "easeInOut",
+            times: [0, 0.1, 0.35, 0.6, 0.85, 1],
+          }}
+          className="absolute z-[1] pointer-events-none"
+        >
+          <motion.div
+            animate={{ y: [0, -5, 0, 4, 0] }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <div className="drop-shadow-[0_0_16px_rgba(139,92,246,0.35)]">
+              <PulseBee size={44} />
+            </div>
+          </motion.div>
+        </motion.div>
       </div>
 
       <motion.div

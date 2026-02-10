@@ -3,6 +3,7 @@
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
 import Link from "next/link";
+import PulseBee from "./PulseBee";
 
 export default function Hero() {
   const ref = useRef(null);
@@ -47,6 +48,33 @@ export default function Hero() {
           transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full bg-pink-600/[0.04] blur-[100px]"
         />
+
+        {/* Bee flythrough */}
+        <motion.div
+          initial={{ x: "-10vw", y: "45vh", opacity: 0 }}
+          animate={{
+            x: ["-10vw", "15vw", "30vw", "45vw", "55vw", "65vw", "80vw", "110vw"],
+            y: ["45vh", "38vh", "48vh", "35vh", "42vh", "32vh", "40vh", "36vh"],
+            opacity: [0, 0.18, 0.28, 0.38, 0.28, 0.28, 0.18, 0],
+            rotate: [0, -5, 8, -6, 4, -3, 5, 0],
+          }}
+          transition={{
+            duration: 20,
+            delay: 1.5,
+            ease: "easeInOut",
+            times: [0, 0.08, 0.22, 0.38, 0.54, 0.7, 0.86, 1],
+          }}
+          className="absolute z-[1] pointer-events-none"
+        >
+          <motion.div
+            animate={{ y: [0, -6, 0, 5, 0] }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <div className="drop-shadow-[0_0_16px_rgba(139,92,246,0.35)]">
+              <PulseBee size={52} />
+            </div>
+          </motion.div>
+        </motion.div>
       </div>
 
       <motion.div
