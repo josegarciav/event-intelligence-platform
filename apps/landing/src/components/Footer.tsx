@@ -1,6 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
+import logo from "@/app/apple-icon.png";
 
 const footerLinks = {
   Product: [
@@ -33,9 +35,13 @@ export default function Footer() {
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
             <Link href="/" className="flex items-center gap-2 mb-4">
-              <div className="w-7 h-7 rounded-md gradient-bg flex items-center justify-center">
-                <span className="text-white font-bold text-xs">P</span>
-              </div>
+              <Image
+                src={logo}
+                alt="Pulsecity"
+                width={28}
+                height={28}
+                className="w-7 h-7 rounded-md object-cover"
+              />
               <span className="font-semibold tracking-tight">Pulsecity</span>
             </Link>
             <p className="text-sm text-[#555] leading-relaxed">

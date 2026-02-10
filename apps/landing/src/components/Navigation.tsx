@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 import Link from "next/link";
+import logo from "@/app/apple-icon.png";
 
 const links = [
   { label: "Product", href: "/product" },
@@ -34,9 +36,13 @@ export default function Navigation() {
       >
         <div className="max-w-7xl mx-auto px-6 md:px-12 py-5 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 rounded-lg gradient-bg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">P</span>
-            </div>
+            <Image
+              src={logo}
+              alt="Pulsecity"
+              width={32}
+              height={32}
+              className="w-8 h-8 rounded-lg object-cover"
+            />
             <span className="font-semibold text-lg tracking-tight">
               Pulsecity
             </span>
