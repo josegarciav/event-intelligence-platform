@@ -29,6 +29,26 @@ class EventDataWriter:
         """
         self.conn = db_connection
         self._value_to_id = get_primary_category_value_to_id_map()
+        # Metadata cache for foreign key verification (issue #8)
+        self._valid_primary_categories = set()
+        self._valid_subcategories = set()
+        self._valid_activities = set()
+        self._load_metadata_cache()
+
+    def _load_metadata_cache(self) -> None:
+        """Load valid IDs from taxonomy tables into memory for verification."""
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute("SELECT primary_category_id FROM primary_categories")
+                self._valid_primary_categories = {row[0] for row in cur.fetchall()}
+
+                cur.execute("SELECT subcategory_id FROM subcategories")
+                self._valid_subcategories = {row[0] for row in cur.fetchall()}
+
+                cur.execute("SELECT activity_id FROM activities_metadata")
+                self._valid_activities = {str(row[0]) for row in cur.fetchall()}
+        except Exception as e:
+            logger.error(f"Failed to load metadata cache: {e}")
 
     def persist_batch(self, events: List[EventSchema]) -> int:
         """
@@ -211,6 +231,14 @@ class EventDataWriter:
         # Convert PrimaryCategory enum value to taxonomy ID
         primary_cat_id = self._value_to_id.get(event.primary_category)
 
+        # Issue #8: Verify primary_category_id exists
+        if primary_cat_id and primary_cat_id not in self._valid_primary_categories:
+            logger.warning(
+                f"Event '{event.title}': primary_category_id '{primary_cat_id}' "
+                "not found in metadata. Setting to NULL."
+            )
+            primary_cat_id = None
+
         cur.execute(
             """
             INSERT INTO events (
@@ -289,6 +317,23 @@ class EventDataWriter:
 
     def _persist_taxonomy_mappings(self, cur, event: EventSchema, event_id):
         for dim in event.taxonomy_dimensions:
+            # Issue #8: Verify subcategory_id and activity_id
+            sub_id = dim.subcategory
+            if sub_id and sub_id not in self._valid_subcategories:
+                logger.warning(
+                    f"Event '{event.title}': subcategory_id '{sub_id}' "
+                    "not found in metadata. Skipping this dimension mapping."
+                )
+                continue
+
+            act_id = dim.activity_id
+            if act_id and str(act_id) not in self._valid_activities:
+                logger.warning(
+                    f"Event '{event.title}': activity_id '{act_id}' "
+                    "not found in metadata. Setting to NULL."
+                )
+                act_id = None
+
             cur.execute(
                 """
                 INSERT INTO event_taxonomy_mappings (
@@ -301,8 +346,8 @@ class EventDataWriter:
                 """,
                 (
                     event_id,
-                    dim.subcategory,
-                    dim.activity_id,
+                    sub_id,
+                    act_id,
                     dim.activity_name,
                     dim.energy_level,
                     dim.social_intensity,
@@ -320,6 +365,10 @@ class EventDataWriter:
 
             # Persist emotional outputs for this mapping
             for emotion in dim.emotional_output:
+                if not act_id:
+                    # Cannot link emotion to non-existent activity metadata
+                    continue
+
                 cur.execute(
                     """
                     INSERT INTO activity_emotional_outputs (activity_id, emotion_name)
@@ -327,7 +376,7 @@ class EventDataWriter:
                     ON CONFLICT (activity_id, emotion_name) DO NOTHING
                     RETURNING emotional_output_id;
                     """,
-                    (dim.activity_id, emotion),
+                    (act_id, emotion),
                 )
                 res = cur.fetchone()
                 if res:
@@ -336,7 +385,7 @@ class EventDataWriter:
                     cur.execute(
                         "SELECT emotional_output_id FROM activity_emotional_outputs "
                         "WHERE activity_id = %s AND emotion_name = %s",
-                        (dim.activity_id, emotion),
+                        (act_id, emotion),
                     )
                     emo_id = cur.fetchone()[0]
 
