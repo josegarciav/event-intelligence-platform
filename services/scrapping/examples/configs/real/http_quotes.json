@@ -1,0 +1,18 @@
+{
+  "sources": [
+    {
+      "source_id": "http_quotes",
+      "engine": {
+        "type": "http",
+        "rate_limit_policy": { "min_delay_s": 0.5 }
+      },
+      "entrypoints": [
+        { "url": "https://quotes.toscrape.com/page/{page}/", "paging": { "mode": "page", "start": 1, "end": 2 } }
+      ],
+      "discovery": {
+        "link_extract": { "method": "css", "selector": ".quote span a" }
+      },
+      "quality": { "min_text_len": 100 }
+    }
+  ]
+}

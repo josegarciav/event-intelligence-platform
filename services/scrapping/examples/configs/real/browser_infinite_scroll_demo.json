@@ -1,0 +1,20 @@
+{
+  "sources": [
+    {
+      "source_id": "browser_infinite_scroll",
+      "engine": {
+        "type": "browser",
+        "headless": true
+      },
+      "entrypoints": [ { "url": "https://quotes.toscrape.com/scroll" } ],
+      "discovery": {
+        "wait_for": ".quote",
+        "link_extract": { "method": "css", "selector": ".quote span a" }
+      },
+      "actions": [
+        { "type": "scroll", "params": { "mode": "down", "repeat": 3 } },
+        { "type": "wait_for", "selector": ".quote:nth-child(10)" }
+      ]
+    }
+  ]
+}

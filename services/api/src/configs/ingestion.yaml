@@ -141,7 +141,7 @@ sources:
       days_ahead: 120
       areas:
         Barcelona: 20
-        Madrid: 28
+        Madrid: 41
       location:
         cities: [ "Barcelona", "Madrid" ]
         country_code: "ES"

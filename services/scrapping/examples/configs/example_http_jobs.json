@@ -1,0 +1,41 @@
+{
+  "sources": [
+    {
+      "source_id": "example_http_jobs",
+      "engine": {
+        "type": "http",
+        "timeout_s": 15,
+        "retry_policy": {
+          "max_retries": 3,
+          "backoff": "exp"
+        }
+      },
+      "entrypoints": [
+        {
+          "url": "https://example.com/jobs?page={page}",
+          "paging": {
+            "mode": "page",
+            "start": 1,
+            "end": 5
+          }
+        }
+      ],
+      "schedule": {
+        "frequency": "1h"
+      },
+      "discovery": {
+        "link_extract": {
+          "method": "regex",
+          "pattern": "https://example\\.com/jobs/\\d+"
+        }
+      },
+      "quality": {
+        "min_text_len": 200,
+        "required_fields": ["title", "text"]
+      },
+      "storage": {
+        "items_format": "jsonl"
+      }
+    }
+  ]
+}

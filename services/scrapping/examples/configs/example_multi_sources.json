@@ -1,0 +1,42 @@
+{
+  "sources": [
+    {
+      "source_id": "naukrigulf",
+      "engine": { "type": "http" },
+      "schedule": { "frequency": "12h" },
+      "entrypoints": [ { "url": "https://www.naukrigulf.com/jobs-in-gulf" } ],
+      "discovery": {
+        "link_extract": { "method": "regex", "pattern": "https://www\\.naukrigulf\\.com/.*-jobs-\\d+" }
+      },
+      "quality": { "min_text_len": 300 }
+    },
+    {
+      "source_id": "linkedin_guest",
+      "engine": { "type": "http" },
+      "entrypoints": [ { "url": "https://www.linkedin.com/jobs/search?keywords=data+science" } ],
+      "discovery": {
+        "link_extract": { "method": "regex", "pattern": "https://www\\.linkedin\\.com/jobs/view/\\d+" }
+      },
+      "quality": { "min_text_len": 300 }
+    },
+    {
+      "source_id": "emploi_ma",
+      "engine": { "type": "http" },
+      "entrypoints": [ { "url": "https://www.emploi.ma/recherche-jobs-maroc" } ],
+      "discovery": {
+        "link_extract": { "method": "css", "selector": "div.job-description-wrapper a" }
+      },
+      "quality": { "min_text_len": 200 }
+    },
+    {
+      "source_id": "rekrute",
+      "engine": { "type": "hybrid" },
+      "entrypoints": [ { "url": "https://www.rekrute.com/offres.html" } ],
+      "discovery": {
+        "link_extract": { "method": "regex", "pattern": "https://www\\.rekrute\\.com/offre-emploi-.*\\.html" },
+        "wait_for": ".job-list"
+      },
+      "quality": { "min_text_len": 300 }
+    }
+  ]
+}

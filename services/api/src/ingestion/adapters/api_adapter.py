@@ -130,7 +130,9 @@ class APIAdapter(BaseSourceAdapter):
 
                 all_data.extend(data)
                 metadata["pages_fetched"] = 1
-                metadata["total_available"] = response.get("totalResults", len(data))
+                metadata["total_available"] = self._extract_total_available(
+                    response, data
+                )
 
         except Exception as e:
             logger.error(f"API fetch failed: {e}")
@@ -195,6 +197,14 @@ class APIAdapter(BaseSourceAdapter):
 
             logger.error(f"Request failed after {retry_count} retries: {e}")
             return None
+
+    def _extract_total_available(self, response: Dict, data: list) -> int:
+        """
+        Extract total available count from the API response.
+
+        Override in subclasses to navigate source-specific response structures.
+        """
+        return response.get("totalResults", len(data))
 
     def _default_query_builder(self, **kwargs) -> Dict:
         """Default query builder - override or provide custom."""

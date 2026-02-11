@@ -1,0 +1,114 @@
+{
+  "config_version": "v1",
+  "run": {
+    "name": "Hard Targets Bot Diagnostics",
+    "description": "Multi-source diagnostics hitting bot-detection test pages."
+  },
+  "storage": {
+    "items": { "format": "jsonl" }
+  },
+  "sources": [
+    {
+      "source_id": "bot_incolumitas",
+      "engine": {
+        "type": "browser",
+        "timeout_s": 30,
+        "browser": {
+          "headless": true,
+          "save_artifacts": true
+        },
+        "rate_limit_policy": {
+          "rps": 0.1,
+          "min_delay_s": 5.0
+        }
+      },
+      "entrypoints": [{ "url": "https://bot.incolumitas.com/" }],
+      "metadata": { "purpose": "diagnostic", "compliance": "detection_only" }
+    },
+    {
+      "source_id": "bot_sannysoft",
+      "engine": {
+        "type": "browser",
+        "timeout_s": 30,
+        "browser": {
+          "headless": true,
+          "save_artifacts": true
+        },
+        "rate_limit_policy": {
+          "rps": 0.1,
+          "min_delay_s": 5.0
+        }
+      },
+      "entrypoints": [{ "url": "https://bot.sannysoft.com/" }],
+      "metadata": { "purpose": "diagnostic", "compliance": "detection_only" }
+    },
+    {
+      "source_id": "bot_rebrowser",
+      "engine": {
+        "type": "browser",
+        "timeout_s": 30,
+        "browser": {
+          "headless": true,
+          "save_artifacts": true
+        },
+        "rate_limit_policy": {
+          "rps": 0.1,
+          "min_delay_s": 5.0
+        }
+      },
+      "entrypoints": [{ "url": "https://rebrowser.net/docs/rebrowser-bot-detector" }],
+      "metadata": { "purpose": "diagnostic", "compliance": "detection_only" }
+    },
+    {
+      "source_id": "bot_areyouheadless",
+      "engine": {
+        "type": "browser",
+        "timeout_s": 30,
+        "browser": {
+          "headless": true,
+          "save_artifacts": true
+        },
+        "rate_limit_policy": {
+          "rps": 0.1,
+          "min_delay_s": 5.0
+        }
+      },
+      "entrypoints": [{ "url": "https://arh.antoinevastel.com/bots/areyouheadless" }],
+      "metadata": { "purpose": "diagnostic", "compliance": "detection_only" }
+    },
+    {
+      "source_id": "bot_pixelscan",
+      "engine": {
+        "type": "browser",
+        "timeout_s": 30,
+        "browser": {
+          "headless": true,
+          "save_artifacts": true
+        },
+        "rate_limit_policy": {
+          "rps": 0.1,
+          "min_delay_s": 5.0
+        }
+      },
+      "entrypoints": [{ "url": "https://pixelscan.net/" }],
+      "metadata": { "purpose": "diagnostic", "compliance": "detection_only" }
+    },
+    {
+      "source_id": "bot_browserscan",
+      "engine": {
+        "type": "browser",
+        "timeout_s": 30,
+        "browser": {
+          "headless": true,
+          "save_artifacts": true
+        },
+        "rate_limit_policy": {
+          "rps": 0.1,
+          "min_delay_s": 5.0
+        }
+      },
+      "entrypoints": [{ "url": "https://www.browserscan.net/bot-detection" }],
+      "metadata": { "purpose": "diagnostic", "compliance": "detection_only" }
+    }
+  ]
+}

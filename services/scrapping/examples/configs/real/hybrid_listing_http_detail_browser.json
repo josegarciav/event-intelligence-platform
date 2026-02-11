@@ -1,0 +1,16 @@
+{
+  "sources": [
+    {
+      "source_id": "hybrid_quotes",
+      "engine": {
+        "type": "hybrid",
+        "default_get": "http"
+      },
+      "entrypoints": [ { "url": "https://quotes.toscrape.com/" } ],
+      "discovery": {
+        "link_extract": { "method": "css", "selector": ".quote span a" }
+      },
+      "quality": { "min_text_len": 100 }
+    }
+  ]
+}

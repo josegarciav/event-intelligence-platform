@@ -179,6 +179,13 @@ class ConfigDrivenAPIAdapter(APIAdapter):
         """
         Recursively substitute {{variable}} placeholders in template.
 
+        When the entire string is a single placeholder (e.g. "{{area_id}}"),
+        the original value type is preserved (int, float, etc.) so that
+        GraphQL Int fields receive integers, not strings.
+
+        When the placeholder is embedded in a larger string
+        (e.g. "https://example.com/{{id}}"), string conversion is used.
+
         Args:
             template: Template structure (dict, list, or string)
             params: Parameter values for substitution
@@ -187,7 +194,15 @@ class ConfigDrivenAPIAdapter(APIAdapter):
             Template with substituted values
         """
         if isinstance(template, str):
-            # Find and replace {{variable}} patterns
+            # Fast path: if the entire string is exactly one placeholder,
+            # return the raw value to preserve its type (int, float, bool, etc.)
+            stripped = template.strip()
+            for key, value in params.items():
+                placeholder = f"{{{{{key}}}}}"
+                if stripped == placeholder:
+                    return value
+
+            # General case: string interpolation (always produces a string)
             result = template
             for key, value in params.items():
                 placeholder = f"{{{{{key}}}}}"
@@ -233,6 +248,23 @@ class ConfigDrivenAPIAdapter(APIAdapter):
         except Exception as e:
             logger.error(f"Failed to parse response: {e}")
             return []
+
+    def _extract_total_available(self, response: dict, data: list) -> int:
+        """Extract total available using configured total_results_path."""
+        path = self.source_config.total_results_path
+        if not path:
+            return len(data)
+
+        value = response
+        for part in path.split("."):
+            if isinstance(value, dict):
+                value = value.get(part)
+            else:
+                return len(data)
+
+        if isinstance(value, (int, float)):
+            return int(value)
+        return len(data)
 
     def fetch(self, **kwargs) -> FetchResult:
         """

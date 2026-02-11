@@ -200,6 +200,73 @@ class TestConfigDrivenAPIAdapterSubstitution:
 
         assert result == 42
 
+    def test_substitute_preserves_int_type(self, sample_source_config):
+        """Whole-placeholder substitution should preserve int type for GraphQL."""
+        from src.ingestion.adapters.api_adapter import APIAdapterConfig
+
+        api_config = APIAdapterConfig(
+            source_id="test",
+            source_type=SourceType.API,
+            graphql_endpoint="https://test.com",
+        )
+        adapter = ConfigDrivenAPIAdapter(api_config, sample_source_config)
+
+        result = adapter._substitute_variables(
+            "{{area_id}}",
+            {"area_id": 20},
+        )
+
+        assert result == 20
+        assert isinstance(result, int)
+
+    def test_substitute_int_in_mixed_string_becomes_str(self, sample_source_config):
+        """Embedded placeholder should still produce a string."""
+        from src.ingestion.adapters.api_adapter import APIAdapterConfig
+
+        api_config = APIAdapterConfig(
+            source_id="test",
+            source_type=SourceType.API,
+            graphql_endpoint="https://test.com",
+        )
+        adapter = ConfigDrivenAPIAdapter(api_config, sample_source_config)
+
+        result = adapter._substitute_variables(
+            "area={{area_id}}&page=1",
+            {"area_id": 20},
+        )
+
+        assert result == "area=20&page=1"
+        assert isinstance(result, str)
+
+    def test_substitute_preserves_types_in_nested_dict(self, sample_source_config):
+        """Type preservation should work in nested structures (like GraphQL vars)."""
+        from src.ingestion.adapters.api_adapter import APIAdapterConfig
+
+        api_config = APIAdapterConfig(
+            source_id="test",
+            source_type=SourceType.API,
+            graphql_endpoint="https://test.com",
+        )
+        adapter = ConfigDrivenAPIAdapter(api_config, sample_source_config)
+
+        template = {
+            "filters": {
+                "areas": {"eq": "{{area_id}}"},
+            },
+            "pageSize": "{{page_size}}",
+            "page": "{{page}}",
+        }
+        result = adapter._substitute_variables(
+            template,
+            {"area_id": 20, "page_size": 50, "page": 1},
+        )
+
+        assert result["filters"]["areas"]["eq"] == 20
+        assert isinstance(result["filters"]["areas"]["eq"], int)
+        assert result["pageSize"] == 50
+        assert isinstance(result["pageSize"], int)
+        assert result["page"] == 1
+
 
 class TestConfigDrivenAPIAdapterParseResponse:
     """Tests for response parsing in ConfigDrivenAPIAdapter."""

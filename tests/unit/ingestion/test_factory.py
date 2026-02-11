@@ -480,7 +480,7 @@ class TestRealConfigPipelineCreation:
         assert "Barcelona" in areas
         assert "Madrid" in areas
         assert areas["Barcelona"] == 20
-        assert areas["Madrid"] == 28
+        assert areas["Madrid"] == 41
 
     def test_factory_creates_pipeline_with_event_type_rules(self):
         """Pipeline should have event type rules from config."""

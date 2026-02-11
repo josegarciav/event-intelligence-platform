@@ -1,0 +1,41 @@
+{
+  "config_version": 1,
+  "sources": [
+    {
+      "source_id": "quotes_js",
+      "engine": {
+        "type": "browser",
+        "browser": {
+          "browser_name": "chromium",
+          "headless": true,
+          "timeout_s": 30,
+          "render_timeout_s": 10
+        }
+      },
+      "entrypoints": [
+        {
+          "url": "https://quotes.toscrape.com/js/"
+        }
+      ],
+      "discovery": {
+        "link_extract": {
+          "method": "regex",
+          "pattern": "/page/\\d+/"
+        }
+      },
+      "parsing": {
+        "item_extract": {
+          "method": "css",
+          "selector": ".quote",
+          "fields": {
+            "text": { "selector": ".text", "type": "text" },
+            "author": { "selector": ".author", "type": "text" }
+          }
+        }
+      },
+      "storage": {
+        "items": { "format": "jsonl" }
+      }
+    }
+  ]
+}

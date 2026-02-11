@@ -1,0 +1,46 @@
+{
+  "config_version": "v1",
+  "run": {
+    "name": "Hard Targets Challenge Detection",
+    "description": "Detection of Turnstile and reCAPTCHA challenge pages."
+  },
+  "storage": {
+    "items": { "format": "jsonl" }
+  },
+  "sources": [
+    {
+      "source_id": "challenge_turnstile",
+      "engine": {
+        "type": "browser",
+        "timeout_s": 30,
+        "browser": {
+          "headless": true,
+          "save_artifacts": true
+        },
+        "rate_limit_policy": {
+          "rps": 0.1,
+          "min_delay_s": 5.0
+        }
+      },
+      "entrypoints": [{ "url": "https://demo.turnstile.workers.dev/" }],
+      "metadata": { "purpose": "challenge_detection", "compliance": "no_bypass" }
+    },
+    {
+      "source_id": "challenge_recaptcha",
+      "engine": {
+        "type": "browser",
+        "timeout_s": 30,
+        "browser": {
+          "headless": true,
+          "save_artifacts": true
+        },
+        "rate_limit_policy": {
+          "rps": 0.1,
+          "min_delay_s": 5.0
+        }
+      },
+      "entrypoints": [{ "url": "https://www.google.com/recaptcha/api2/demo" }],
+      "metadata": { "purpose": "challenge_detection", "compliance": "no_bypass" }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "config_version": 1,
+  "batch_name": "alibaba_l3_electronics",
+  "keywords_source": "examples/configs/real/alibaba/l3_hierarchy.json",
+  "recipe": "alibaba_l3",
+  "recipe_config": {
+    "max_pages": 10,
+    "checkpoint_every_n": 20
+  }
+}

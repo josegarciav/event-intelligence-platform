@@ -1,0 +1,39 @@
+{
+  "sources": [
+    {
+      "source_id": "example_hybrid_js",
+      "engine": {
+        "type": "hybrid",
+        "headless": true
+      },
+      "entrypoints": [
+        {
+          "url": "https://example.com/dynamic"
+        }
+      ],
+      "discovery": {
+        "wait_for": "div.content-loaded",
+        "link_extract": {
+          "method": "css",
+          "selector": "a.item-link"
+        }
+      },
+      "actions": [
+        {
+          "type": "scroll",
+          "params": {
+            "mode": "down",
+            "repeat": 2
+          }
+        },
+        {
+          "type": "wait_for",
+          "selector": "footer"
+        }
+      ],
+      "storage": {
+        "items_format": "jsonl"
+      }
+    }
+  ]
+}
