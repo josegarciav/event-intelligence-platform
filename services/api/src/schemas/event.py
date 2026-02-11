@@ -278,6 +278,7 @@ class TaxonomyDimension(BaseModel):
         description="Human-readable subcategory name (e.g. 'Music & Rhythm Play')",
     )
     values: List[str] = Field(default_factory=list)
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
 
     # Activity identification
     activity_id: Optional[str] = Field(

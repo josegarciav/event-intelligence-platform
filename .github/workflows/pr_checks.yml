@@ -43,10 +43,11 @@ jobs:
         run: uv run pytest --cov=. --cov-fail-under=50
 
       - name: Validate commit messages
-        uses: amitsingh-007/validate-commit-message@v2
+        uses: gsactions/commit-message-checker@v2
         with:
           pattern: '^(feat|fix|docs|style|refactor|perf|test|chore)(\(.+\))?: [a-z0-9 ]{1,150}$'
-          ignore-case: true
+          flags: 'i'
+          error: 'Commit message does not follow Conventional Commits format.'
 
       - name: Verify lockfile is in sync
         run: uv lock --check
