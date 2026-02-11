@@ -40,7 +40,15 @@ async def lifespan(app: FastAPI):
     """
     Handle app startup and shutdown events.
     """
+    # Initialize the database connection pool on startup
+    try:
+        get_pool()
+    except Exception as e:
+        # Log error or handle as needed; for now, we let it fail startup if DB is required
+        print(f"Failed to initialize database pool: {e}")
+
     yield
+
     # Shutdown: Close all connections in the pool
     global _POOL
     if _POOL is not None:
