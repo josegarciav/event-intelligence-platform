@@ -409,3 +409,164 @@ class TestConvenienceFunctions:
         create_all_pipelines()
 
         mock_factory.create_all_enabled_pipelines.assert_called_once()
+
+
+# =============================================================================
+# TESTS: Real config-driven pipeline creation
+# =============================================================================
+
+
+class TestRealConfigPipelineCreation:
+    """Tests using the actual ingestion.yaml to verify pipeline creation works."""
+
+    def test_factory_reads_real_config(self):
+        """Factory should successfully load the real ingestion.yaml."""
+        from src.ingestion.factory import PipelineFactory, DEFAULT_CONFIG_PATH
+
+        factory = PipelineFactory()
+        config = factory.config
+
+        assert "sources" in config
+        assert "ra_co" in config["sources"]
+
+    def test_factory_lists_real_sources(self):
+        """Should list all real sources with correct metadata."""
+        from src.ingestion.factory import PipelineFactory
+
+        factory = PipelineFactory()
+        sources = factory.list_sources()
+
+        assert "ra_co" in sources
+        assert sources["ra_co"]["enabled"] is True
+        assert sources["ra_co"]["type"] == "api"
+
+        assert "ticketmaster" in sources
+        assert sources["ticketmaster"]["enabled"] is False
+
+    def test_factory_creates_ra_co_pipeline(self):
+        """Should create a working pipeline from ra_co config."""
+        from src.ingestion.factory import PipelineFactory
+        from src.ingestion.pipelines.apis.base_api import BaseAPIPipeline
+
+        factory = PipelineFactory()
+        pipeline = factory.create_pipeline("ra_co")
+
+        assert isinstance(pipeline, BaseAPIPipeline)
+        assert pipeline.source_config.source_name == "ra_co"
+        assert pipeline.source_config.protocol == "graphql"
+        assert pipeline.source_config.endpoint == "https://ra.co/graphql"
+        assert pipeline.source_config.max_pages == 10
+        assert pipeline.source_config.default_page_size == 50
+
+    def test_factory_creates_pipeline_with_field_mappings(self):
+        """Pipeline should have field mappings from config."""
+        from src.ingestion.factory import PipelineFactory
+
+        factory = PipelineFactory()
+        pipeline = factory.create_pipeline("ra_co")
+
+        assert "title" in pipeline.source_config.field_mappings
+        assert pipeline.source_config.field_mappings["title"] == "event.title"
+        assert "source_event_id" in pipeline.source_config.field_mappings
+
+    def test_factory_creates_pipeline_with_areas(self):
+        """Pipeline should have multi-city areas from config."""
+        from src.ingestion.factory import PipelineFactory
+
+        factory = PipelineFactory()
+        pipeline = factory.create_pipeline("ra_co")
+
+        areas = pipeline.source_config.defaults.get("areas", {})
+        assert "Barcelona" in areas
+        assert "Madrid" in areas
+        assert areas["Barcelona"] == 20
+        assert areas["Madrid"] == 28
+
+    def test_factory_creates_pipeline_with_event_type_rules(self):
+        """Pipeline should have event type rules from config."""
+        from src.ingestion.factory import PipelineFactory
+
+        factory = PipelineFactory()
+        pipeline = factory.create_pipeline("ra_co")
+
+        rules = pipeline.source_config.event_type_rules
+        assert len(rules) > 0
+        # Check that festival rule is present
+        festival_rules = [
+            r for r in rules if r.get("type") == "festival"
+        ]
+        assert len(festival_rules) == 1
+
+    def test_factory_disabled_source_raises(self):
+        """Should raise ValueError for disabled source."""
+        from src.ingestion.factory import PipelineFactory
+
+        factory = PipelineFactory()
+
+        with pytest.raises(ValueError, match="not enabled"):
+            factory.create_pipeline("ticketmaster")
+
+    def test_create_all_enabled_skips_disabled(self):
+        """create_all_enabled_pipelines should skip disabled sources."""
+        from src.ingestion.factory import PipelineFactory
+
+        factory = PipelineFactory()
+        pipelines = factory.create_all_enabled_pipelines()
+
+        assert "ra_co" in pipelines
+        assert "ticketmaster" not in pipelines
+
+
+class TestRESTAPIPipelineConfig:
+    """Tests for REST API (Ticketmaster) config parsing."""
+
+    def test_ticketmaster_config_parses_correctly(self):
+        """Should parse Ticketmaster config correctly."""
+        from src.ingestion.factory import PipelineFactory
+        from src.ingestion.pipelines.apis.base_api import (
+            create_api_pipeline_from_config,
+        )
+
+        factory = PipelineFactory()
+        config = factory.get_source_config("ticketmaster")
+
+        assert config is not None
+        assert config["connection"]["protocol"] == "rest"
+        assert config["connection"]["endpoint"] == (
+            "https://app.ticketmaster.com/discovery/v2/events.json"
+        )
+
+    def test_ticketmaster_pipeline_creation(self):
+        """Should create pipeline from Ticketmaster config (even if disabled)."""
+        from src.ingestion.factory import PipelineFactory
+        from src.ingestion.pipelines.apis.base_api import (
+            BaseAPIPipeline,
+            create_api_pipeline_from_config,
+        )
+
+        factory = PipelineFactory()
+        config = factory.get_source_config("ticketmaster")
+
+        # Create pipeline directly (bypassing enabled check)
+        pipeline = create_api_pipeline_from_config("ticketmaster", config)
+
+        assert isinstance(pipeline, BaseAPIPipeline)
+        assert pipeline.source_config.protocol == "rest"
+        assert pipeline.source_config.source_name == "ticketmaster"
+
+    def test_ticketmaster_field_mappings(self):
+        """Ticketmaster field mappings should be loaded."""
+        from src.ingestion.factory import PipelineFactory
+        from src.ingestion.pipelines.apis.base_api import (
+            create_api_pipeline_from_config,
+        )
+
+        factory = PipelineFactory()
+        config = factory.get_source_config("ticketmaster")
+        pipeline = create_api_pipeline_from_config("ticketmaster", config)
+
+        mappings = pipeline.source_config.field_mappings
+        assert mappings["title"] == "name"
+        assert mappings["source_event_id"] == "id"
+        assert "cost_min" in mappings
+        assert "cost_max" in mappings

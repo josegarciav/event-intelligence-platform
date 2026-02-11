@@ -460,15 +460,21 @@ class BaseAPIPipeline(BasePipeline):
         **kwargs,
     ) -> List[Dict[str, Any]]:
         """
-        Fetch events for a single area using a sliding date window.
+        Fetch events for a single area using an adaptive sliding date window.
 
-        Walks through the full date range in fixed-size windows (default 7 days).
-        Each window fetches up to max_pages of results. If a window is saturated
-        (total_available > fetched), the window size is halved for denser periods.
-        After a non-saturated window, the size is gradually restored.
+        Walks through the full date range in windows that automatically shrink
+        when a window is saturated (total_available > fetched) and grow back
+        when data density decreases.
 
-        This guarantees we retrieve as much data as the API allows, regardless
-        of how events are distributed across dates.
+        Supports fractional-day windows (down to 6 hours) so even a single
+        dense day can be split into sub-day windows, preventing data loss.
+
+        Algorithm:
+        1. Start at range_start with an initial 7-day window.
+        2. Fetch events for [cursor, cursor + window).
+        3. If saturated AND window can shrink: halve the window, retry same cursor.
+        4. If saturated at minimum window: accept partial data, log warning, advance.
+        5. If not saturated: advance cursor, gradually double window toward initial.
 
         Args:
             area_id: The area/city ID for the API
@@ -497,10 +503,10 @@ class BaseAPIPipeline(BasePipeline):
         max_pages = self.source_config.max_pages
         fetch_capacity = page_size * max_pages
 
-        # Start with a 7-day window; shrink/grow adaptively
-        initial_window = 7
-        window_days = initial_window
-        min_window = 1  # never go below 1 day
+        # Window sizing (in hours for sub-day granularity)
+        initial_window_hours = 7 * 24  # 7 days
+        min_window_hours = 6  # 6 hours — allows 4 slices per day
+        window_hours = initial_window_hours
 
         all_events: List[Dict[str, Any]] = []
         cursor = range_start
@@ -508,13 +514,22 @@ class BaseAPIPipeline(BasePipeline):
         self.logger.info(
             f"  {city_name}: sliding window fetch "
             f"[{range_start.date()}..{range_end.date()}] "
-            f"(capacity={fetch_capacity}/call, window={window_days}d)"
+            f"(capacity={fetch_capacity}/call, window={window_hours}h)"
         )
 
         while cursor < range_end:
-            window_end = min(cursor + timedelta(days=window_days), range_end)
+            window_end = min(
+                cursor + timedelta(hours=window_hours), range_end
+            )
+
+            # Snap to date strings for the API (most APIs accept date, not datetime)
             date_from_str = cursor.strftime("%Y-%m-%d")
             date_to_str = window_end.strftime("%Y-%m-%d")
+
+            # Avoid zero-width windows when sub-day and dates collapse
+            if date_from_str == date_to_str and window_hours < 24:
+                # Sub-day window within same calendar day — use next day as end
+                date_to_str = (cursor + timedelta(days=1)).strftime("%Y-%m-%d")
 
             fetch_result = self.adapter.fetch(
                 area_id=area_id,
@@ -526,28 +541,42 @@ class BaseAPIPipeline(BasePipeline):
             if fetch_result.success and fetch_result.raw_data:
                 fetched = len(fetch_result.raw_data)
                 total_available = fetch_result.metadata.get("total_available", fetched)
+                saturated = total_available > fetched
+
+                if saturated and window_hours > min_window_hours:
+                    # Window too big for this density — halve and retry
+                    window_hours = max(window_hours // 2, min_window_hours)
+                    self.logger.info(
+                        f"  {city_name}: [{date_from_str}..{date_to_str}] "
+                        f"{fetched}/{total_available} events "
+                        f"(SATURATED — shrinking to {window_hours}h)"
+                    )
+                    continue
+
+                # Accept the data (either not saturated or at minimum window)
                 all_events.extend(fetch_result.raw_data)
 
-                saturated = total_available > fetched
-                self.logger.info(
-                    f"  {city_name}: [{date_from_str}..{date_to_str}] "
-                    f"{fetched}/{total_available} events"
-                    f"{' (SATURATED — shrinking window)' if saturated else ''}"
-                )
-
-                if saturated and window_days > min_window:
-                    # Window too big for this density — halve it and re-try
-                    # the SAME cursor position with a smaller window
-                    window_days = max(window_days // 2, min_window)
-                    continue
+                if saturated:
+                    self.logger.warning(
+                        f"  {city_name}: [{date_from_str}..{date_to_str}] "
+                        f"{fetched}/{total_available} events "
+                        f"(SATURATED at min window — {total_available - fetched} "
+                        f"events may be missing)"
+                    )
                 else:
-                    # Window was fine — advance cursor past this window
-                    cursor = window_end
-                    # Gradually restore window size toward initial
-                    if window_days < initial_window:
-                        window_days = min(window_days * 2, initial_window)
+                    self.logger.info(
+                        f"  {city_name}: [{date_from_str}..{date_to_str}] "
+                        f"{fetched}/{total_available} events"
+                    )
+
+                # Advance cursor past this window
+                cursor = window_end
+
+                # Gradually restore window size toward initial
+                if window_hours < initial_window_hours:
+                    window_hours = min(window_hours * 2, initial_window_hours)
             else:
-                # Fetch failed or empty — advance anyway to avoid infinite loop
+                # Fetch failed or empty — advance to avoid infinite loop
                 self.logger.warning(
                     f"  {city_name}: [{date_from_str}..{date_to_str}] "
                     f"no results or fetch failed, advancing"

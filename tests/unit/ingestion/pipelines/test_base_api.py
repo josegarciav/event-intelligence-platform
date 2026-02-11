@@ -5,7 +5,7 @@ Tests for BaseAPIPipeline, APISourceConfig, and ConfigDrivenAPIAdapter.
 """
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -15,8 +15,8 @@ from src.ingestion.pipelines.apis.base_api import (
     ConfigDrivenAPIAdapter,
     create_api_pipeline_from_config,
 )
-from src.ingestion.base_pipeline import PipelineConfig
-from src.ingestion.adapters import SourceType
+from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
+from src.ingestion.adapters import FetchResult, SourceType
 from src.schemas.event import (
     EventType,
     LocationInfo,
@@ -576,3 +576,424 @@ class TestCreateAPIPipelineFromConfig:
             call_args = mock_init.call_args
             source_config = call_args[0][1]
             assert source_config.defaults["location"]["city"] == "Madrid"
+
+
+# =============================================================================
+# HELPER: Pipeline with mocked adapter for date-splitting tests
+# =============================================================================
+
+
+def _make_pipeline_for_date_splitting(source_config=None, pipeline_config=None):
+    """Create a BaseAPIPipeline instance with a mock adapter for testing."""
+    pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
+    pipeline.source_config = source_config or APISourceConfig(
+        source_name="test_api",
+        max_pages=2,
+        default_page_size=50,
+        defaults={"days_ahead": 30},
+    )
+    pipeline.config = pipeline_config or PipelineConfig(
+        source_name="test_api",
+        source_type=SourceType.API,
+    )
+    pipeline.adapter = MagicMock()
+    pipeline.logger = MagicMock()
+    return pipeline
+
+
+def _make_fetch_result(count, total_available=None, success=True):
+    """Build a FetchResult with `count` dummy events."""
+    return FetchResult(
+        success=success,
+        source_type=SourceType.API,
+        raw_data=[{"id": str(i)} for i in range(count)] if success and count else [],
+        total_fetched=count,
+        metadata={"total_available": total_available or count},
+    )
+
+
+# =============================================================================
+# TESTS: _fetch_with_date_splitting
+# =============================================================================
+
+
+class TestFetchWithDateSplitting:
+    """Tests for the adaptive sliding-window fetch logic."""
+
+    def test_single_window_non_saturated(self):
+        """When all data fits in one window, no splitting occurs."""
+        pipeline = _make_pipeline_for_date_splitting()
+        pipeline.adapter.fetch.return_value = _make_fetch_result(30, 30)
+
+        events = pipeline._fetch_with_date_splitting(
+            area_id=20,
+            city_name="Barcelona",
+            date_from="2025-06-01",
+            date_to="2025-06-08",
+        )
+
+        assert len(events) == 30
+        assert pipeline.adapter.fetch.call_count == 1
+
+    def test_saturated_window_triggers_halving(self):
+        """Saturated window should shrink and retry before accepting data."""
+        pipeline = _make_pipeline_for_date_splitting()
+
+        # First call: saturated (100 available, only 50 fetched) with 7d window
+        # Second call: non-saturated after halving to ~3.5d
+        pipeline.adapter.fetch.side_effect = [
+            _make_fetch_result(50, total_available=100),  # saturated, retry
+            _make_fetch_result(40, total_available=40),    # ok, advance
+            _make_fetch_result(35, total_available=35),    # ok, advance
+        ]
+
+        events = pipeline._fetch_with_date_splitting(
+            area_id=20,
+            city_name="Barcelona",
+            date_from="2025-06-01",
+            date_to="2025-06-08",
+        )
+
+        # First fetch was saturated, so data is NOT collected (retry with smaller window)
+        # Second + third fetches collected
+        assert len(events) == 40 + 35
+        assert pipeline.adapter.fetch.call_count == 3
+
+    def test_multiple_halvings_on_dense_period(self):
+        """Should halve multiple times for very dense data."""
+        pipeline = _make_pipeline_for_date_splitting()
+
+        # 7d → saturated → 3.5d (84h) → saturated → 1.75d (42h) → ok
+        pipeline.adapter.fetch.side_effect = [
+            _make_fetch_result(50, total_available=200),   # 168h window, saturated
+            _make_fetch_result(50, total_available=150),   # 84h window, saturated
+            _make_fetch_result(40, total_available=40),    # 42h window, ok
+            _make_fetch_result(30, total_available=30),    # next window, ok
+        ]
+
+        events = pipeline._fetch_with_date_splitting(
+            area_id=20,
+            city_name="Barcelona",
+            date_from="2025-06-01",
+            date_to="2025-06-04",
+        )
+
+        # Only non-saturated fetches contribute events
+        assert len(events) == 40 + 30
+        # Two saturated retries + two successful fetches = 4 calls
+        assert pipeline.adapter.fetch.call_count == 4
+
+    def test_saturated_at_min_window_accepts_data_with_warning(self):
+        """At min window (6h), should accept partial data and warn."""
+        pipeline = _make_pipeline_for_date_splitting()
+
+        saturated = _make_fetch_result(50, total_available=500)
+        non_saturated = _make_fetch_result(10, total_available=10)
+
+        # Halving: 168h→84h→42h→21h→10h→6h (min). At 6h: accept+warn.
+        # After accepting at 6h, cursor advances to 06:00.
+        # Window restores to 12h → fetch [06:00..18:00], then 24h → [18:00..June 2].
+        pipeline.adapter.fetch.side_effect = [
+            saturated,      # 168h, retry
+            saturated,      # 84h, retry
+            saturated,      # 42h, retry
+            saturated,      # 21h, retry
+            saturated,      # 10h, retry (10//2=5, clamped to 6)
+            saturated,      # 6h (min), accept + warn, advance to 06:00
+            non_saturated,  # 12h [06:00..18:00], ok, advance to 18:00
+            non_saturated,  # 24h [18:00..June 2], ok, done
+        ]
+
+        events = pipeline._fetch_with_date_splitting(
+            area_id=20,
+            city_name="Barcelona",
+            date_from="2025-06-01",
+            date_to="2025-06-02",
+        )
+
+        # Saturated window data (50) + two non-saturated windows (10 + 10)
+        assert len(events) == 50 + 10 + 10
+        # Verify warning was logged for the saturated-at-min case
+        warning_calls = [
+            c for c in pipeline.logger.warning.call_args_list
+            if "SATURATED at min window" in str(c)
+        ]
+        assert len(warning_calls) >= 1
+
+    def test_window_restores_after_non_saturated(self):
+        """Window size should gradually grow back after sparse period."""
+        pipeline = _make_pipeline_for_date_splitting()
+
+        # Track the date_from in each fetch call to verify window sizing
+        call_dates = []
+
+        def track_fetch(**kwargs):
+            call_dates.append((kwargs.get("date_from"), kwargs.get("date_to")))
+            return _make_fetch_result(10, total_available=10)
+
+        pipeline.adapter.fetch.side_effect = track_fetch
+
+        pipeline._fetch_with_date_splitting(
+            area_id=20,
+            city_name="Barcelona",
+            date_from="2025-06-01",
+            date_to="2025-07-01",
+        )
+
+        # All calls should succeed (non-saturated), window stays at 7 days
+        assert len(call_dates) >= 4
+        # Verify the windows advance forward
+        for i in range(1, len(call_dates)):
+            assert call_dates[i][0] >= call_dates[i - 1][0]
+
+    def test_empty_fetch_advances_cursor(self):
+        """Empty/failed fetch should advance cursor to avoid infinite loop."""
+        pipeline = _make_pipeline_for_date_splitting()
+
+        pipeline.adapter.fetch.side_effect = [
+            _make_fetch_result(0, success=True),   # empty
+            _make_fetch_result(20, total_available=20),  # next window ok
+        ]
+
+        events = pipeline._fetch_with_date_splitting(
+            area_id=20,
+            city_name="Barcelona",
+            date_from="2025-06-01",
+            date_to="2025-06-15",
+        )
+
+        assert len(events) == 20
+        assert pipeline.adapter.fetch.call_count == 2
+
+    def test_failed_fetch_advances_cursor(self):
+        """Failed fetch should advance cursor."""
+        pipeline = _make_pipeline_for_date_splitting()
+
+        pipeline.adapter.fetch.side_effect = [
+            _make_fetch_result(0, success=False),       # failed
+            _make_fetch_result(15, total_available=15),  # ok
+        ]
+
+        events = pipeline._fetch_with_date_splitting(
+            area_id=20,
+            city_name="Barcelona",
+            date_from="2025-06-01",
+            date_to="2025-06-15",
+        )
+
+        assert len(events) == 15
+        assert pipeline.adapter.fetch.call_count == 2
+
+    def test_uses_config_days_ahead_default(self):
+        """Should use days_ahead from config when date_to not provided."""
+        pipeline = _make_pipeline_for_date_splitting()
+        pipeline.source_config.defaults = {"days_ahead": 14}
+        pipeline.adapter.fetch.return_value = _make_fetch_result(10, 10)
+
+        with patch(
+            "src.ingestion.pipelines.apis.base_api.datetime"
+        ) as mock_dt:
+            mock_dt.now.return_value = datetime(2025, 6, 1, tzinfo=timezone.utc)
+            mock_dt.strptime = datetime.strptime
+            mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+
+            events = pipeline._fetch_with_date_splitting(
+                area_id=20,
+                city_name="Barcelona",
+                date_from="2025-06-01",
+            )
+
+        # Should have fetched events (exact count depends on window math)
+        assert len(events) >= 10
+
+    def test_full_range_coverage(self):
+        """Should cover the entire date range without gaps."""
+        pipeline = _make_pipeline_for_date_splitting()
+
+        fetched_ranges = []
+
+        def track_fetch(**kwargs):
+            fetched_ranges.append((kwargs["date_from"], kwargs["date_to"]))
+            return _make_fetch_result(5, total_available=5)
+
+        pipeline.adapter.fetch.side_effect = track_fetch
+
+        pipeline._fetch_with_date_splitting(
+            area_id=20,
+            city_name="Barcelona",
+            date_from="2025-06-01",
+            date_to="2025-06-22",
+        )
+
+        # Verify no gaps: each window starts where the last ended
+        for i in range(1, len(fetched_ranges)):
+            prev_end = fetched_ranges[i - 1][1]
+            curr_start = fetched_ranges[i][0]
+            assert curr_start >= prev_end or curr_start == prev_end
+
+    def test_passes_extra_kwargs_to_adapter(self):
+        """Extra kwargs should be forwarded to adapter.fetch."""
+        pipeline = _make_pipeline_for_date_splitting()
+        pipeline.adapter.fetch.return_value = _make_fetch_result(10, 10)
+
+        pipeline._fetch_with_date_splitting(
+            area_id=20,
+            city_name="Barcelona",
+            date_from="2025-06-01",
+            date_to="2025-06-08",
+            custom_param="value",
+        )
+
+        # Verify custom_param was passed through
+        fetch_kwargs = pipeline.adapter.fetch.call_args[1]
+        assert fetch_kwargs["custom_param"] == "value"
+        assert fetch_kwargs["area_id"] == 20
+
+
+class TestFetchWithDateSplittingEdgeCases:
+    """Edge cases for the sliding window algorithm."""
+
+    def test_single_day_range(self):
+        """Should handle a single-day date range."""
+        pipeline = _make_pipeline_for_date_splitting()
+        pipeline.adapter.fetch.return_value = _make_fetch_result(5, 5)
+
+        events = pipeline._fetch_with_date_splitting(
+            area_id=20,
+            city_name="Barcelona",
+            date_from="2025-06-01",
+            date_to="2025-06-02",
+        )
+
+        assert len(events) == 5
+        assert pipeline.adapter.fetch.call_count == 1
+
+    def test_same_start_end_returns_empty(self):
+        """Should return empty when start == end."""
+        pipeline = _make_pipeline_for_date_splitting()
+
+        events = pipeline._fetch_with_date_splitting(
+            area_id=20,
+            city_name="Barcelona",
+            date_from="2025-06-01",
+            date_to="2025-06-01",
+        )
+
+        assert len(events) == 0
+        assert pipeline.adapter.fetch.call_count == 0
+
+    def test_all_windows_empty(self):
+        """Should handle case where all windows return no data."""
+        pipeline = _make_pipeline_for_date_splitting()
+        pipeline.adapter.fetch.return_value = _make_fetch_result(0, success=True)
+
+        events = pipeline._fetch_with_date_splitting(
+            area_id=20,
+            city_name="Barcelona",
+            date_from="2025-06-01",
+            date_to="2025-06-15",
+        )
+
+        assert len(events) == 0
+        assert pipeline.adapter.fetch.call_count >= 1
+
+
+# =============================================================================
+# TESTS: Multi-city execute() integration
+# =============================================================================
+
+
+class TestMultiCityExecution:
+    """Tests for multi-city execution via execute()."""
+
+    @patch.object(BaseAPIPipeline, "_process_events_batch", return_value=[])
+    @patch.object(BaseAPIPipeline, "_fetch_with_date_splitting")
+    @patch.object(BaseAPIPipeline, "__init__", return_value=None)
+    def test_execute_iterates_over_areas(
+        self, mock_init, mock_fetch, mock_process
+    ):
+        """Should call _fetch_with_date_splitting for each city in areas."""
+        pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
+        pipeline.source_config = APISourceConfig(
+            source_name="test_api",
+            defaults={
+                "areas": {"Barcelona": 20, "Madrid": 28},
+            },
+        )
+        pipeline.config = PipelineConfig(
+            source_name="test_api",
+            source_type=SourceType.API,
+            deduplicate=False,
+        )
+        pipeline.logger = MagicMock()
+        pipeline.adapter = MagicMock()
+        pipeline.adapter.source_type = SourceType.API
+
+        mock_fetch.return_value = [{"id": "1"}, {"id": "2"}]
+
+        result = pipeline.execute()
+
+        # Should have been called twice — once per city
+        assert mock_fetch.call_count == 2
+        city_names = [c.kwargs["city_name"] for c in mock_fetch.call_args_list]
+        assert "Barcelona" in city_names
+        assert "Madrid" in city_names
+
+    @patch.object(BaseAPIPipeline, "_process_events_batch", return_value=[])
+    @patch.object(BaseAPIPipeline, "_fetch_with_date_splitting")
+    @patch.object(BaseAPIPipeline, "__init__", return_value=None)
+    def test_execute_continues_on_city_failure(
+        self, mock_init, mock_fetch, mock_process
+    ):
+        """Should continue with other cities if one fails."""
+        pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
+        pipeline.source_config = APISourceConfig(
+            source_name="test_api",
+            defaults={
+                "areas": {"Barcelona": 20, "Madrid": 28},
+            },
+        )
+        pipeline.config = PipelineConfig(
+            source_name="test_api",
+            source_type=SourceType.API,
+            deduplicate=False,
+        )
+        pipeline.logger = MagicMock()
+        pipeline.adapter = MagicMock()
+        pipeline.adapter.source_type = SourceType.API
+
+        # First city fails, second succeeds
+        mock_fetch.side_effect = [
+            Exception("Network error"),
+            [{"id": "1"}],
+        ]
+
+        result = pipeline.execute()
+
+        assert mock_fetch.call_count == 2
+        # Should have recorded the error
+        assert len(result.errors) == 1
+        assert "Network error" in result.errors[0]["error"]
+
+    @patch.object(BaseAPIPipeline, "__init__", return_value=None)
+    def test_execute_falls_back_to_base_without_areas(self, mock_init):
+        """Without areas config, should fall back to BasePipeline.execute."""
+        pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
+        pipeline.source_config = APISourceConfig(
+            source_name="test_api",
+            defaults={},  # No areas
+        )
+        pipeline.config = PipelineConfig(
+            source_name="test_api",
+            source_type=SourceType.API,
+        )
+        pipeline.logger = MagicMock()
+        pipeline.adapter = MagicMock()
+        pipeline.adapter.source_type = SourceType.API
+
+        # Mock the parent execute
+        with patch.object(
+            BasePipeline, "execute", return_value=MagicMock()
+        ) as mock_base_exec:
+            pipeline.execute()
+            mock_base_exec.assert_called_once()

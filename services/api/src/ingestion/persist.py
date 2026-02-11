@@ -34,6 +34,10 @@ class EventDataWriter:
         """
         Persists a list of events to the database.
 
+        Each event is persisted in its own transaction. If one event fails,
+        it is rolled back, but previously successful events remain committed
+        and the process continues for the rest of the batch.
+
         Returns:
             int: Number of successfully persisted events.
         """
@@ -41,13 +45,13 @@ class EventDataWriter:
         for event in events:
             try:
                 self._persist_single_event(event)
+                self.conn.commit()
                 success_count += 1
             except Exception as e:
                 self.conn.rollback()
                 logger.error(f"Failed to persist event '{event.title}': {e}")
                 continue
 
-        self.conn.commit()
         return success_count
 
     def _persist_single_event(self, event: EventSchema) -> None:

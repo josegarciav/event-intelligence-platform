@@ -5,13 +5,14 @@ Tests for PipelineOrchestrator pipeline management and execution.
 """
 
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.ingestion.orchestrator import (
     PipelineOrchestrator,
     ScheduledPipeline,
+    load_orchestrator_from_config,
     register_pipeline,
     PIPELINE_REGISTRY,
 )
@@ -603,3 +604,250 @@ class TestGetExecutionStats:
 
         assert stats["total_executions"] == 1
         assert stats["total_events_processed"] == 100
+
+
+# =============================================================================
+# TESTS: load_orchestrator_from_config
+# =============================================================================
+
+
+class TestLoadOrchestratorFromConfig:
+    """Tests for the load_orchestrator_from_config factory function."""
+
+    def test_loads_orchestrator_from_real_config(self):
+        """Should create orchestrator from the real ingestion.yaml."""
+        from src.ingestion.factory import DEFAULT_CONFIG_PATH
+
+        orchestrator = load_orchestrator_from_config(str(DEFAULT_CONFIG_PATH))
+
+        # Should have registered the enabled pipelines
+        assert len(orchestrator.pipelines) >= 1
+        assert "ra_co" in orchestrator.pipelines
+
+    def test_excludes_disabled_pipelines(self):
+        """Should not register disabled pipelines."""
+        from src.ingestion.factory import DEFAULT_CONFIG_PATH
+
+        orchestrator = load_orchestrator_from_config(str(DEFAULT_CONFIG_PATH))
+
+        assert "ticketmaster" not in orchestrator.pipelines
+
+    def test_schedules_enabled_pipelines(self):
+        """Should schedule pipelines with enabled schedules."""
+        import tempfile
+
+        import yaml
+
+        config = {
+            "sources": {
+                "test_src": {
+                    "enabled": True,
+                    "pipeline_type": "api",
+                    "connection": {
+                        "endpoint": "https://api.example.com",
+                        "protocol": "rest",
+                    },
+                    "schedule": {
+                        "type": "cron",
+                        "cron_expression": "0 */6 * * *",
+                        "enabled": True,
+                    },
+                }
+            }
+        }
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(config, f)
+            config_path = f.name
+
+        orchestrator = load_orchestrator_from_config(config_path)
+
+        assert "test_src" in orchestrator.scheduled_pipelines
+        scheduled = orchestrator.scheduled_pipelines["test_src"]
+        assert scheduled.schedule_type == "cron"
+
+    def test_does_not_schedule_disabled_schedules(self):
+        """Pipelines with schedule.enabled=false should not be scheduled."""
+        from src.ingestion.factory import DEFAULT_CONFIG_PATH
+
+        orchestrator = load_orchestrator_from_config(str(DEFAULT_CONFIG_PATH))
+
+        # ra_co has schedule.enabled: false in the real config
+        assert "ra_co" not in orchestrator.scheduled_pipelines
+
+
+# =============================================================================
+# TESTS: run_full_ingestion
+# =============================================================================
+
+
+class TestRunFullIngestion:
+    """Tests for the run_full_ingestion end-to-end method."""
+
+    def test_run_full_ingestion_with_no_events(self, orchestrator):
+        """Should handle case where pipelines return no events."""
+        pipe = MagicMock(spec=BasePipeline)
+        pipe.source_type = SourceType.API
+        pipe.execute.return_value = PipelineExecutionResult(
+            status=PipelineStatus.SUCCESS,
+            source_name="test",
+            source_type=SourceType.API,
+            execution_id="1",
+            started_at=datetime.utcnow(),
+            ended_at=datetime.utcnow(),
+            total_events_processed=0,
+            events=[],
+        )
+        orchestrator.register_pipeline("test", pipe)
+
+        stats = orchestrator.run_full_ingestion()
+
+        assert stats["total_raw_fetched"] == 0
+        assert stats["total_unique_found"] == 0
+        assert stats["total_saved_to_db"] == 0
+
+    def test_run_full_ingestion_with_events(self, orchestrator, create_event):
+        """Should execute, deduplicate, and persist events."""
+        events = [create_event(title=f"Event {i}") for i in range(5)]
+
+        pipe = MagicMock(spec=BasePipeline)
+        pipe.source_type = SourceType.API
+        pipe.execute.return_value = PipelineExecutionResult(
+            status=PipelineStatus.SUCCESS,
+            source_name="test",
+            source_type=SourceType.API,
+            execution_id="1",
+            started_at=datetime.utcnow(),
+            ended_at=datetime.utcnow(),
+            total_events_processed=5,
+            successful_events=5,
+            events=events,
+        )
+        orchestrator.register_pipeline("test", pipe)
+
+        # Mock database persistence
+        with patch("src.ingestion.orchestrator.get_connection") as mock_conn, \
+             patch("src.ingestion.orchestrator.EventDataWriter") as mock_writer:
+            mock_writer_instance = MagicMock()
+            mock_writer_instance.persist_batch.return_value = 5
+            mock_writer.return_value = mock_writer_instance
+
+            stats = orchestrator.run_full_ingestion()
+
+        assert stats["total_raw_fetched"] == 5
+        assert stats["total_unique_found"] == 5
+        assert stats["total_saved_to_db"] == 5
+        assert "test" in stats["pipelines_executed"]
+
+    def test_run_full_ingestion_deduplicates_across_sources(
+        self, orchestrator, create_event
+    ):
+        """Should deduplicate events across multiple sources."""
+        base_time = datetime.utcnow() + timedelta(days=1)
+        shared_event = create_event(
+            title="Shared Event",
+            venue_name="Same Venue",
+            start_datetime=base_time,
+        )
+        unique_event = create_event(
+            title="Unique Event",
+            venue_name="Other Venue",
+            start_datetime=base_time,
+        )
+
+        # Two pipelines returning overlapping events
+        pipe1 = MagicMock(spec=BasePipeline)
+        pipe1.source_type = SourceType.API
+        pipe1.execute.return_value = PipelineExecutionResult(
+            status=PipelineStatus.SUCCESS,
+            source_name="source1",
+            source_type=SourceType.API,
+            execution_id="1",
+            started_at=datetime.utcnow(),
+            ended_at=datetime.utcnow(),
+            total_events_processed=2,
+            events=[shared_event, unique_event],
+        )
+
+        pipe2 = MagicMock(spec=BasePipeline)
+        pipe2.source_type = SourceType.API
+        pipe2.execute.return_value = PipelineExecutionResult(
+            status=PipelineStatus.SUCCESS,
+            source_name="source2",
+            source_type=SourceType.API,
+            execution_id="2",
+            started_at=datetime.utcnow(),
+            ended_at=datetime.utcnow(),
+            total_events_processed=1,
+            events=[shared_event],  # duplicate
+        )
+
+        orchestrator.register_pipeline("source1", pipe1)
+        orchestrator.register_pipeline("source2", pipe2)
+
+        with patch("src.ingestion.orchestrator.get_connection") as mock_conn, \
+             patch("src.ingestion.orchestrator.EventDataWriter") as mock_writer:
+            mock_writer_instance = MagicMock()
+            mock_writer_instance.persist_batch.return_value = 2
+            mock_writer.return_value = mock_writer_instance
+
+            stats = orchestrator.run_full_ingestion()
+
+        assert stats["total_raw_fetched"] == 3
+        assert stats["total_unique_found"] == 2  # deduplicated
+        assert stats["total_saved_to_db"] == 2
+        assert len(stats["pipelines_executed"]) == 2
+
+    def test_run_full_ingestion_handles_persistence_error(
+        self, orchestrator, create_event
+    ):
+        """Should handle persistence errors gracefully."""
+        events = [create_event(title="Test Event")]
+
+        pipe = MagicMock(spec=BasePipeline)
+        pipe.source_type = SourceType.API
+        pipe.execute.return_value = PipelineExecutionResult(
+            status=PipelineStatus.SUCCESS,
+            source_name="test",
+            source_type=SourceType.API,
+            execution_id="1",
+            started_at=datetime.utcnow(),
+            ended_at=datetime.utcnow(),
+            total_events_processed=1,
+            events=events,
+        )
+        orchestrator.register_pipeline("test", pipe)
+
+        # Simulate database connection failure
+        with patch("src.ingestion.orchestrator.get_connection") as mock_conn:
+            mock_conn.side_effect = Exception("DB connection failed")
+
+            stats = orchestrator.run_full_ingestion()
+
+        # Should still return stats even if persistence failed
+        assert stats["total_raw_fetched"] == 1
+        assert stats["total_unique_found"] == 1
+        assert stats["total_saved_to_db"] == 0
+
+    def test_run_full_ingestion_returns_timing(self, orchestrator):
+        """Should include timing information in stats."""
+        pipe = MagicMock(spec=BasePipeline)
+        pipe.source_type = SourceType.API
+        pipe.execute.return_value = PipelineExecutionResult(
+            status=PipelineStatus.SUCCESS,
+            source_name="test",
+            source_type=SourceType.API,
+            execution_id="1",
+            started_at=datetime.utcnow(),
+            ended_at=datetime.utcnow(),
+            events=[],
+        )
+        orchestrator.register_pipeline("test", pipe)
+
+        stats = orchestrator.run_full_ingestion()
+
+        assert "timestamp" in stats
+        assert "duration_seconds" in stats
+        assert stats["duration_seconds"] >= 0
