@@ -23,7 +23,6 @@ from pydantic import (
     model_validator,
 )
 
-
 from src.schemas.taxonomy import (
     build_taxonomy_index,
     get_all_subcategory_ids,
@@ -278,8 +277,13 @@ class TaxonomyDimension(BaseModel):
         default=None,
         description="Human-readable subcategory name (e.g. 'Music & Rhythm Play')",
     )
+    confidence: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description="Confidence score for this taxonomy mapping (0.0-1.0)",
+    )
     values: List[str] = Field(default_factory=list)
-    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
 
     # Activity identification
     activity_id: Optional[str] = Field(
@@ -531,7 +535,10 @@ class SourceInfo(BaseModel):
         default=None,
         description="Parsed HTML or JSON data from source for debugging/validation",
     )
-    updated_at: datetime
+    updated_at: datetime = Field(
+        default_factory=_utc_now,
+        description="When we last updated this event from the source",
+    )
     ingestion_timestamp: datetime = Field(
         default_factory=_utc_now, description="When we ingested this event"
     )

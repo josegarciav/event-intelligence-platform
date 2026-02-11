@@ -400,7 +400,7 @@ class TestTaxonomyDimension:
         """Minimal valid dimension."""
         dim = TaxonomyDimension(primary_category=PrimaryCategory.PLAY_AND_PURE_FUN)
         assert dim.primary_category == PrimaryCategory.PLAY_AND_PURE_FUN
-        assert dim.confidence == 0.5  # Default
+        assert dim.confidence == 1.0  # Default
 
     def test_with_valid_subcategory(self):
         """Dimension with valid subcategory."""

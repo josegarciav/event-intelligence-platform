@@ -1,5 +1,5 @@
 """
-services.api.src.main
+services.api.src.main.
 
 FastAPI entrypoint for the Event Intelligence Platform.
 
@@ -37,9 +37,7 @@ from pydantic import BaseModel
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Handle app startup and shutdown events.
-    """
+    """Handle app startup and shutdown events."""
     # Initialize the database connection pool on startup
     try:
         get_pool()
@@ -131,7 +129,7 @@ def get_pool() -> psycopg2.pool.ThreadedConnectionPool:
 
 def get_db() -> Generator[_connection, None, None]:
     """
-    FastAPI dependency that yields a database connection from the pool.
+    Yield a database connection from the pool.
 
     Ensures the connection is returned to the pool after the request lifecycle.
 
@@ -155,9 +153,7 @@ def get_db() -> Generator[_connection, None, None]:
 
 
 class Category(BaseModel):
-    """
-    Experience category response model.
-    """
+    """Experience category response model."""
 
     category_id: str
     name: str
@@ -172,7 +168,7 @@ class Category(BaseModel):
 @app.get("/health", tags=["Monitoring"])
 def health_check() -> dict[str, str]:
     """
-    API health check endpoint.
+    Check API health.
 
     Returns
     -------
