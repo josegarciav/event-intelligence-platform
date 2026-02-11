@@ -10,9 +10,9 @@ This package provides:
 """
 
 from .base_scraper import (
-    BaseScraperPipeline,
-    EventScraper,
-    PageFetchResult,
-    ScraperConfig,
-    load_scraper_config,
+    BaseScraperPipeline as BaseScraperPipeline,
+    EventScraper as EventScraper,
+    PageFetchResult as PageFetchResult,
+    ScraperConfig as ScraperConfig,
+    load_scraper_config as load_scraper_config,
 )
