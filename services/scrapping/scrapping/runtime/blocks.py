@@ -10,7 +10,6 @@ import re
 
 from .results import BlockSignal
 
-
 _PATTERNS = {
     BlockSignal.CAPTCHA_PRESENT: [
         r"\bcaptcha\b",

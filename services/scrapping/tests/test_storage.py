@@ -9,8 +9,12 @@ def test_layout_paths():
     run_id = "20260101_120000"
 
     assert layout.run_dir(run_id) == root / f"run_{run_id}"
-    assert layout.source_dir(run_id, "example.com") == root / f"run_{run_id}" / "sources" / "example.com"
+    assert (
+        layout.source_dir(run_id, "example.com")
+        == root / f"run_{run_id}" / "sources" / "example.com"
+    )
     assert layout.run_meta_path(run_id) == root / f"run_{run_id}" / "run_meta.json"
+
 
 def test_safe_name():
     assert _safe_name("example.com") == "example.com"

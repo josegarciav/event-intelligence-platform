@@ -11,10 +11,13 @@ def test_cli_dry_run(tmp_path):
     run_id = "test_run_123"
     argv = [
         "run",
-        "--config", config_path,
-        "--results", str(results_dir),
+        "--config",
+        config_path,
+        "--results",
+        str(results_dir),
         "--dry-run",
-        "--run-id", run_id
+        "--run-id",
+        run_id,
     ]
 
     exit_code = cli.main(argv)

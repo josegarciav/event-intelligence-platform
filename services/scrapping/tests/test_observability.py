@@ -10,10 +10,13 @@ def test_observability_metrics(tmp_path):
     # We call cli.main directly with dry-run
     argv = [
         "run",
-        "--config", config_path,
-        "--results", str(results_dir),
+        "--config",
+        config_path,
+        "--results",
+        str(results_dir),
         "--dry-run",
-        "--run-id", "obs_test"
+        "--run-id",
+        "obs_test",
     ]
 
     exit_code = cli.main(argv)

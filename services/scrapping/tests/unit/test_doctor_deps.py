@@ -1,6 +1,7 @@
-import pytest
+from unittest.mock import MagicMock, patch
+
 from scrapping.orchestrator import doctor_environment
-from unittest.mock import patch, MagicMock
+
 
 def test_doctor_detects_missing_os_deps():
     # Simulate a playwright launch failure due to missing shared libraries

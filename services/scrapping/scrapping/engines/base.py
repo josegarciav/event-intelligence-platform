@@ -17,7 +17,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from scrapping.runtime.results import FetchResult
-from scrapping.runtime.resilience import RateLimiter
 
 Headers = dict[str, str]
 
@@ -28,6 +27,7 @@ class EngineContext:
     The minimum execution context engines may need.
     Keep it small. If you need more, add fields deliberately.
     """
+
     timeout_s: float = 15.0
     verify_ssl: bool = True
     user_agent: str | None = None

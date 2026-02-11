@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
+
 
 @dataclass
 class StateManager:
@@ -23,7 +24,7 @@ class StateManager:
             json.dump(asdict(self), f, indent=2)
 
     @classmethod
-    def load(cls, output_dir: str) -> Optional[StateManager]:
+    def load(cls, output_dir: str) -> StateManager | None:
         p = Path(output_dir) / "state.json"
         if not p.exists():
             return None

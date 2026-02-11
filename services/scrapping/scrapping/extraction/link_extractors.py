@@ -33,8 +33,15 @@ class LinkExtractRequest:
     normalize: bool = True
     drop_tracking_params: bool = True
     tracking_params: tuple[str, ...] = (
-        "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
-        "gclid", "fbclid", "mc_cid", "mc_eid",
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+        "utm_term",
+        "utm_content",
+        "gclid",
+        "fbclid",
+        "mc_cid",
+        "mc_eid",
     )
 
 
@@ -65,7 +72,9 @@ def extract_links(req: LinkExtractRequest) -> list[str]:
     elif method == "js":
         # Placeholder for future: if html is from browser engine we can also do page.evaluate,
         # but that belongs to engine/actions; here we stay HTML-only.
-        raise NotImplementedError("js extraction is not supported in pure HTML mode yet")
+        raise NotImplementedError(
+            "js extraction is not supported in pure HTML mode yet"
+        )
 
     else:
         raise ValueError(f"unknown link extract method: {method}")
@@ -104,6 +113,7 @@ def extract_links(req: LinkExtractRequest) -> list[str]:
 # Extractors
 # ---------------------------------------------------------------------
 
+
 def _extract_regex(html: str, pattern: str) -> list[str]:
     # If pattern has capturing group(s), return the first group; else return whole match.
     rx = re.compile(pattern, flags=re.IGNORECASE | re.MULTILINE)
@@ -120,7 +130,7 @@ def _extract_css(html: str, selector: str) -> list[str]:
     """
     Extract href/src attributes using BeautifulSoup.
 
-    selector example: "a.job-card::attr(href)" or "a.job-card"
+    selector example: "a.event-card::attr(href)" or "a.event-card"
     If ::attr(name) is provided, use that attribute, else default to href/src.
     """
     soup = _bs4_soup(html)
@@ -154,7 +164,7 @@ def _extract_xpath(html: str, xpath: str) -> list[str]:
     Extract links using lxml if available.
 
     xpath example:
-      //a[contains(@class,'job')]/@href
+      //a[contains(@class,'event')]/@href
     """
     doc = _lxml_doc(html)
     if doc is None:
@@ -166,7 +176,9 @@ def _extract_xpath(html: str, xpath: str) -> list[str]:
     out: list[str] = []
     for x in res:
         if isinstance(x, (str, bytes)):
-            out.append(x.decode("utf-8", errors="ignore") if isinstance(x, bytes) else x)
+            out.append(
+                x.decode("utf-8", errors="ignore") if isinstance(x, bytes) else x
+            )
         else:
             # lxml may return nodes; attempt href/src
             try:
@@ -200,6 +212,7 @@ def _lxml_doc(html: str):
 # ---------------------------------------------------------------------
 # URL canonicalization
 # ---------------------------------------------------------------------
+
 
 def canonicalize_url(
     url: str,

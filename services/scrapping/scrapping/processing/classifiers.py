@@ -4,8 +4,8 @@ scrapping.processing.classifiers
 Lightweight classification hooks for QA and enrichment.
 
 Use cases:
-- classify "is_job_post" vs "noise"
-- tag content categories (e.g., product, news, legal doc)
+- classify "is_event_page" vs "noise"
+- tag content categories (e.g., event, product, news, legal doc)
 - detect page types (login wall, anti-bot, empty)
 
 V1 includes:
@@ -32,13 +32,13 @@ class Classification:
 class BaseClassifier(Protocol):
     name: str
 
-    def predict(self, item: dict[str, Any]) -> Classification:
-        ...
+    def predict(self, item: dict[str, Any]) -> Classification: ...
 
 
 # ---------------------------------------------------------------------
 # Keyword baseline (strong for MVP)
 # ---------------------------------------------------------------------
+
 
 @dataclass
 class KeywordClassifier:
@@ -49,6 +49,7 @@ class KeywordClassifier:
     - keywords_negative: list of terms that decrease score
     - threshold: score >= threshold => positive label
     """
+
     name: str = "keyword_classifier"
     positive_label: str = "positive"
     negative_label: str = "negative"
@@ -66,7 +67,9 @@ class KeywordClassifier:
         blob = (title + "\n" + text).strip()
 
         if not blob:
-            return Classification(label=self.negative_label, score=0.0, meta={"reason": "empty_text"})
+            return Classification(
+                label=self.negative_label, score=0.0, meta={"reason": "empty_text"}
+            )
 
         pos_hits = [k for k in self.keywords_positive if k.lower() in blob]
         neg_hits = [k for k in self.keywords_negative if k.lower() in blob]
@@ -81,13 +84,18 @@ class KeywordClassifier:
         return Classification(
             label=label,
             score=score,
-            meta={"pos_hits": pos_hits, "neg_hits": neg_hits, "threshold": self.threshold},
+            meta={
+                "pos_hits": pos_hits,
+                "neg_hits": neg_hits,
+                "threshold": self.threshold,
+            },
         )
 
 
 # ---------------------------------------------------------------------
 # Optional sklearn wrapper (future-ready)
 # ---------------------------------------------------------------------
+
 
 @dataclass
 class SklearnTextClassifier:
@@ -99,6 +107,7 @@ class SklearnTextClassifier:
 
     This stays optional; do not require sklearn in core.
     """
+
     model_path: str
     name: str = "sklearn_text_classifier"
     text_field: str = "text"
@@ -122,7 +131,9 @@ class SklearnTextClassifier:
         blob = (title + "\n" + text).strip()
 
         if not blob:
-            return Classification(label="unknown", score=0.0, meta={"reason": "empty_text"})
+            return Classification(
+                label="unknown", score=0.0, meta={"reason": "empty_text"}
+            )
 
         model = self._model
         try:
@@ -132,14 +143,19 @@ class SklearnTextClassifier:
             best_i = int(proba.argmax())
             label = str(classes[best_i])
             score = float(proba[best_i])
-            return Classification(label=label, score=score, meta={"classes": [str(c) for c in classes]})
+            return Classification(
+                label=label, score=score, meta={"classes": [str(c) for c in classes]}
+            )
         except Exception as e:
-            return Classification(label="error", score=0.0, meta={"error": f"{type(e).__name__}: {e}"})
+            return Classification(
+                label="error", score=0.0, meta={"error": f"{type(e).__name__}: {e}"}
+            )
 
 
 # ---------------------------------------------------------------------
 # Helper: apply multiple classifiers
 # ---------------------------------------------------------------------
+
 
 def apply_classifiers(item: dict[str, Any], classifiers: list[Any]) -> dict[str, Any]:
     """

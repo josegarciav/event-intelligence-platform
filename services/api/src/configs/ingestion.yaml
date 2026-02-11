@@ -38,9 +38,12 @@ sources:
                 date
                 startTime
                 endTime
+                attending
+                isTicketed
                 venue {
                   name
                   address
+                  live
                   area {
                     name
                     country {
@@ -54,6 +57,7 @@ sources:
                 }
                 images {
                   filename
+                  crop
                 }
                 cost
                 contentUrl
@@ -97,6 +101,10 @@ sources:
       cost: "event.cost"
       content_url: "event.contentUrl"
       image_filename: "event.images[0].filename"
+      image_crop: "event.images[0].crop"
+      venue_live: "event.venue.live"
+      attending: "event.attending"
+      is_ticketed: "event.isTicketed"
 
     # Transformations applied after field extraction
     transformations:
@@ -155,6 +163,11 @@ sources:
     # Enrichment options
     enrichment:
       geocoding: true
+      compressed_html:
+        enabled: true
+        engine_type: hybrid
+        rate_limit_per_second: 2.0
+        timeout_s: 15.0
       # Feature extraction (LLM-based)
       feature_extraction:
         enabled: false
@@ -297,6 +310,13 @@ sources:
 
     # Enrichment options
     enrichment:
+      geocoding: true
+      compressed_html:
+        enabled: false
+        engine_type: hybrid
+        rate_limit_per_second: 2.0
+        timeout_s: 15.0
+      # Feature extraction (LLM-based)
       feature_extraction:
         enabled: false
 

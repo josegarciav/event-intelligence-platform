@@ -24,6 +24,7 @@ from scrapping.storage.layouts import Layout, ensure_parent
 # Formatters
 # ---------------------------------------------------------------------
 
+
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         base = {
@@ -79,6 +80,7 @@ class TextFormatter(logging.Formatter):
 # ---------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class LoggingOptions:
@@ -177,6 +179,7 @@ def add_source_file_handler(
 # Context injection
 # ---------------------------------------------------------------------
 
+
 class ContextAdapter(logging.LoggerAdapter):
     def process(self, msg: str, kwargs: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         extra = kwargs.get("extra", {})
@@ -186,7 +189,13 @@ class ContextAdapter(logging.LoggerAdapter):
         return msg, kwargs
 
 
-def with_context(logger: logging.Logger, *, run_id: str | None = None, source_id: str | None = None, stage: str | None = None) -> ContextAdapter:
+def with_context(
+    logger: logging.Logger,
+    *,
+    run_id: str | None = None,
+    source_id: str | None = None,
+    stage: str | None = None,
+) -> ContextAdapter:
     extra: dict[str, Any] = {}
     if run_id:
         extra["run_id"] = run_id

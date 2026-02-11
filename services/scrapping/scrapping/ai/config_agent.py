@@ -33,11 +33,13 @@ from scrapping.extraction.transforms import canonicalize_url
 # Data structures
 # -----------------------------
 
+
 @dataclass
 class ConfigProposal:
     """
     The output of the agent: a source config dict + rationale and confidence.
     """
+
     source_config: dict[str, Any]
     rationale: list[str]
     confidence: float  # 0..1
@@ -58,6 +60,7 @@ class UrlHint:
     Optional hints you can pass from a manual/automated probe step.
     (Later, tests_agent can generate this by fetching a sample page.)
     """
+
     url: str
     html_sample: str | None = None
     is_js_heavy: bool | None = None
@@ -70,6 +73,7 @@ class UrlHint:
 # -----------------------------
 # Core Agent (heuristics)
 # -----------------------------
+
 
 class ConfigAgent:
     """
@@ -154,12 +158,19 @@ class ConfigAgent:
         rationale.extend(engine_reason)
 
         # Entry points
-        entrypoints = [{"url": u, "paging": {"mode": "page", "pages": 1, "start": 1, "step": 1}} for u in urls]
+        entrypoints = [
+            {"url": u, "paging": {"mode": "page", "pages": 1, "start": 1, "step": 1}}
+            for u in urls
+        ]
         if len(entrypoints) > 5:
-            rationale.append("Many URLs provided; grouped as multiple entrypoints in one source (V1).")
+            rationale.append(
+                "Many URLs provided; grouped as multiple entrypoints in one source (V1)."
+            )
 
         # Discovery defaults: try to infer a regex pattern for links (very rough)
-        link_extract, link_conf, link_reason = self._propose_link_extraction(dom, urls, base_url=base, hints=hints)
+        link_extract, link_conf, link_reason = self._propose_link_extraction(
+            dom, urls, base_url=base, hints=hints
+        )
         rationale.extend(link_reason)
 
         # Parse hints
@@ -201,7 +212,11 @@ class ConfigAgent:
             "type": engine_type,
             "timeout_s": 20 if engine_type in ("browser", "hybrid") else 15,
             "verify_ssl": True,
-            "retry_policy": {"max_retries": 3, "backoff": "exp", "retry_on_status": [429, 500, 502, 503, 504]},
+            "retry_policy": {
+                "max_retries": 3,
+                "backoff": "exp",
+                "retry_on_status": [429, 500, 502, 503, 504],
+            },
             "rate_limit_policy": {"min_delay_s": 0.2, "jitter_s": 0.2},
         }
         if engine_type in ("browser", "hybrid"):
@@ -239,11 +254,17 @@ class ConfigAgent:
 
         # Safety warnings
         if engine_type in ("browser", "hybrid") and not base:
-            warnings.append("Engine uses browser/hybrid but base_url could not be inferred; relative links may break.")
+            warnings.append(
+                "Engine uses browser/hybrid but base_url could not be inferred; relative links may break."
+            )
         if link_extract.get("method") == "regex" and not link_extract.get("pattern"):
-            warnings.append("Link extraction regex pattern is empty; you must set discovery.link_extract.pattern.")
+            warnings.append(
+                "Link extraction regex pattern is empty; you must set discovery.link_extract.pattern."
+            )
         if dom == "unknown":
-            warnings.append("Domain could not be inferred; source_id may be generic and should be renamed.")
+            warnings.append(
+                "Domain could not be inferred; source_id may be generic and should be renamed."
+            )
 
         return ConfigProposal(
             source_config=src,
@@ -256,7 +277,9 @@ class ConfigAgent:
     # Internal heuristics
     # -----------------------------
 
-    def _decide_engine(self, urls: Sequence[str], *, hints: Sequence[UrlHint] | None = None) -> tuple[str, float, list[str]]:
+    def _decide_engine(
+        self, urls: Sequence[str], *, hints: Sequence[UrlHint] | None = None
+    ) -> tuple[str, float, list[str]]:
         """
         Pick engine based on URL patterns and hints.
         """
@@ -265,14 +288,27 @@ class ConfigAgent:
         if hints:
             for h in hints:
                 if h.is_js_heavy is True:
-                    rationale.append("Hints indicate JS-heavy pages -> choosing hybrid engine.")
+                    rationale.append(
+                        "Hints indicate JS-heavy pages -> choosing hybrid engine."
+                    )
                     return "hybrid", 0.85, rationale
 
         # URL pattern heuristics: common SPA frameworks / dynamic search pages
         u = " ".join(urls).lower()
-        spa_markers = ["#/","/app","/spa","?s=","?search=","/search","/jobs","/careers"]
+        spa_markers = [
+            "#/",
+            "/app",
+            "/spa",
+            "?s=",
+            "?search=",
+            "/search",
+            "/jobs",
+            "/careers",
+        ]
         if any(m in u for m in spa_markers):
-            rationale.append("URL patterns suggest search/listing pages; starting with http engine (upgrade to hybrid if blocked).")
+            rationale.append(
+                "URL patterns suggest search/listing pages; starting with http engine (upgrade to hybrid if blocked)."
+            )
             return "http", 0.55, rationale
 
         rationale.append("No strong JS signals; starting with http engine.")
@@ -295,7 +331,9 @@ class ConfigAgent:
         if hints:
             for h in hints:
                 if h.discovered_link_patterns:
-                    rationale.append("Using discovered_link_patterns from hints for regex extraction.")
+                    rationale.append(
+                        "Using discovered_link_patterns from hints for regex extraction."
+                    )
                     # Use first pattern as primary; in V2 we can support multiple.
                     pat = h.discovered_link_patterns[0]
                     return (
@@ -313,7 +351,9 @@ class ConfigAgent:
         if domain and domain != "unknown":
             safe_dom = re.escape(domain)
             pat = rf"https?://(?:www\.)?{safe_dom}/[^\s\"\'<>]+"
-            rationale.append("Default link extraction: broad domain URL regex (needs narrowing for precision).")
+            rationale.append(
+                "Default link extraction: broad domain URL regex (needs narrowing for precision)."
+            )
             return (
                 {
                     "method": "regex",
@@ -339,6 +379,7 @@ class ConfigAgent:
 # -----------------------------
 # Helpers
 # -----------------------------
+
 
 def _domain(url: str) -> str | None:
     try:

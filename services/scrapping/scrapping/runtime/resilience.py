@@ -72,7 +72,9 @@ class RateLimiter:
         # Enforce min delay + jitter between calls
         now = time.time()
         since_last = now - self._last_call_s
-        target_delay = self.min_delay_s + (random.random() * self.jitter_s if self.jitter_s else 0.0)
+        target_delay = self.min_delay_s + (
+            random.random() * self.jitter_s if self.jitter_s else 0.0
+        )
         if target_delay > since_last:
             time.sleep(target_delay - since_last)
 
@@ -91,7 +93,9 @@ class RateLimiter:
         # Enforce min delay + jitter between calls
         now = time.time()
         since_last = now - self._last_call_s
-        target_delay = self.min_delay_s + (random.random() * self.jitter_s if self.jitter_s else 0.0)
+        target_delay = self.min_delay_s + (
+            random.random() * self.jitter_s if self.jitter_s else 0.0
+        )
         if target_delay > since_last:
             await asyncio.sleep(target_delay - since_last)
 

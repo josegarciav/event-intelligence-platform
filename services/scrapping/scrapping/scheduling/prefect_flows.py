@@ -46,15 +46,18 @@ except Exception as e:
     def flow(*args, **kwargs):  # type: ignore
         def _decorator(fn):
             return fn
+
         return _decorator
 
     def task(*args, **kwargs):  # type: ignore
         def _decorator(fn):
             return fn
+
         return _decorator
 
     def get_run_logger():  # type: ignore
         import logging
+
         return logging.getLogger("prefect_missing")
 
 
@@ -70,14 +73,16 @@ def _require_prefect() -> None:
 # Options for flow build
 # -----------------------------
 
+
 @dataclass(frozen=True)
 class PrefectFlowOptions:
     """
-    Controls how Prefect runs the scraping job.
+    Controls how Prefect runs the scraping flow.
 
     - per_source_tasks: if True, create one task per source (nice in Prefect UI)
     - only_sources: optional list of source_ids to include
     """
+
     per_source_tasks: bool = True
     only_sources: list[str] | None = None
 
@@ -92,6 +97,7 @@ class PrefectFlowOptions:
 # -----------------------------
 # Tasks
 # -----------------------------
+
 
 @task(name="validate_config", retries=0)
 def validate_config_task(cfg: dict[str, Any]) -> dict[str, Any]:
@@ -132,7 +138,9 @@ def run_sources_task(cfg: dict[str, Any], opts: PrefectFlowOptions) -> dict[str,
 
 
 @task(name="run_one_source", retries=0)
-def run_one_source_task(cfg: dict[str, Any], source_id: str, opts: PrefectFlowOptions) -> dict[str, Any]:
+def run_one_source_task(
+    cfg: dict[str, Any], source_id: str, opts: PrefectFlowOptions
+) -> dict[str, Any]:
     """
     Run orchestrator but restricted to a single source.
     """
@@ -163,6 +171,7 @@ def run_one_source_task(cfg: dict[str, Any], source_id: str, opts: PrefectFlowOp
 # Flow factory
 # -----------------------------
 
+
 def build_scrap_flow(
     cfg: dict[str, Any],
     *,
@@ -183,7 +192,11 @@ def build_scrap_flow(
         _ = validate_config_task(cfg)
 
         sources = cfg.get("sources") or []
-        source_ids = [s.get("source_id") for s in sources if isinstance(s, dict) and s.get("source_id")]
+        source_ids = [
+            s.get("source_id")
+            for s in sources
+            if isinstance(s, dict) and s.get("source_id")
+        ]
 
         if options.only_sources:
             allow = set(options.only_sources)
@@ -205,6 +218,7 @@ def build_scrap_flow(
 # -----------------------------
 # Convenience helper
 # -----------------------------
+
 
 def run_prefect_flow_from_config_path(
     config_path: str,

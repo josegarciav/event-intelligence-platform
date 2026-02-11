@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from .base import BaseEngine, EngineContext, FetchResult
 from .browser import BrowserEngine, BrowserEngineOptions
@@ -28,11 +28,11 @@ class HybridEngineOptions:
 
     # fallback policy
     fallback_to_browser: bool = True
-    min_text_len: int = 200 # If HTTP returns less text, try browser
+    min_text_len: int = 200  # If HTTP returns less text, try browser
 
 
 class HybridEngine(BaseEngine):
-    def __init__(self, *, options: Optional[HybridEngineOptions] = None) -> None:
+    def __init__(self, *, options: HybridEngineOptions | None = None) -> None:
         super().__init__(name="hybrid")
         self.options = options or HybridEngineOptions()
         self.http = HttpEngine(options=self.options.http)
@@ -42,7 +42,7 @@ class HybridEngine(BaseEngine):
         self.http.close()
         self.browser.close()
 
-    def get(self, url: str, *, ctx: Optional[EngineContext] = None) -> FetchResult:
+    def get(self, url: str, *, ctx: EngineContext | None = None) -> FetchResult:
         if self.options.default_get == "browser":
             return self.browser.get(url, ctx=ctx)
 
@@ -63,7 +63,11 @@ class HybridEngine(BaseEngine):
                 res_browser = self.browser.get(url, ctx=ctx)
                 # Combine traces
                 res_browser.engine_trace = [
-                    {"engine": "http", "result": "fallback_triggered", "http_res": res.status_code}
+                    {
+                        "engine": "http",
+                        "result": "fallback_triggered",
+                        "http_res": res.status_code,
+                    }
                 ] + res_browser.engine_trace
                 return res_browser
 
@@ -73,9 +77,11 @@ class HybridEngine(BaseEngine):
         self,
         url: str,
         *,
-        ctx: Optional[EngineContext] = None,
-        actions: Optional[Sequence[dict[str, Any]]] = None,
-        wait_for: Optional[str] = None,
+        ctx: EngineContext | None = None,
+        actions: Sequence[dict[str, Any]] | None = None,
+        wait_for: str | None = None,
     ) -> FetchResult:
         # get_rendered always goes to browser
-        return self.browser.get_rendered(url, ctx=ctx, actions=actions, wait_for=wait_for)
+        return self.browser.get_rendered(
+            url, ctx=ctx, actions=actions, wait_for=wait_for
+        )

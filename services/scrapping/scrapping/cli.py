@@ -31,24 +31,51 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     # run
     pr = sub.add_parser("run", help="Run scraping pipeline")
-    pr.add_argument("--config", "-c", required=True, help="Path to JSON config (single file)")
-    pr.add_argument("--results", "-o", default="results", help="Results output directory")
-    pr.add_argument("--parallelism", "-p", type=int, default=16, help="Parallelism for fetch/detail")
+    pr.add_argument(
+        "--config", "-c", required=True, help="Path to JSON config (single file)"
+    )
+    pr.add_argument(
+        "--results", "-o", default="results", help="Results output directory"
+    )
+    pr.add_argument(
+        "--parallelism", "-p", type=int, default=16, help="Parallelism for fetch/detail"
+    )
     pr.add_argument("--only", nargs="*", default=None, help="Run only these source_ids")
     pr.add_argument("--json-logs", action="store_true", help="Emit JSON logs")
-    pr.add_argument("--strict", action="store_true", help="Fail if optional deps are missing for requested outputs")
-    pr.add_argument("--items-format", default=None, choices=["jsonl", "csv", "parquet"], help="Override items output format")
-    pr.add_argument("--dry-run", action="store_true", help="Do not fetch; only validate+plan (no network calls)")
-    pr.add_argument("--run-id", default=None, help="Override run_id (useful for tests/reproducibility)")
+    pr.add_argument(
+        "--strict",
+        action="store_true",
+        help="Fail if optional deps are missing for requested outputs",
+    )
+    pr.add_argument(
+        "--items-format",
+        default=None,
+        choices=["jsonl", "csv", "parquet"],
+        help="Override items output format",
+    )
+    pr.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Do not fetch; only validate+plan (no network calls)",
+    )
+    pr.add_argument(
+        "--run-id",
+        default=None,
+        help="Override run_id (useful for tests/reproducibility)",
+    )
 
     # validate
     pv = sub.add_parser("validate", help="Validate config file(s)")
     pv.add_argument("--config", "-c", required=True, help="Path to JSON config")
-    pv.add_argument("--verbose", "-v", action="store_true", help="Print parsed config summary")
+    pv.add_argument(
+        "--verbose", "-v", action="store_true", help="Print parsed config summary"
+    )
 
     # doctor
     pd = sub.add_parser("doctor", help="Check environment readiness")
-    pd.add_argument("--verbose", "-v", action="store_true", help="Print extra diagnostics")
+    pd.add_argument(
+        "--verbose", "-v", action="store_true", help="Print extra diagnostics"
+    )
 
     # plan
     pp = sub.add_parser("plan", help="Show scraping plan (schedules) without running")
@@ -58,37 +85,67 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     pre = sub.add_parser("recipe", help="Run a recipe")
     pre.add_argument("recipe_name", help="Name of the recipe (e.g., alibaba, jobs)")
     pre.add_argument("--config", "-c", required=True, help="Path to recipe config JSON")
-    pre.add_argument("--keyword", "-k", required=False, help="Keyword to scrape (for keyword-based recipes)")
+    pre.add_argument(
+        "--keyword",
+        "-k",
+        required=False,
+        help="Keyword to scrape (for keyword-based recipes)",
+    )
     pre.add_argument("--results", "-o", default=None, help="Output directory")
     pre.add_argument("--online", action="store_true", help="Run in online mode")
     pre.add_argument("--headed", action="store_true", help="Run with headed browser")
-    pre.add_argument("--only", help="Comma-separated source IDs to run (for multi-source recipes)")
+    pre.add_argument(
+        "--only", help="Comma-separated source IDs to run (for multi-source recipes)"
+    )
     pre.add_argument("--max-pages", type=int, help="Override max pages")
     pre.add_argument("--max-items", type=int, help="Override max items")
 
     # recipe-batch
     preb = sub.add_parser("recipe-batch", help="Run a batch recipe")
     preb.add_argument("recipe_name", help="Name of the recipe (e.g., alibaba)")
-    preb.add_argument("--config", "-c", required=True, help="Path to recipe config JSON")
+    preb.add_argument(
+        "--config", "-c", required=True, help="Path to recipe config JSON"
+    )
     preb.add_argument("--l3-json", required=True, help="Path to keywords JSON")
-    preb.add_argument("--results", "-o", default="results/recipe_batch", help="Output directory")
+    preb.add_argument(
+        "--results", "-o", default="results/recipe_batch", help="Output directory"
+    )
     preb.add_argument("--online", action="store_true", help="Run in online mode")
     preb.add_argument("--start-from", type=int, default=0, help="Start from index")
 
     # capture-fixture
     pcf = sub.add_parser("capture-fixture", help="Fetch a URL and save HTML as fixture")
     pcf.add_argument("--url", required=True, help="URL to fetch")
-    pcf.add_argument("--engine", choices=["http", "browser"], default="http", help="Engine to use")
-    pcf.add_argument("--out", required=True, help="Output path (e.g., tests/fixtures/html/test.html)")
-    pcf.add_argument("--save-artifacts", action="store_true", help="Save browser screenshots/traces if using browser engine")
+    pcf.add_argument(
+        "--engine", choices=["http", "browser"], default="http", help="Engine to use"
+    )
+    pcf.add_argument(
+        "--out", required=True, help="Output path (e.g., tests/fixtures/html/test.html)"
+    )
+    pcf.add_argument(
+        "--save-artifacts",
+        action="store_true",
+        help="Save browser screenshots/traces if using browser engine",
+    )
 
     # scaffold-test
-    pst = sub.add_parser("scaffold-test", help="Generate a regression test for a fixture")
+    pst = sub.add_parser(
+        "scaffold-test", help="Generate a regression test for a fixture"
+    )
     pst.add_argument("--fixture", required=True, help="Path to the HTML fixture")
-    pst.add_argument("--extract", choices=["css", "regex"], default="css", help="Extraction method to test")
+    pst.add_argument(
+        "--extract",
+        choices=["css", "regex"],
+        default="css",
+        help="Extraction method to test",
+    )
     pst.add_argument("--pattern", required=True, help="CSS selector or Regex pattern")
-    pst.add_argument("--expect-count", type=int, default=1, help="Expected number of links")
-    pst.add_argument("--out", help="Output test file path (default: tests/test_autogen.py)")
+    pst.add_argument(
+        "--expect-count", type=int, default=1, help="Expected number of links"
+    )
+    pst.add_argument(
+        "--out", help="Output test file path (default: tests/test_autogen.py)"
+    )
 
     return p.parse_args(argv)
 
@@ -120,6 +177,7 @@ def _main_impl(argv: list[str] | None = None) -> int:
 
     if args.version:
         from scrapping import __version__
+
         print(f"scrapping version {__version__}")
         return 0
 
@@ -202,73 +260,18 @@ def _main_impl(argv: list[str] | None = None) -> int:
         return 0 if ok else 2
 
     if args.cmd == "recipe":
-        results_dir = args.results or f"results/{args.recipe_name}"
-        if args.recipe_name == "alibaba":
-            if not args.keyword:
-                print("Error: --keyword is required for alibaba recipe", file=sys.stderr)
-                return 1
-            from scrapping.recipes.alibaba_l3 import run_single_keyword, AlibabaConfig
-            cfg_data = _read_json(args.config)
-            r_cfg = cfg_data.get("recipe_config", {}) if "recipe_config" in cfg_data else cfg_data
-            if args.max_pages: r_cfg["max_pages"] = args.max_pages
-            config = AlibabaConfig(**r_cfg)
-            run_single_keyword(
-                keyword=args.keyword,
-                output_dir=results_dir,
-                config=config,
-                online=args.online,
-                headed=args.headed
-            )
-            print(f"Recipe {args.recipe_name} finished. Results in {results_dir}")
-            return 0
-        elif args.recipe_name == "jobs":
-            from scrapping.recipes.jobs_aggregator import run_jobs_recipe, JobSourceConfig
-            cfg_data = _read_json(args.config)
-            sources_data = cfg_data.get("sources", [])
-            source_configs = []
-            for s in sources_data:
-                if args.max_pages and "entrypoints" in s:
-                    for ep in s["entrypoints"]:
-                        if "paging" not in ep: ep["paging"] = {}
-                        ep["paging"]["pages"] = args.max_pages
-                source_configs.append(JobSourceConfig(**s))
-
-            only = args.only.split(",") if args.only else None
-            run_jobs_recipe(
-                source_configs=source_configs,
-                output_root=results_dir,
-                online=args.online,
-                only_sources=only,
-                max_items_total=args.max_items
-            )
-            print(f"Recipe {args.recipe_name} finished. Results in {results_dir}")
-            return 0
-        else:
-            print(f"Unknown recipe: {args.recipe_name}", file=sys.stderr)
-            return 1
+        print(f"Unknown recipe: {args.recipe_name}", file=sys.stderr)
+        print("No built-in recipes are currently registered.", file=sys.stderr)
+        return 1
 
     if args.cmd == "recipe-batch":
-        if args.recipe_name == "alibaba":
-            from scrapping.recipes.alibaba_l3 import run_l3_batch, AlibabaConfig
-            cfg_data = _read_json(args.config)
-            r_cfg = cfg_data.get("recipe_config", {}) if "recipe_config" in cfg_data else cfg_data
-            config = AlibabaConfig(**r_cfg)
-            run_l3_batch(
-                json_path=args.l3_json,
-                base_output_dir=args.results,
-                config=config,
-                start_from=args.start_from,
-                online=args.online
-            )
-            print(f"Recipe batch {args.recipe_name} finished. Results in {args.results}")
-            return 0
-        else:
-            print(f"Unknown recipe: {args.recipe_name}", file=sys.stderr)
-            return 1
+        print(f"Unknown recipe: {args.recipe_name}", file=sys.stderr)
+        print("No built-in recipes are currently registered.", file=sys.stderr)
+        return 1
 
     if args.cmd == "capture-fixture":
         from scrapping.engines.browser import BrowserEngine, BrowserEngineOptions
-        from scrapping.engines.http import HttpEngine, HttpEngineOptions
+        from scrapping.engines.http import HttpEngine
 
         out_path = Path(args.out)
         out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -276,7 +279,9 @@ def _main_impl(argv: list[str] | None = None) -> int:
         print(f"Capturing fixture from {args.url} using {args.engine} engine...")
 
         if args.engine == "browser":
-            opts = BrowserEngineOptions(headless=True, save_artifacts=args.save_artifacts)
+            opts = BrowserEngineOptions(
+                headless=True, save_artifacts=args.save_artifacts
+            )
             engine = BrowserEngine(options=opts)
             res = engine.get_rendered(args.url)
             engine.close()

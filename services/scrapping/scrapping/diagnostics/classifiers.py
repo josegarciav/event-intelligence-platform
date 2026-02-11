@@ -7,7 +7,7 @@ Heuristics for classifying HTTP responses and rendered DOMs.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .signals import DiagnosisLabel, NextStep
 
@@ -17,13 +17,11 @@ class Diagnosis:
     label: DiagnosisLabel
     reason: str
     next_step: NextStep
-    details: Dict[str, Any]
+    details: dict[str, Any]
 
 
 def diagnose_http_response(
-    status_code: int,
-    headers: Dict[str, str],
-    text: Optional[str] = None
+    status_code: int, headers: dict[str, str], text: str | None = None
 ) -> Diagnosis:
     """
     Classify a raw HTTP response.
@@ -37,13 +35,20 @@ def diagnose_http_response(
             label=DiagnosisLabel.RATE_LIMITED,
             reason="Received 429 status or Retry-After header",
             next_step=NextStep.TRY_HTTP_TUNING,
-            details={"status_code": status_code, "retry_after": headers_low.get("retry-after")}
+            details={
+                "status_code": status_code,
+                "retry_after": headers_low.get("retry-after"),
+            },
         )
 
     # 2. Challenge detection
     challenge_patterns = [
-        "captcha", "recaptcha", "turnstile", "cf-turnstile",
-        "verify you are human", "unusual traffic"
+        "captcha",
+        "recaptcha",
+        "turnstile",
+        "cf-turnstile",
+        "verify you are human",
+        "unusual traffic",
     ]
     for p in challenge_patterns:
         if p in text:
@@ -51,7 +56,7 @@ def diagnose_http_response(
                 label=DiagnosisLabel.CHALLENGE_DETECTED,
                 reason=f"Found challenge pattern: {p}",
                 next_step=NextStep.STOP_FOR_HUMAN,
-                details={"pattern": p}
+                details={"pattern": p},
             )
 
     # 3. Auth required (high confidence)
@@ -61,7 +66,7 @@ def diagnose_http_response(
             label=DiagnosisLabel.REQUIRES_AUTH,
             reason="Auth required signals detected",
             next_step=NextStep.USE_AUTH,
-            details={"status_code": status_code}
+            details={"status_code": status_code},
         )
 
     # 4. Blocked/Denied / 403
@@ -70,18 +75,22 @@ def diagnose_http_response(
             label=DiagnosisLabel.BLOCKED_OR_DENIED,
             reason="Received 403 Forbidden",
             next_step=NextStep.TRY_HTTP_TUNING,
-            details={"status_code": status_code}
+            details={"status_code": status_code},
         )
 
     # 5. Missing content / JS required
     # Heuristic: very short body or common JS-only indicators
     if status_code == 200:
-        if len(text) < 500 or "javascript is required" in text or "enable javascript" in text:
-             return Diagnosis(
+        if (
+            len(text) < 500
+            or "javascript is required" in text
+            or "enable javascript" in text
+        ):
+            return Diagnosis(
                 label=DiagnosisLabel.JS_REQUIRED_OR_MISSING_CONTENT,
                 reason="Response too short or contains JS-requirement message",
                 next_step=NextStep.SWITCH_TO_BROWSER,
-                details={"len": len(text)}
+                details={"len": len(text)},
             )
 
     if 200 <= status_code < 300:
@@ -89,14 +98,14 @@ def diagnose_http_response(
             label=DiagnosisLabel.OK,
             reason="Status 2xx",
             next_step=NextStep.PROCEED,
-            details={"status_code": status_code}
+            details={"status_code": status_code},
         )
 
     return Diagnosis(
         label=DiagnosisLabel.UNKNOWN_ERROR,
         reason=f"Unhandled status code: {status_code}",
         next_step=NextStep.TRY_HTTP_TUNING,
-        details={"status_code": status_code}
+        details={"status_code": status_code},
     )
 
 
@@ -108,8 +117,12 @@ def diagnose_rendered_dom(text: str) -> Diagnosis:
 
     # 1. Challenge detection (even in browser)
     challenge_patterns = [
-        "captcha", "recaptcha", "turnstile", "cf-turnstile",
-        "verify you are human", "unusual traffic"
+        "captcha",
+        "recaptcha",
+        "turnstile",
+        "cf-turnstile",
+        "verify you are human",
+        "unusual traffic",
     ]
     for p in challenge_patterns:
         if p in text_low:
@@ -117,17 +130,17 @@ def diagnose_rendered_dom(text: str) -> Diagnosis:
                 label=DiagnosisLabel.CHALLENGE_DETECTED,
                 reason=f"Found challenge pattern in rendered DOM: {p}",
                 next_step=NextStep.STOP_FOR_HUMAN,
-                details={"pattern": p}
+                details={"pattern": p},
             )
 
     # 2. Auth required
     auth_patterns = ["login", "sign in", "create account", "password required"]
     if any(p in text_low for p in auth_patterns):
-         return Diagnosis(
+        return Diagnosis(
             label=DiagnosisLabel.REQUIRES_AUTH,
             reason="Auth required signals detected in DOM",
             next_step=NextStep.USE_AUTH,
-            details={}
+            details={},
         )
 
     # 3. Missing content
@@ -136,14 +149,14 @@ def diagnose_rendered_dom(text: str) -> Diagnosis:
             label=DiagnosisLabel.JS_REQUIRED_OR_MISSING_CONTENT,
             reason="Rendered DOM is suspiciously short",
             next_step=NextStep.TRY_HTTP_TUNING,
-            details={"len": len(text)}
+            details={"len": len(text)},
         )
 
     return Diagnosis(
         label=DiagnosisLabel.OK,
         reason="Rendered content seems ok",
         next_step=NextStep.PROCEED,
-        details={"len": len(text)}
+        details={"len": len(text)},
     )
 
 

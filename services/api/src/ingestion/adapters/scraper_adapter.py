@@ -1,10 +1,12 @@
 """
 Scraper Source Adapter.
 
-Adapter for fetching data from web scraping sources using Playwright.
+Adapter for fetching and cleaning individual
+event page HTML using the scrapping service engines.
 """
 
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Callable, Dict, Optional
@@ -184,3 +186,145 @@ class ScraperAdapter(BaseSourceAdapter):
         if self._scraper:
             self._scraper.close()
             self._scraper = None
+
+
+# ============================================================================
+# HTML Enrichment Scraper
+# ============================================================================
+
+
+@dataclass
+class HtmlEnrichmentConfig:
+    """Configuration for HTML enrichment scraping."""
+
+    enabled: bool = False
+    engine_type: str = "hybrid"  # hybrid | http | browser
+    rate_limit_per_second: float = 2.0
+    timeout_s: float = 15.0
+    min_text_len: int = 200
+    max_text_length: int = 50_000
+
+
+class HtmlEnrichmentScraper:
+    """
+    Scraper for fetching and cleaning a single URL's HTML content.
+
+    Uses the scrapping service's engines + html_to_structured + evaluate_quality
+    to produce cleaned text for the compressed_html field on SourceInfo.
+    """
+
+    def __init__(self, config: HtmlEnrichmentConfig):
+        self.config = config
+        self._engine = None
+        self._last_request_time: float = 0.0
+        self.logger = logging.getLogger("enrichment.html_scraper")
+
+    def _get_engine(self):
+        """Lazy-initialize the scrapping engine."""
+        if self._engine is not None:
+            return self._engine
+
+        engine_type = self.config.engine_type
+
+        if engine_type == "hybrid":
+            from scrapping.engines.hybrid import HybridEngine, HybridEngineOptions
+            from scrapping.engines.http import HttpEngineOptions
+
+            http_opts = HttpEngineOptions(
+                timeout_s=self.config.timeout_s,
+                rps=self.config.rate_limit_per_second,
+            )
+            options = HybridEngineOptions(
+                http=http_opts,
+                min_text_len=self.config.min_text_len,
+            )
+            self._engine = HybridEngine(options=options)
+        elif engine_type == "http":
+            from scrapping.engines.http import HttpEngine, HttpEngineOptions
+
+            options = HttpEngineOptions(
+                timeout_s=self.config.timeout_s,
+                rps=self.config.rate_limit_per_second,
+            )
+            self._engine = HttpEngine(options=options)
+        elif engine_type == "browser":
+            from scrapping.engines.browser import BrowserEngine, BrowserEngineOptions
+
+            options = BrowserEngineOptions(
+                nav_timeout_ms=int(self.config.timeout_s * 1000),
+            )
+            self._engine = BrowserEngine(options=options)
+        else:
+            raise ValueError(f"Unknown engine_type: {engine_type}")
+
+        return self._engine
+
+    def _rate_limit(self) -> None:
+        """Simple rate limiting between requests."""
+        if self.config.rate_limit_per_second <= 0:
+            return
+        min_interval = 1.0 / self.config.rate_limit_per_second
+        elapsed = time.monotonic() - self._last_request_time
+        if elapsed < min_interval:
+            time.sleep(min_interval - elapsed)
+        self._last_request_time = time.monotonic()
+
+    def fetch_compressed_html(self, url: str) -> Optional[str]:
+        """
+        Fetch a URL, extract clean text, and return it if quality passes.
+
+        Returns:
+            Cleaned text content, or None if fetch/quality fails.
+        """
+        if not url:
+            return None
+
+        try:
+            from scrapping.processing.html_to_structured import html_to_structured
+            from scrapping.processing.quality_filters import evaluate_quality
+
+            self._rate_limit()
+            engine = self._get_engine()
+            result = engine.get(url)
+
+            if not result.ok or not result.text:
+                self.logger.debug(
+                    f"Fetch failed for {url}: status={result.status_code}"
+                )
+                return None
+
+            # Extract structured text from HTML
+            doc = html_to_structured(result.text, url=url)
+            if not doc.ok or not doc.text:
+                self.logger.debug(f"No text extracted from {url}")
+                return None
+
+            # Quality check
+            quality = evaluate_quality(
+                {"url": url, "title": doc.title or "", "text": doc.text},
+                rules={"min_text_len": self.config.min_text_len},
+            )
+            if not quality.keep:
+                issues = ", ".join(i.message for i in quality.errors())
+                self.logger.debug(f"Quality check failed for {url}: {issues}")
+                return None
+
+            # Truncate if needed
+            text = doc.text
+            if len(text) > self.config.max_text_length:
+                text = text[: self.config.max_text_length]
+
+            return text
+
+        except ImportError as e:
+            self.logger.warning(f"Scrapping service not available: {e}")
+            return None
+        except Exception as e:
+            self.logger.warning(f"HTML enrichment failed for {url}: {e}")
+            return None
+
+    def close(self) -> None:
+        """Release engine resources."""
+        if self._engine is not None:
+            self._engine.close()
+            self._engine = None

@@ -77,8 +77,15 @@ def canonicalize_url(
     allow_fragments: bool = False,
     drop_tracking_params: bool = True,
     tracking_params: Sequence[str] = (
-        "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
-        "gclid", "fbclid", "mc_cid", "mc_eid",
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+        "utm_term",
+        "utm_content",
+        "gclid",
+        "fbclid",
+        "mc_cid",
+        "mc_eid",
     ),
 ) -> str:
     """
@@ -116,7 +123,9 @@ def canonicalize_url(
     return urlunparse((scheme, netloc, path, parts.params, query, fragment))
 
 
-def normalize_item_fields(item: dict[str, Any], *, url_fields: Sequence[str] = ("url",)) -> dict[str, Any]:
+def normalize_item_fields(
+    item: dict[str, Any], *, url_fields: Sequence[str] = ("url",)
+) -> dict[str, Any]:
     """
     Apply common cleaning rules to an item dict:
     - normalize whitespace in strings

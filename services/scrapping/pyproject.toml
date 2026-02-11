@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=69.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "scrapping"
@@ -99,13 +99,8 @@ all = [
 #   scrap doctor ...
 scrap = "scrapping.cli:main"
 
-[tool.setuptools]
-# We want setuptools to find the package automatically
-packages = { find = { include = ["scrapping*"] } }
-
-[tool.setuptools.package-data]
-# If later you ship default config templates or static assets
-# "scrapping" = ["templates/*.json", "assets/*"]
+[tool.hatch.build.targets.wheel]
+packages = ["scrapping"]
 
 # ---------------------------
 # Tooling configuration

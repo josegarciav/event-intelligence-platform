@@ -57,7 +57,9 @@ def parse_schedule(spec: dict[str, Any]) -> Schedule | None:
     return None
 
 
-def next_run_times(schedule: Schedule, start_ts: float, n: int = 5) -> list[datetime.datetime]:
+def next_run_times(
+    schedule: Schedule, start_ts: float, n: int = 5
+) -> list[datetime.datetime]:
     """
     Calculate next N run times starting from start_ts.
     """
@@ -73,6 +75,7 @@ def next_run_times(schedule: Schedule, start_ts: float, n: int = 5) -> list[date
         # Simple placeholder for cron logic if croniter missing
         try:
             from croniter import croniter
+
             it = croniter(str(schedule.value), base_dt)
             for _ in range(n):
                 out.append(it.get_next(datetime.datetime))

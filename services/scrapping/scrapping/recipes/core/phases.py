@@ -1,26 +1,30 @@
 from __future__ import annotations
 
-import time
 import logging
+import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional, Protocol, Sequence
+from typing import Any, Protocol
 
 from scrapping.monitoring.events import emit_event
 
 logger = logging.getLogger("scrapping.recipes.core.phases")
 
+
 class Phase(Protocol):
     name: str
-    def run(self, ctx: Any) -> Any:
-        ...
+
+    def run(self, ctx: Any) -> Any: ...
+
 
 @dataclass
 class PhaseResult:
     name: str
     ok: bool
     elapsed_ms: float
-    error: Optional[str] = None
+    error: str | None = None
     counts: dict[str, int] = field(default_factory=dict)
+
 
 class PhaseRunner:
     def __init__(self, ctx: Any, log: Any = None):
@@ -28,7 +32,7 @@ class PhaseRunner:
         self.log = log or logger
         self.results: list[PhaseResult] = []
 
-    def run_phases(self, phases: Sequence[Phase], start_at: Optional[str] = None):
+    def run_phases(self, phases: Sequence[Phase], start_at: str | None = None):
         skip = start_at is not None
         for phase in phases:
             if skip:
@@ -47,10 +51,19 @@ class PhaseRunner:
 
                 # If phase returns a dict of counts or result, wrap it
                 if not isinstance(res, PhaseResult):
-                    res = PhaseResult(name=phase.name, ok=True, elapsed_ms=elapsed, counts=res if isinstance(res, dict) else {})
+                    res = PhaseResult(
+                        name=phase.name,
+                        ok=True,
+                        elapsed_ms=elapsed,
+                        counts=res if isinstance(res, dict) else {},
+                    )
 
                 self.results.append(res)
-                emit_event(self.log, "phase.finished", {"phase": phase.name, "ok": res.ok, "elapsed_ms": res.elapsed_ms})
+                emit_event(
+                    self.log,
+                    "phase.finished",
+                    {"phase": phase.name, "ok": res.ok, "elapsed_ms": res.elapsed_ms},
+                )
 
                 if not res.ok:
                     self.log.error(f"Phase {phase.name} failed: {res.error}")
@@ -58,9 +71,16 @@ class PhaseRunner:
 
             except Exception as e:
                 elapsed = (time.time() - t0) * 1000
-                res = PhaseResult(name=phase.name, ok=False, elapsed_ms=elapsed, error=str(e))
+                res = PhaseResult(
+                    name=phase.name, ok=False, elapsed_ms=elapsed, error=str(e)
+                )
                 self.results.append(res)
-                emit_event(self.log, "phase.failed", {"phase": phase.name, "error": str(e)}, level="error")
+                emit_event(
+                    self.log,
+                    "phase.failed",
+                    {"phase": phase.name, "error": str(e)},
+                    level="error",
+                )
                 self.log.exception(f"Exception in phase {phase.name}")
                 break
         return self.results

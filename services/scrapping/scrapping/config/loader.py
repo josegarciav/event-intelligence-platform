@@ -51,7 +51,7 @@ def load_sources(
     *,
     config_path: str | Path | None = None,
     configs_glob: str | None = None,
-    options: LoadOptions | None = None
+    options: LoadOptions | None = None,
 ) -> LoadResult:
     """
     Load and validate SourceConfig(s).
@@ -87,7 +87,9 @@ def load_sources(
 
     if options.only_source_id_contains:
         needle = options.only_source_id_contains.lower()
-        raw_source_dicts = [d for d in raw_source_dicts if needle in str(d.get("source_id", "")).lower()]
+        raw_source_dicts = [
+            d for d in raw_source_dicts if needle in str(d.get("source_id", "")).lower()
+        ]
 
     if options.max_sources is not None:
         raw_source_dicts = raw_source_dicts[: int(options.max_sources)]
@@ -97,14 +99,20 @@ def load_sources(
     for d in raw_source_dicts:
         migrated, was_migrated = migrate_config(d)
         if was_migrated:
-            migration_reports.append({
-                "source_id": migrated.get("source_id", "unknown"),
-                "to_version": migrated.get("config_version"),
-            })
+            migration_reports.append(
+                {
+                    "source_id": migrated.get("source_id", "unknown"),
+                    "to_version": migrated.get("config_version"),
+                }
+            )
 
         # loader-level warnings
-        if migrated.get("engine", {}).get("type") == "browser" and not migrated.get("engine", {}).get("browser"):
-            warnings.append(f"{migrated.get('source_id','<no source_id>')}: engine.browser not set (recommended: seleniumbase|playwright)")
+        if migrated.get("engine", {}).get("type") == "browser" and not migrated.get(
+            "engine", {}
+        ).get("browser"):
+            warnings.append(
+                f"{migrated.get('source_id','<no source_id>')}: engine.browser not set (recommended: seleniumbase|playwright)"
+            )
 
         try:
             sources.append(SourceConfig.model_validate(migrated))
@@ -126,9 +134,7 @@ def load_sources(
 
 
 def _resolve_paths(
-    *,
-    config_path: str | Path | None,
-    configs_glob: str | None
+    *, config_path: str | Path | None, configs_glob: str | None
 ) -> list[Path]:
     if config_path and configs_glob:
         raise ValueError("Provide only one of config_path or configs_glob")

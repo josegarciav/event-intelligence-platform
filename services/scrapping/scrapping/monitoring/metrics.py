@@ -30,17 +30,25 @@ def _key(name: str, labels: dict[str, str] | None) -> str:
 class MetricsRegistry:
     counters: dict[str, float] = field(default_factory=dict)
     gauges: dict[str, float] = field(default_factory=dict)
-    timers: dict[str, dict[str, float]] = field(default_factory=dict)  # sum, count, max, min
+    timers: dict[str, dict[str, float]] = field(
+        default_factory=dict
+    )  # sum, count, max, min
 
-    def inc(self, name: str, value: float = 1.0, *, labels: dict[str, str] | None = None) -> None:
+    def inc(
+        self, name: str, value: float = 1.0, *, labels: dict[str, str] | None = None
+    ) -> None:
         k = _key(name, labels)
         self.counters[k] = float(self.counters.get(k, 0.0)) + float(value)
 
-    def set_gauge(self, name: str, value: float, *, labels: dict[str, str] | None = None) -> None:
+    def set_gauge(
+        self, name: str, value: float, *, labels: dict[str, str] | None = None
+    ) -> None:
         k = _key(name, labels)
         self.gauges[k] = float(value)
 
-    def observe(self, name: str, value: float, *, labels: dict[str, str] | None = None) -> None:
+    def observe(
+        self, name: str, value: float, *, labels: dict[str, str] | None = None
+    ) -> None:
         k = _key(name, labels)
         d = self.timers.get(k)
         if d is None:
@@ -52,7 +60,9 @@ class MetricsRegistry:
         d["min"] = min(d["min"], float(value))
 
     @contextmanager
-    def time(self, name: str, *, labels: dict[str, str] | None = None) -> Iterator[None]:
+    def time(
+        self, name: str, *, labels: dict[str, str] | None = None
+    ) -> Iterator[None]:
         t0 = time.time()
         try:
             yield

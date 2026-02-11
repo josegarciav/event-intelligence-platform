@@ -44,7 +44,7 @@ def _migrate_source(s: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         try:
             version = int(float(version))
         except ValueError:
-            version = 1 # assume current if malformed string
+            version = 1  # assume current if malformed string
 
     if version >= CURRENT_CONFIG_VERSION:
         return s, False

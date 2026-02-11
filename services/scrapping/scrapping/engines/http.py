@@ -12,20 +12,19 @@ Requests-based engine:
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
-from typing import Any, Optional
+from dataclasses import dataclass
+from typing import Any
 
 import requests
 
+from scrapping.runtime.blocks import classify_blocks
 from scrapping.runtime.resilience import RateLimiter, RetryPolicy
 from scrapping.runtime.results import (
-    BlockSignal,
     EngineError,
     FetchResult,
     RequestMeta,
     ResponseMeta,
 )
-from scrapping.runtime.blocks import classify_blocks
 
 from .base import BaseEngine, EngineContext, Headers
 
@@ -42,13 +41,13 @@ class HttpEngineOptions:
     retry_on_status: tuple[int, ...] = (408, 429, 500, 502, 503, 504)
 
     # rate limit
-    rps: Optional[float] = None
-    burst: Optional[int] = None
-    min_delay_s: Optional[float] = None
-    jitter_s: Optional[float] = None
+    rps: float | None = None
+    burst: int | None = None
+    min_delay_s: float | None = None
+    jitter_s: float | None = None
 
     # headers
-    user_agent: Optional[str] = None
+    user_agent: str | None = None
 
     # pool
     pool_connections: int = 10
@@ -56,14 +55,14 @@ class HttpEngineOptions:
 
 
 class HttpEngine(BaseEngine):
-    def __init__(self, *, options: Optional[HttpEngineOptions] = None) -> None:
+    def __init__(self, *, options: HttpEngineOptions | None = None) -> None:
         super().__init__(name="http")
         self.options = options or HttpEngineOptions()
         self._session = requests.Session()
 
         adapter = requests.adapters.HTTPAdapter(
             pool_connections=self.options.pool_connections,
-            pool_maxsize=self.options.pool_maxsize
+            pool_maxsize=self.options.pool_maxsize,
         )
         self._session.mount("http://", adapter)
         self._session.mount("https://", adapter)
@@ -87,10 +86,12 @@ class HttpEngine(BaseEngine):
         except Exception:
             pass
 
-    def get(self, url: str, *, ctx: Optional[EngineContext] = None) -> FetchResult:
+    def get(self, url: str, *, ctx: EngineContext | None = None) -> FetchResult:
         ctx = ctx or EngineContext()
         timeout_s = float(ctx.timeout_s or self.options.timeout_s)
-        verify_ssl = bool(ctx.verify_ssl if ctx.verify_ssl is not None else self.options.verify_ssl)
+        verify_ssl = bool(
+            ctx.verify_ssl if ctx.verify_ssl is not None else self.options.verify_ssl
+        )
 
         headers: Headers = {}
         if self.options.user_agent:
@@ -100,13 +101,13 @@ class HttpEngine(BaseEngine):
         if ctx.headers:
             headers.update({str(k): str(v) for k, v in ctx.headers.items()})
 
-        proxies: Optional[dict[str, str]] = None
+        proxies: dict[str, str] | None = None
         if ctx.proxy:
             proxies = {"http": ctx.proxy, "https": ctx.proxy}
 
         cookies = ctx.cookies or None
 
-        last_result: Optional[FetchResult] = None
+        last_result: FetchResult | None = None
         trace: list[dict[str, Any]] = []
 
         for attempt in range(0, self._retry_policy.max_retries + 1):
@@ -151,7 +152,9 @@ class HttpEngine(BaseEngine):
                     text=text,
                     elapsed_ms=elapsed_ms,
                     request_meta=req_meta,
-                    response_meta=ResponseMeta(headers=resp_headers, redirects=redirects),
+                    response_meta=ResponseMeta(
+                        headers=resp_headers, redirects=redirects
+                    ),
                     engine_trace=trace,
                 )
 
@@ -162,7 +165,9 @@ class HttpEngine(BaseEngine):
                     return result
 
                 last_result = result
-                trace.append({"attempt": attempt, "status": result.status_code, "ok": False})
+                trace.append(
+                    {"attempt": attempt, "status": result.status_code, "ok": False}
+                )
 
                 # Check if retryable
                 if attempt < self._retry_policy.max_retries and result.is_retryable:
@@ -175,7 +180,9 @@ class HttpEngine(BaseEngine):
 
             except requests.RequestException as e:
                 elapsed_ms = (time.time() - t0) * 1000
-                err = EngineError(type=type(e).__name__, message=str(e), is_retryable=True)
+                err = EngineError(
+                    type=type(e).__name__, message=str(e), is_retryable=True
+                )
 
                 result = FetchResult(
                     final_url=url,

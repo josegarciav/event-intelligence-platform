@@ -1,6 +1,9 @@
-import pytest
 import os
+
+import pytest
+
 from scrapping.engines.browser import BrowserEngine, BrowserEngineOptions
+
 
 @pytest.mark.integration
 def test_browser_engine_online_quotes():
@@ -18,10 +21,8 @@ def test_browser_engine_online_quotes():
         assert "Albert Einstein" in res.text
 
         # Check action results in trace
-        actions_found = False
         for entry in res.engine_trace:
             if "actions" in entry:
-                actions_found = True
                 break
         # Even if we didn't pass explicit actions, wait_for might be logged if we updated it to be so.
         # But wait_for is separate in get_rendered.

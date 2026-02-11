@@ -15,18 +15,17 @@ import asyncio
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
+from scrapping.actions.browser_actions import ActionRunnerOptions, BrowserActionRunner
+from scrapping.runtime.blocks import classify_blocks
 from scrapping.runtime.resilience import RateLimiter, RetryPolicy
 from scrapping.runtime.results import (
-    BlockSignal,
     EngineError,
     FetchResult,
     RequestMeta,
     ResponseMeta,
 )
-from scrapping.runtime.blocks import classify_blocks
-from scrapping.actions.browser_actions import BrowserActionRunner, ActionRunnerOptions
 
 from .base import BaseEngine, EngineContext, Headers
 
@@ -43,14 +42,16 @@ class BrowserEngineOptions:
     backoff_mode: str = "exp"
 
     # throttling
-    rps: Optional[float] = None
-    burst: Optional[int] = None
+    rps: float | None = None
+    burst: int | None = None
     min_delay_s: float = 0.0
     jitter_s: float = 0.25
 
     # context behavior
-    user_agent: Optional[str] = None
-    viewport: Optional[dict[str, int]] = field(default_factory=lambda: {"width": 1280, "height": 720})
+    user_agent: str | None = None
+    viewport: dict[str, int] | None = field(
+        default_factory=lambda: {"width": 1280, "height": 720}
+    )
     locale: str = "en-US"
     timezone_id: str = "UTC"
 
@@ -73,7 +74,7 @@ class BrowserEngine(BaseEngine):
     via aget_rendered() or by running sync calls in a thread (Option B).
     """
 
-    def __init__(self, *, options: Optional[BrowserEngineOptions] = None) -> None:
+    def __init__(self, *, options: BrowserEngineOptions | None = None) -> None:
         super().__init__(name="browser")
         self.options = options or BrowserEngineOptions()
         self._limiter = RateLimiter(
@@ -96,7 +97,7 @@ class BrowserEngine(BaseEngine):
         self._browser = None
         self._context = None
 
-        self._async_engine: Optional[AsyncBrowserEngine] = None
+        self._async_engine: AsyncBrowserEngine | None = None
 
     # -------------------------
     # Lifecycle
@@ -121,6 +122,7 @@ class BrowserEngine(BaseEngine):
                     # Check if we are in a thread other than the main thread.
                     # sync_playwright().start() often works in a thread even if the main thread has a loop.
                     import threading
+
                     if threading.current_thread() is threading.main_thread():
                         raise RuntimeError(
                             "Playwright Sync API cannot be used inside an asyncio loop (e.g. Jupyter). "
@@ -135,7 +137,10 @@ class BrowserEngine(BaseEngine):
             try:
                 self._browser = browser_launcher.launch(headless=self.options.headless)
             except Exception as e:
-                if "executable doesn't exist" in str(e) or "not installed" in str(e).lower():
+                if (
+                    "executable doesn't exist" in str(e)
+                    or "not installed" in str(e).lower()
+                ):
                     raise RuntimeError(
                         f"Browser binaries for {self.options.browser_name} are missing. "
                         "Run: playwright install"
@@ -154,7 +159,9 @@ class BrowserEngine(BaseEngine):
             self._context = self._browser.new_context(**context_kwargs)
 
             if self.options.trace:
-                self._context.tracing.start(screenshots=True, snapshots=True, sources=True)
+                self._context.tracing.start(
+                    screenshots=True, snapshots=True, sources=True
+                )
 
         except Exception:
             self.close()
@@ -164,6 +171,7 @@ class BrowserEngine(BaseEngine):
         try:
             asyncio.get_running_loop()
             import concurrent.futures
+
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 executor.submit(self._close_sync).result()
         except RuntimeError:
@@ -175,6 +183,7 @@ class BrowserEngine(BaseEngine):
                 if self.options.trace:
                     try:
                         from pathlib import Path
+
                         out_dir = Path(self.options.artifacts_dir)
                         out_dir.mkdir(parents=True, exist_ok=True)
                         trace_path = out_dir / f"trace_{int(time.time())}.zip"
@@ -212,7 +221,7 @@ class BrowserEngine(BaseEngine):
     # Core API
     # -------------------------
 
-    def get(self, url: str, *, ctx: Optional[EngineContext] = None) -> FetchResult:
+    def get(self, url: str, *, ctx: EngineContext | None = None) -> FetchResult:
         # For browser engine, plain get just renders without actions.
         return self.get_rendered(url, ctx=ctx, actions=None, wait_for=None)
 
@@ -220,9 +229,9 @@ class BrowserEngine(BaseEngine):
         self,
         url: str,
         *,
-        ctx: Optional[EngineContext] = None,
-        actions: Optional[Sequence[dict[str, Any]]] = None,
-        wait_for: Optional[str] = None,
+        ctx: EngineContext | None = None,
+        actions: Sequence[dict[str, Any]] | None = None,
+        wait_for: str | None = None,
     ) -> FetchResult:
         # Check if we are in a notebook loop
         try:
@@ -232,38 +241,49 @@ class BrowserEngine(BaseEngine):
             # to encourage aget_rendered in notebooks.
             # For compatibility, let's try to run it in a separate thread if called sync in a loop.
             import concurrent.futures
+
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(self._get_rendered_sync, url, ctx=ctx, actions=actions, wait_for=wait_for)
+                future = executor.submit(
+                    self._get_rendered_sync,
+                    url,
+                    ctx=ctx,
+                    actions=actions,
+                    wait_for=wait_for,
+                )
                 return future.result()
         except RuntimeError:
             # No loop, just run it.
-            return self._get_rendered_sync(url, ctx=ctx, actions=actions, wait_for=wait_for)
+            return self._get_rendered_sync(
+                url, ctx=ctx, actions=actions, wait_for=wait_for
+            )
 
     async def aget_rendered(
         self,
         url: str,
         *,
-        ctx: Optional[EngineContext] = None,
-        actions: Optional[Sequence[dict[str, Any]]] = None,
-        wait_for: Optional[str] = None,
+        ctx: EngineContext | None = None,
+        actions: Sequence[dict[str, Any]] | None = None,
+        wait_for: str | None = None,
     ) -> FetchResult:
         if not self._async_engine:
             self._async_engine = AsyncBrowserEngine(options=self.options)
-        return await self._async_engine.get_rendered(url, ctx=ctx, actions=actions, wait_for=wait_for)
+        return await self._async_engine.get_rendered(
+            url, ctx=ctx, actions=actions, wait_for=wait_for
+        )
 
     def _get_rendered_sync(
         self,
         url: str,
         *,
-        ctx: Optional[EngineContext] = None,
-        actions: Optional[Sequence[dict[str, Any]]] = None,
-        wait_for: Optional[str] = None,
+        ctx: EngineContext | None = None,
+        actions: Sequence[dict[str, Any]] | None = None,
+        wait_for: str | None = None,
     ) -> FetchResult:
         ctx = ctx or EngineContext()
         nav_timeout_s = float(ctx.timeout_s or self.options.nav_timeout_s)
         render_timeout_s = float(self.options.render_timeout_s)
 
-        last_result: Optional[FetchResult] = None
+        last_result: FetchResult | None = None
         trace: list[dict[str, Any]] = []
 
         for attempt in range(0, self._retry_policy.max_retries + 1):
@@ -290,14 +310,20 @@ class BrowserEngine(BaseEngine):
                     block_types.add("font")
 
                 if block_types:
-                    def _route_filter(route):
-                        if route.request.resource_type in block_types:
-                            return route.abort()
-                        return route.continue_()
-                    page.route("**/*", _route_filter)
+
+                    def _make_route_filter(types=block_types):
+                        def _route_filter(route):
+                            if route.request.resource_type in types:
+                                return route.abort()
+                            return route.continue_()
+                        return _route_filter
+
+                    page.route("**/*", _make_route_filter())
 
                 # Navigate
-                resp = page.goto(url, wait_until="domcontentloaded", timeout=nav_timeout_s * 1000)
+                resp = page.goto(
+                    url, wait_until="domcontentloaded", timeout=nav_timeout_s * 1000
+                )
                 status_code = resp.status if resp is not None else None
                 final_url = page.url
 
@@ -337,7 +363,13 @@ class BrowserEngine(BaseEngine):
                     elapsed_ms=elapsed_ms,
                     request_meta=req_meta,
                     response_meta=ResponseMeta(headers=resp_headers),
-                    engine_trace=trace + [{"actions": [r.__dict__ for r in action_results], "artifacts": artifacts_meta}],
+                    engine_trace=trace
+                    + [
+                        {
+                            "actions": [r.__dict__ for r in action_results],
+                            "artifacts": artifacts_meta,
+                        }
+                    ],
                 )
 
                 result.block_signals = classify_blocks(result.text)
@@ -348,7 +380,14 @@ class BrowserEngine(BaseEngine):
                     return result
 
                 last_result = result
-                trace.append({"attempt": attempt, "status": result.status_code, "ok": False, "artifacts": artifacts_meta})
+                trace.append(
+                    {
+                        "attempt": attempt,
+                        "status": result.status_code,
+                        "ok": False,
+                        "artifacts": artifacts_meta,
+                    }
+                )
 
                 if attempt < self._retry_policy.max_retries:
                     delay = self._retry_policy.compute_backoff_s(attempt + 1)
@@ -360,7 +399,9 @@ class BrowserEngine(BaseEngine):
 
             except Exception as e:
                 elapsed_ms = (time.time() - t0) * 1000
-                err = EngineError(type=type(e).__name__, message=str(e), is_retryable=True)
+                err = EngineError(
+                    type=type(e).__name__, message=str(e), is_retryable=True
+                )
 
                 # Screenshot on error
                 artifacts_meta = {}
@@ -369,7 +410,9 @@ class BrowserEngine(BaseEngine):
                         # try to get the page if it was created
                         pages = self._context.pages
                         if pages:
-                            artifacts_meta = self._save_page_artifacts(pages[-1], url, attempt, error=True)
+                            artifacts_meta = self._save_page_artifacts(
+                                pages[-1], url, attempt, error=True
+                            )
                 except Exception:
                     pass
 
@@ -383,7 +426,14 @@ class BrowserEngine(BaseEngine):
                 )
 
                 last_result = result
-                trace.append({"attempt": attempt, "error": err.type, "ok": False, "artifacts": artifacts_meta})
+                trace.append(
+                    {
+                        "attempt": attempt,
+                        "error": err.type,
+                        "ok": False,
+                        "artifacts": artifacts_meta,
+                    }
+                )
 
                 if attempt < self._retry_policy.max_retries:
                     delay = self._retry_policy.compute_backoff_s(attempt + 1)
@@ -405,11 +455,11 @@ class BrowserEngine(BaseEngine):
         page: Any,
         url: str,
         attempt: int,
-        html: Optional[str] = None,
-        error: bool = False
+        html: str | None = None,
+        error: bool = False,
     ) -> dict[str, str]:
-        from pathlib import Path
         import hashlib
+        from pathlib import Path
 
         artifacts = {}
         out_dir = Path(self.options.artifacts_dir)
@@ -426,7 +476,7 @@ class BrowserEngine(BaseEngine):
             artifacts["html_path"] = str(html_path)
 
         # Screenshot
-        if (self.options.save_artifacts or (error and self.options.screenshot_on_error)):
+        if self.options.save_artifacts or (error and self.options.screenshot_on_error):
             ss_path = out_dir / f"{base_name}.png"
             try:
                 page.screenshot(path=str(ss_path), full_page=True)
@@ -442,7 +492,7 @@ class AsyncBrowserEngine(BaseEngine):
     Playwright-based browser engine using Async API.
     """
 
-    def __init__(self, *, options: Optional[BrowserEngineOptions] = None) -> None:
+    def __init__(self, *, options: BrowserEngineOptions | None = None) -> None:
         super().__init__(name="browser_async")
         self.options = options or BrowserEngineOptions()
         self._limiter = RateLimiter(
@@ -480,9 +530,14 @@ class AsyncBrowserEngine(BaseEngine):
             self._pw = await async_playwright().start()
             browser_launcher = getattr(self._pw, self.options.browser_name)
             try:
-                self._browser = await browser_launcher.launch(headless=self.options.headless)
+                self._browser = await browser_launcher.launch(
+                    headless=self.options.headless
+                )
             except Exception as e:
-                if "executable doesn't exist" in str(e) or "not installed" in str(e).lower():
+                if (
+                    "executable doesn't exist" in str(e)
+                    or "not installed" in str(e).lower()
+                ):
                     raise RuntimeError(
                         f"Browser binaries for {self.options.browser_name} are missing. "
                         "Run: playwright install"
@@ -500,7 +555,9 @@ class AsyncBrowserEngine(BaseEngine):
             self._context = await self._browser.new_context(**context_kwargs)
 
             if self.options.trace:
-                await self._context.tracing.start(screenshots=True, snapshots=True, sources=True)
+                await self._context.tracing.start(
+                    screenshots=True, snapshots=True, sources=True
+                )
 
         except Exception:
             await self.close()
@@ -512,6 +569,7 @@ class AsyncBrowserEngine(BaseEngine):
                 if self.options.trace:
                     try:
                         from pathlib import Path
+
                         out_dir = Path(self.options.artifacts_dir)
                         out_dir.mkdir(parents=True, exist_ok=True)
                         trace_path = out_dir / f"trace_{int(time.time())}.zip"
@@ -534,22 +592,24 @@ class AsyncBrowserEngine(BaseEngine):
         finally:
             self._pw = None
 
-    async def get(self, url: str, *, ctx: Optional[EngineContext] = None) -> FetchResult:
+    async def get(
+        self, url: str, *, ctx: EngineContext | None = None
+    ) -> FetchResult:
         return await self.get_rendered(url, ctx=ctx, actions=None, wait_for=None)
 
     async def get_rendered(
         self,
         url: str,
         *,
-        ctx: Optional[EngineContext] = None,
-        actions: Optional[Sequence[dict[str, Any]]] = None,
-        wait_for: Optional[str] = None,
+        ctx: EngineContext | None = None,
+        actions: Sequence[dict[str, Any]] | None = None,
+        wait_for: str | None = None,
     ) -> FetchResult:
         ctx = ctx or EngineContext()
         nav_timeout_s = float(ctx.timeout_s or self.options.nav_timeout_s)
         render_timeout_s = float(self.options.render_timeout_s)
 
-        last_result: Optional[FetchResult] = None
+        last_result: FetchResult | None = None
         trace: list[dict[str, Any]] = []
 
         for attempt in range(0, self._retry_policy.max_retries + 1):
@@ -576,20 +636,28 @@ class AsyncBrowserEngine(BaseEngine):
                     block_types.add("font")
 
                 if block_types:
-                    async def _route_filter(route):
-                        if route.request.resource_type in block_types:
-                            return await route.abort()
-                        return await route.continue_()
-                    await page.route("**/*", _route_filter)
+
+                    def _make_route_filter(types=block_types):
+                        async def _route_filter(route):
+                            if route.request.resource_type in types:
+                                return await route.abort()
+                            return await route.continue_()
+                        return _route_filter
+
+                    await page.route("**/*", _make_route_filter())
 
                 # Navigate
-                resp = await page.goto(url, wait_until="domcontentloaded", timeout=nav_timeout_s * 1000)
+                resp = await page.goto(
+                    url, wait_until="domcontentloaded", timeout=nav_timeout_s * 1000
+                )
                 status_code = resp.status if resp is not None else None
                 final_url = page.url
 
                 # Optional wait_for selector
                 if wait_for:
-                    await page.wait_for_selector(wait_for, timeout=render_timeout_s * 1000)
+                    await page.wait_for_selector(
+                        wait_for, timeout=render_timeout_s * 1000
+                    )
 
                 # Run actions
                 action_results = []
@@ -605,7 +673,9 @@ class AsyncBrowserEngine(BaseEngine):
                 # Handle artifacts
                 artifacts_meta = {}
                 if self.options.save_artifacts:
-                    artifacts_meta = await self._asave_page_artifacts(page, url, attempt, html)
+                    artifacts_meta = await self._asave_page_artifacts(
+                        page, url, attempt, html
+                    )
                 elapsed_ms = (time.time() - t0) * 1000
 
                 resp_headers: Headers = {}
@@ -623,7 +693,13 @@ class AsyncBrowserEngine(BaseEngine):
                     elapsed_ms=elapsed_ms,
                     request_meta=req_meta,
                     response_meta=ResponseMeta(headers=resp_headers),
-                    engine_trace=trace + [{"actions": [r.__dict__ for r in action_results], "artifacts": artifacts_meta}],
+                    engine_trace=trace
+                    + [
+                        {
+                            "actions": [r.__dict__ for r in action_results],
+                            "artifacts": artifacts_meta,
+                        }
+                    ],
                 )
 
                 result.block_signals = classify_blocks(result.text)
@@ -634,7 +710,14 @@ class AsyncBrowserEngine(BaseEngine):
                     return result
 
                 last_result = result
-                trace.append({"attempt": attempt, "status": result.status_code, "ok": False, "artifacts": artifacts_meta})
+                trace.append(
+                    {
+                        "attempt": attempt,
+                        "status": result.status_code,
+                        "ok": False,
+                        "artifacts": artifacts_meta,
+                    }
+                )
 
                 if attempt < self._retry_policy.max_retries:
                     delay = self._retry_policy.compute_backoff_s(attempt + 1)
@@ -646,7 +729,9 @@ class AsyncBrowserEngine(BaseEngine):
 
             except Exception as e:
                 elapsed_ms = (time.time() - t0) * 1000
-                err = EngineError(type=type(e).__name__, message=str(e), is_retryable=True)
+                err = EngineError(
+                    type=type(e).__name__, message=str(e), is_retryable=True
+                )
 
                 # Screenshot on error
                 artifacts_meta = {}
@@ -654,7 +739,9 @@ class AsyncBrowserEngine(BaseEngine):
                     if self.options.screenshot_on_error and self._context:
                         pages = self._context.pages
                         if pages:
-                            artifacts_meta = await self._asave_page_artifacts(pages[-1], url, attempt, error=True)
+                            artifacts_meta = await self._asave_page_artifacts(
+                                pages[-1], url, attempt, error=True
+                            )
                 except Exception:
                     pass
 
@@ -668,7 +755,14 @@ class AsyncBrowserEngine(BaseEngine):
                 )
 
                 last_result = result
-                trace.append({"attempt": attempt, "error": err.type, "ok": False, "artifacts": artifacts_meta})
+                trace.append(
+                    {
+                        "attempt": attempt,
+                        "error": err.type,
+                        "ok": False,
+                        "artifacts": artifacts_meta,
+                    }
+                )
 
                 if attempt < self._retry_policy.max_retries:
                     delay = self._retry_policy.compute_backoff_s(attempt + 1)
@@ -681,7 +775,9 @@ class AsyncBrowserEngine(BaseEngine):
         return last_result or FetchResult(
             final_url=url,
             text="",
-            error=EngineError(type="AsyncBrowserEngineError", message="Exhausted retries"),
+            error=EngineError(
+                type="AsyncBrowserEngineError", message="Exhausted retries"
+            ),
             engine_trace=trace,
         )
 
@@ -690,11 +786,11 @@ class AsyncBrowserEngine(BaseEngine):
         page: Any,
         url: str,
         attempt: int,
-        html: Optional[str] = None,
-        error: bool = False
+        html: str | None = None,
+        error: bool = False,
     ) -> dict[str, str]:
-        from pathlib import Path
         import hashlib
+        from pathlib import Path
 
         artifacts = {}
         out_dir = Path(self.options.artifacts_dir)
@@ -711,7 +807,7 @@ class AsyncBrowserEngine(BaseEngine):
             artifacts["html_path"] = str(html_path)
 
         # Screenshot
-        if (self.options.save_artifacts or (error and self.options.screenshot_on_error)):
+        if self.options.save_artifacts or (error and self.options.screenshot_on_error):
             ss_path = out_dir / f"{base_name}.png"
             try:
                 await page.screenshot(path=str(ss_path), full_page=True)

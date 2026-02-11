@@ -133,5 +133,6 @@ def html_to_structured(
 
 _TAGS = re.compile(r"<[^>]+>")
 
+
 def _strip_tags(html: str) -> str:
     return _TAGS.sub(" ", html or "")

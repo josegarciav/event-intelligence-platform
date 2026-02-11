@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 
 class BlockSignal(str, Enum):
@@ -23,8 +23,8 @@ class BlockSignal(str, Enum):
 class RequestMeta:
     method: str = "GET"
     headers: dict[str, str] = field(default_factory=dict)
-    proxy: Optional[str] = None
-    user_agent: Optional[str] = None
+    proxy: str | None = None
+    user_agent: str | None = None
 
 
 @dataclass(frozen=True)
@@ -43,22 +43,26 @@ class EngineError:
 @dataclass
 class FetchResult:
     final_url: str
-    status_code: Optional[int] = None
-    content_type: Optional[str] = None
-    body_bytes: Optional[bytes] = None
+    status_code: int | None = None
+    content_type: str | None = None
+    body_bytes: bytes | None = None
     text: str = ""
     elapsed_ms: float = 0.0
 
     request_meta: RequestMeta = field(default_factory=RequestMeta)
     response_meta: ResponseMeta = field(default_factory=ResponseMeta)
 
-    error: Optional[EngineError] = None
+    error: EngineError | None = None
     block_signals: list[BlockSignal] = field(default_factory=list)
     engine_trace: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
-        return self.error is None and self.status_code is not None and 200 <= self.status_code < 400
+        return (
+            self.error is None
+            and self.status_code is not None
+            and 200 <= self.status_code < 400
+        )
 
     @property
     def is_retryable(self) -> bool:
@@ -85,11 +89,13 @@ class FetchResult:
     def timings(self) -> Any:
         # Compatibility with old FetchTimings
         from dataclasses import dataclass
+
         @dataclass
         class CompatibilityTimings:
             elapsed_s: float
             started_at_s: float = 0.0
             ended_at_s: float = 0.0
+
         return CompatibilityTimings(elapsed_s=self.elapsed_s)
 
     def short_error(self) -> str:

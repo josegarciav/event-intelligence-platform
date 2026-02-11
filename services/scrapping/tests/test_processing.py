@@ -16,9 +16,13 @@ def test_quality_filters():
     assert any(i.code == "blocked_page" for i in q.issues)
 
     # OK
-    item = {"text": "This is a long enough text for testing quality filters.", "title": "Good Title"}
+    item = {
+        "text": "This is a long enough text for testing quality filters.",
+        "title": "Good Title",
+    }
     q = evaluate_quality(item, rules={"min_text_len": 10})
     assert q.keep is True
+
 
 def test_html_to_structured_empty():
     res = html_to_structured("")

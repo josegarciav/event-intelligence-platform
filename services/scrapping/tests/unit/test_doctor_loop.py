@@ -1,6 +1,8 @@
+
 import pytest
-import asyncio
+
 from scrapping.orchestrator import doctor_environment
+
 
 @pytest.mark.asyncio
 async def test_doctor_environment_in_loop():

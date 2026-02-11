@@ -1,6 +1,5 @@
-import pytest
-from pathlib import Path
 from scrapping.cli import main
+
 
 def test_scaffold_test_command(tmp_path):
     fixture_path = tmp_path / "test.html"
@@ -10,11 +9,16 @@ def test_scaffold_test_command(tmp_path):
 
     argv = [
         "scaffold-test",
-        "--fixture", str(fixture_path),
-        "--extract", "css",
-        "--pattern", "a",
-        "--expect-count", "1",
-        "--out", str(test_path)
+        "--fixture",
+        str(fixture_path),
+        "--extract",
+        "css",
+        "--pattern",
+        "a",
+        "--expect-count",
+        "1",
+        "--out",
+        str(test_path),
     ]
 
     exit_code = main(argv)
@@ -25,10 +29,11 @@ def test_scaffold_test_command(tmp_path):
     assert "LinkExtractRequest" in content
     assert "assert len(links) == 1" in content
 
+
 def test_capture_fixture_http_offline(tmp_path, monkeypatch):
     # Mocking HttpEngine to avoid network
-    from scrapping.engines.http import HttpEngine, FetchResult
-    from scrapping.runtime.results import ResponseMeta, RequestMeta
+    from scrapping.engines.http import FetchResult, HttpEngine
+    from scrapping.runtime.results import RequestMeta, ResponseMeta
 
     def mock_get(self, url, ctx=None):
         return FetchResult(
@@ -36,7 +41,7 @@ def test_capture_fixture_http_offline(tmp_path, monkeypatch):
             status_code=200,
             text="<html>mock</html>",
             response_meta=ResponseMeta(headers={}),
-            request_meta=RequestMeta(method="GET", headers={})
+            request_meta=RequestMeta(method="GET", headers={}),
         )
 
     monkeypatch.setattr(HttpEngine, "get", mock_get)
@@ -44,9 +49,12 @@ def test_capture_fixture_http_offline(tmp_path, monkeypatch):
     out_path = tmp_path / "captured.html"
     argv = [
         "capture-fixture",
-        "--url", "http://example.com",
-        "--engine", "http",
-        "--out", str(out_path)
+        "--url",
+        "http://example.com",
+        "--engine",
+        "http",
+        "--out",
+        str(out_path),
     ]
 
     exit_code = main(argv)

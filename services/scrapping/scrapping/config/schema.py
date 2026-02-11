@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 # Enums
 # ----------------------------
 
+
 class EngineType(str, Enum):
     http = "http"
     browser = "browser"
@@ -67,18 +68,20 @@ class ActionType(str, Enum):
 # Sub-models
 # ----------------------------
 
+
 class ScheduleConfig(BaseModel):
     frequency: str | None = Field(
-        default=None,
-        description="Human-friendly frequency like '15m', '2h', 'daily'."
+        default=None, description="Human-friendly frequency like '15m', '2h', 'daily'."
     )
-    timezone: str | None = Field(default=None, description="IANA timezone, e.g., Europe/Madrid")
+    timezone: str | None = Field(
+        default=None, description="IANA timezone, e.g., Europe/Madrid"
+    )
     priority: int = Field(default=5, ge=1, le=10)
     polling_strategy: PollingStrategy = Field(default=PollingStrategy.fixed)
 
     window: dict[str, Any] | None = Field(
         default=None,
-        description="Optional run window constraints (team-defined shape)."
+        description="Optional run window constraints (team-defined shape).",
     )
 
 
@@ -92,7 +95,9 @@ class PagingConfig(BaseModel):
 
 
 class EntryPoint(BaseModel):
-    url: str = Field(..., description="Entrypoint URL template. May include {page} etc.")
+    url: str = Field(
+        ..., description="Entrypoint URL template. May include {page} etc."
+    )
     paging: PagingConfig | None = None
     params: dict[str, Any] = Field(default_factory=dict)
     headers: dict[str, Any] = Field(default_factory=dict)
@@ -109,7 +114,9 @@ class RateLimitPolicy(BaseModel):
 class RetryPolicy(BaseModel):
     max_retries: int = Field(default=3, ge=0, le=20)
     backoff: str = Field(default="exp", description="exp | fixed | none")
-    retry_on_status: list[int] = Field(default_factory=lambda: [429, 500, 502, 503, 504])
+    retry_on_status: list[int] = Field(
+        default_factory=lambda: [429, 500, 502, 503, 504]
+    )
 
 
 class CaptchaConfig(BaseModel):
@@ -146,7 +153,9 @@ class LinkExtractConfig(BaseModel):
     method: LinkExtractMethod = Field(default=LinkExtractMethod.regex)
     pattern: str | None = Field(default=None, description="For regex method")
     selector: str | None = Field(default=None, description="For css/xpath/js method")
-    identifier: str | None = Field(default=None, description="Optional filter substring for extracted links")
+    identifier: str | None = Field(
+        default=None, description="Optional filter substring for extracted links"
+    )
 
 
 class DiscoveryConfig(BaseModel):
@@ -162,9 +171,15 @@ class StorageTarget(BaseModel):
 
 
 class StorageConfig(BaseModel):
-    raw_pages: StorageTarget = Field(default_factory=lambda: StorageTarget(enabled=True, format="parquet"))
-    raw_items: StorageTarget = Field(default_factory=lambda: StorageTarget(enabled=False, format="parquet"))
-    items: StorageTarget = Field(default_factory=lambda: StorageTarget(enabled=True, format="parquet"))
+    raw_pages: StorageTarget = Field(
+        default_factory=lambda: StorageTarget(enabled=True, format="parquet")
+    )
+    raw_items: StorageTarget = Field(
+        default_factory=lambda: StorageTarget(enabled=False, format="parquet")
+    )
+    items: StorageTarget = Field(
+        default_factory=lambda: StorageTarget(enabled=True, format="parquet")
+    )
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -177,6 +192,7 @@ class AntiBotConfig(BaseModel):
 # ----------------------------
 # Source (top-level unit)
 # ----------------------------
+
 
 class SourceConfig(BaseModel):
     config_version: str = Field(default="1.0")
@@ -216,13 +232,24 @@ class SourceConfig(BaseModel):
             pass
 
         # Link extractor requirements
-        if self.discovery and self.discovery.link_extract.method == LinkExtractMethod.regex:
+        if (
+            self.discovery
+            and self.discovery.link_extract.method == LinkExtractMethod.regex
+        ):
             if not self.discovery.link_extract.pattern:
-                raise ValueError("discovery.link_extract.pattern is required when method=regex")
+                raise ValueError(
+                    "discovery.link_extract.pattern is required when method=regex"
+                )
 
-        if self.discovery and self.discovery.link_extract.method in (LinkExtractMethod.css, LinkExtractMethod.xpath, LinkExtractMethod.js):
+        if self.discovery and self.discovery.link_extract.method in (
+            LinkExtractMethod.css,
+            LinkExtractMethod.xpath,
+            LinkExtractMethod.js,
+        ):
             if not self.discovery.link_extract.selector:
-                raise ValueError("discovery.link_extract.selector is required when method!=regex")
+                raise ValueError(
+                    "discovery.link_extract.selector is required when method!=regex"
+                )
 
         return self
 

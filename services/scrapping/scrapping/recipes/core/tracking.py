@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
+
 
 class TrackingStore:
     def __init__(self, tracking_path: str):
@@ -23,11 +24,7 @@ class TrackingStore:
 
     def update_item(self, key: str, status: str, **kwargs):
         item = self.data["items"].get(key, {})
-        item.update({
-            "status": status,
-            "updated_at": time.time(),
-            **kwargs
-        })
+        item.update({"status": status, "updated_at": time.time(), **kwargs})
         if "started_at" not in item and status == "running":
             item["started_at"] = time.time()
         if status in ("success", "failed"):
@@ -36,5 +33,5 @@ class TrackingStore:
         self.data["items"][key] = item
         self.save()
 
-    def get_item(self, key: str) -> Optional[dict[str, Any]]:
+    def get_item(self, key: str) -> dict[str, Any] | None:
         return self.data["items"].get(key)

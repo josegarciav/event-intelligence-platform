@@ -19,7 +19,7 @@ Usage:
 
 from .api_adapter import APIAdapter
 from .base_adapter import BaseSourceAdapter, FetchResult, SourceType
-from .scraper_adapter import ScraperAdapter
+from .scraper_adapter import HtmlEnrichmentConfig, HtmlEnrichmentScraper, ScraperAdapter
 
 __all__ = [
     "BaseSourceAdapter",
@@ -27,4 +27,6 @@ __all__ = [
     "FetchResult",
     "APIAdapter",
     "ScraperAdapter",
+    "HtmlEnrichmentScraper",
+    "HtmlEnrichmentConfig",
 ]

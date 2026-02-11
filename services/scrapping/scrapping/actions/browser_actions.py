@@ -23,7 +23,7 @@ import random
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from .human_like import HumanLike, HumanLikeOptions
 
@@ -33,8 +33,8 @@ class ActionResult:
     type: str
     ok: bool = True
     elapsed_ms: float = 0.0
-    error: Optional[str] = None
-    screenshot_path: Optional[str] = None
+    error: str | None = None
+    screenshot_path: str | None = None
 
 
 @dataclass
@@ -42,6 +42,7 @@ class ActionRunnerOptions:
     """
     Behavior for how strictly we treat failures.
     """
+
     strict: bool = False  # if True, unknown actions or failures raise
     default_timeout_s: float = 20.0
 
@@ -54,7 +55,9 @@ class BrowserActionRunner:
         self.options = options or ActionRunnerOptions()
         self.human = HumanLike(self.options.human)
 
-    async def arun(self, page: Any, actions: Sequence[dict[str, Any]]) -> list[ActionResult]:
+    async def arun(
+        self, page: Any, actions: Sequence[dict[str, Any]]
+    ) -> list[ActionResult]:
         """
         Executes a list of action dicts on an Async Playwright `page`.
         """
@@ -71,7 +74,9 @@ class BrowserActionRunner:
             try:
                 if atype == "wait_for":
                     if selector:
-                        await page.wait_for_selector(selector, timeout=int(timeout_s * 1000))
+                        await page.wait_for_selector(
+                            selector, timeout=int(timeout_s * 1000)
+                        )
 
                 elif atype == "click":
                     if selector:
@@ -117,8 +122,12 @@ class BrowserActionRunner:
                     else:
                         # random
                         for _ in range(max(1, repeat)):
-                            delta = random.randint(self.human.opts.scroll_min_px, self.human.opts.scroll_max_px)
-                            if direction == "up": delta = -delta
+                            delta = random.randint(
+                                self.human.opts.scroll_min_px,
+                                self.human.opts.scroll_max_px,
+                            )
+                            if direction == "up":
+                                delta = -delta
                             await page.mouse.wheel(0, delta)
                             await asyncio.sleep(self.human.opts.micro_pause_s)
 
@@ -206,14 +215,18 @@ class BrowserActionRunner:
     # Action implementations
     # ------------------------------------------------------------------
 
-    def _wait_for(self, page: Any, selector: str | None, params: dict[str, Any], timeout_s: float) -> None:
+    def _wait_for(
+        self, page: Any, selector: str | None, params: dict[str, Any], timeout_s: float
+    ) -> None:
         if not selector:
             if self.options.strict:
                 raise ValueError("wait_for requires selector")
             return
         page.wait_for_selector(selector, timeout=int(timeout_s * 1000))
 
-    def _click(self, page: Any, selector: str | None, params: dict[str, Any], timeout_s: float) -> None:
+    def _click(
+        self, page: Any, selector: str | None, params: dict[str, Any], timeout_s: float
+    ) -> None:
         if not selector:
             if self.options.strict:
                 raise ValueError("click requires selector")
@@ -227,6 +240,7 @@ class BrowserActionRunner:
             page.click(selector, timeout=int(timeout_s * 1000))
             if pause > 0:
                 import time
+
                 time.sleep(self.human.jitter(pause, 0.25))
 
     def _hover(self, page: Any, selector: str | None, timeout_s: float) -> None:
@@ -295,7 +309,10 @@ class BrowserActionRunner:
         try:
             self.human.scroll_wheel(page, repeats=repeat, direction=direction)
         finally:
-            self.human.opts.scroll_min_px, self.human.opts.scroll_max_px = old_min, old_max
+            self.human.opts.scroll_min_px, self.human.opts.scroll_max_px = (
+                old_min,
+                old_max,
+            )
 
     def _sleep(self, params: dict[str, Any]) -> None:
         """
@@ -316,7 +333,11 @@ class BrowserActionRunner:
                 self.human.medium_pause()
             return
 
-        if "range_s" in params and isinstance(params["range_s"], (list, tuple)) and len(params["range_s"]) == 2:
+        if (
+            "range_s" in params
+            and isinstance(params["range_s"], (list, tuple))
+            and len(params["range_s"]) == 2
+        ):
             lo, hi = float(params["range_s"][0]), float(params["range_s"][1])
             self.human.sleep_range((lo, hi))
             return

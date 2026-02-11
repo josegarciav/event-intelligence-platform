@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-import json
 import csv
+import json
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import Any
+
 
 def write_jsonl(path: Path, items: Sequence[dict[str, Any]], append: bool = True):
     mode = "a" if append else "w"
@@ -11,7 +13,10 @@ def write_jsonl(path: Path, items: Sequence[dict[str, Any]], append: bool = True
         for item in items:
             f.write(json.dumps(item, ensure_ascii=False) + "\n")
 
-def write_summary_csv(path: Path, items: Sequence[dict[str, Any]], fields: Optional[Sequence[str]] = None):
+
+def write_summary_csv(
+    path: Path, items: Sequence[dict[str, Any]], fields: Sequence[str] | None = None
+):
     if not items:
         return
 
@@ -25,6 +30,7 @@ def write_summary_csv(path: Path, items: Sequence[dict[str, Any]], fields: Optio
         if write_header:
             writer.writeheader()
         writer.writerows(items)
+
 
 def register_artifact(run_report: dict[str, Any], source_id: str, name: str, path: str):
     # This is a helper to update a standard run_report dict with custom recipe artifacts

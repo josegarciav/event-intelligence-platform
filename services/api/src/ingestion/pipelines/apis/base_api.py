@@ -32,6 +32,7 @@ from src.agents.feature_extractor import (
 from src.ingestion.normalization.field_mapper import FieldMapper
 from src.ingestion.normalization.taxonomy_mapper import TaxonomyMapper
 from src.schemas.event import (
+    EngagementMetrics,
     EventFormat,
     EventSchema,
     EventType,
@@ -101,6 +102,9 @@ class APISourceConfig:
 
     # Feature extraction
     feature_extraction: Dict[str, Any] = field(default_factory=dict)
+
+    # HTML enrichment (compressed_html scraping)
+    html_enrichment: Dict[str, Any] = field(default_factory=dict)
 
 
 class ConfigDrivenAPIAdapter(APIAdapter):
@@ -373,6 +377,31 @@ class BaseAPIPipeline(BasePipeline):
                 source_config.feature_extraction
             )
 
+        # Create HTML enrichment scraper if enabled
+        self.html_enrichment_scraper = None
+        if source_config.html_enrichment.get("enabled"):
+            try:
+                from src.ingestion.adapters.scraper_adapter import (
+                    HtmlEnrichmentConfig,
+                    HtmlEnrichmentScraper,
+                )
+
+                enrichment_cfg = HtmlEnrichmentConfig(
+                    enabled=True,
+                    engine_type=source_config.html_enrichment.get(
+                        "engine_type", "hybrid"
+                    ),
+                    rate_limit_per_second=source_config.html_enrichment.get(
+                        "rate_limit_per_second", 2.0
+                    ),
+                    timeout_s=source_config.html_enrichment.get("timeout_s", 15.0),
+                )
+                self.html_enrichment_scraper = HtmlEnrichmentScraper(enrichment_cfg)
+            except ImportError:
+                logger.warning(
+                    "Scrapping service not available; HTML enrichment disabled"
+                )
+
         # Create adapter with config-driven query builder
         adapter = self._create_adapter()
         super().__init__(pipeline_config, adapter)
@@ -550,9 +579,7 @@ class BaseAPIPipeline(BasePipeline):
         )
 
         while cursor < range_end:
-            window_end = min(
-                cursor + timedelta(hours=window_hours), range_end
-            )
+            window_end = min(cursor + timedelta(hours=window_hours), range_end)
 
             # Snap to date strings for the API (most APIs accept date, not datetime)
             date_from_str = cursor.strftime("%Y-%m-%d")
@@ -818,6 +845,21 @@ class BaseAPIPipeline(BasePipeline):
         # Get tags from extracted fields or parsed event
         tags = extracted_fields.get("tags") or parsed_event.get("tags", [])
 
+        # Build engagement metrics from API fields
+        attending = parsed_event.get("attending")
+        engagement = None
+        if attending is not None:
+            try:
+                engagement = EngagementMetrics(going_count=int(attending))
+            except (ValueError, TypeError):
+                pass
+
+        # Capacity from venue_live (if it's an int)
+        venue_live = parsed_event.get("venue_live")
+        capacity = None
+        if isinstance(venue_live, int) and venue_live > 0:
+            capacity = venue_live
+
         return EventSchema(
             event_id=event_id,
             title=parsed_event.get("title", "Untitled Event"),
@@ -834,8 +876,11 @@ class BaseAPIPipeline(BasePipeline):
             image_url=parsed_event.get("image_url"),
             source=source,
             tags=tags,
+            engagement=engagement,
+            capacity=capacity,
             custom_fields={
                 "artists": parsed_event.get("artists", []),
+                **({"is_ticketed": True} if parsed_event.get("is_ticketed") else {}),
             },
         )
 
@@ -932,6 +977,18 @@ class BaseAPIPipeline(BasePipeline):
 
     def enrich_event(self, event: EventSchema) -> EventSchema:
         """Enrich event with additional computed data."""
+        # Fetch compressed HTML if enrichment scraper is configured
+        if (
+            getattr(self, "html_enrichment_scraper", None)
+            and event.source.source_url
+            and not event.source.compressed_html
+        ):
+            compressed = self.html_enrichment_scraper.fetch_compressed_html(
+                event.source.source_url
+            )
+            if compressed:
+                event.source.compressed_html = compressed
+
         # Calculate duration
         if event.end_datetime and event.start_datetime:
             duration = (event.end_datetime - event.start_datetime).total_seconds() / 60
@@ -1011,6 +1068,9 @@ def create_api_pipeline_from_config(
         validation=source_config_dict.get("validation", {}),
         feature_extraction=source_config_dict.get("enrichment", {}).get(
             "feature_extraction", source_config_dict.get("feature_extraction", {})
+        ),
+        html_enrichment=source_config_dict.get("enrichment", {}).get(
+            "compressed_html", {}
         ),
     )
 
