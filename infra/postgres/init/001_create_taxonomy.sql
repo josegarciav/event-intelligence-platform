@@ -454,7 +454,7 @@ CREATE TABLE IF NOT EXISTS event_taxonomy_mappings (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS subcategory_values (
-    value_id UUID PRIMARY KEY,
+    value_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     subcategory_id TEXT
     REFERENCES subcategories(subcategory_id)
     ON DELETE CASCADE,
@@ -472,7 +472,7 @@ CREATE TABLE IF NOT EXISTS subcategory_values (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS activity_emotional_outputs (
-    emotional_output_id UUID PRIMARY KEY,
+    emotional_output_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 
     activity_id UUID
     REFERENCES activities_metadata(activity_id)

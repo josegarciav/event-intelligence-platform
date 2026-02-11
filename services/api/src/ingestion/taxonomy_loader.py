@@ -197,15 +197,13 @@ def insert_subcategory_value(
     cur.execute(
         """
         INSERT INTO subcategory_values (
-            value_id,
             subcategory_id,
             value_name
         )
-        VALUES (%s, %s, %s)
+        VALUES (%s, %s)
         ON CONFLICT DO NOTHING;
         """,
         (
-            str(uuid.uuid4()),
             subcategory_id,
             value,
         ),
@@ -219,15 +217,13 @@ def insert_activity_emotion(
     cur.execute(
         """
         INSERT INTO activity_emotional_outputs (
-            emotional_output_id,
             activity_id,
             emotion_name
         )
-        VALUES (%s, %s, %s)
+        VALUES (%s, %s)
         ON CONFLICT DO NOTHING;
         """,
         (
-            str(uuid.uuid4()),
             activity_id,
             emotion,
         ),
