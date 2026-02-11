@@ -56,6 +56,5 @@ jobs:
           flags: 'i'
           error: 'Commit message header must follow Conventional Commits format.'
 
-
       - name: Verify lockfile is in sync
         run: uv lock --check --project services/api

@@ -24,6 +24,7 @@ from src.schemas.event import (
 def create_event():
     """
     Return a function that creates EventSchema objects with sensible defaults.
+
     Factory fixture to create EventSchema instances for testing.
     All defaults can be overridden via keyword arguments.
 

@@ -71,7 +71,10 @@ class ScraperAdapter(BaseSourceAdapter):
     def _get_scraper(self):
         """Get or create scraper instance."""
         if self._scraper is None:
-            from src.ingestion.pipelines.scrapers import EventScraper, ScraperConfig
+            from src.ingestion.pipelines.scrapers.base_scraper import (
+                EventScraper,
+                ScraperConfig,
+            )
 
             scraper_config = ScraperConfig(
                 source_id=self.scraper_config.source_id,
