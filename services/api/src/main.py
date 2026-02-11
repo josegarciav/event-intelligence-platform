@@ -155,7 +155,7 @@ def get_db() -> Generator[_connection, None, None]:
 class Category(BaseModel):
     """Experience category response model."""
 
-    category_id: str
+    primary_category_id: str
     name: str
     description: str | None
 
@@ -214,10 +214,10 @@ def list_categories(
 
         cur.execute("""
             SELECT
-                category_id,
+                primary_category_id,
                 name,
                 description
-            FROM experience_categories
+            FROM primary_categories
             ORDER BY name;
             """)
 
@@ -227,7 +227,7 @@ def list_categories(
 
         return [
             Category(
-                category_id=row[0],
+                primary_category_id=row[0],
                 name=row[1],
                 description=row[2],
             )
