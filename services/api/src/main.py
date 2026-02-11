@@ -20,10 +20,12 @@ postgresql://user:password@host:port/event_intelligence
 from __future__ import annotations
 
 import os
+from contextlib import asynccontextmanager
 from typing import Generator
 from urllib.parse import urlparse
 
 import psycopg2
+import psycopg2.pool
 from fastapi import Depends, FastAPI, HTTPException
 from psycopg2.extensions import connection as _connection
 from pydantic import BaseModel
@@ -32,16 +34,34 @@ from pydantic import BaseModel
 # APP INITIALIZATION
 # ---------------------------------------------------------------------------
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Handle app startup and shutdown events.
+    """
+    yield
+    # Shutdown: Close all connections in the pool
+    global _POOL
+    if _POOL is not None:
+        _POOL.closeall()
+
+
 app = FastAPI(
     title="Event Intelligence API",
     version="1.0.0",
     description="API for querying the Human Experience Taxonomy.",
+    lifespan=lifespan,
 )
 
 
 # ---------------------------------------------------------------------------
 # DATABASE CONFIGURATION
 # ---------------------------------------------------------------------------
+
+
+# Global connection pool instance
+_POOL: psycopg2.pool.ThreadedConnectionPool | None = None
 
 
 def parse_database_url(database_url: str) -> dict:
@@ -69,47 +89,56 @@ def parse_database_url(database_url: str) -> dict:
     }
 
 
-def get_connection() -> _connection:
+def get_pool() -> psycopg2.pool.ThreadedConnectionPool:
     """
-    Create a new PostgreSQL database connection.
+    Get or initialize the database connection pool.
 
     Returns
     -------
-    psycopg2.extensions.connection
-        Active database connection.
+    psycopg2.pool.ThreadedConnectionPool
+        The active connection pool.
 
     Raises
     ------
     RuntimeError
         If DATABASE_URL is missing.
     """
-    database_url: str | None = os.getenv("DATABASE_URL")
+    global _POOL
+    if _POOL is None:
+        database_url: str | None = os.getenv("DATABASE_URL")
 
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable is not set.")
+        if not database_url:
+            raise RuntimeError("DATABASE_URL environment variable is not set.")
 
-    conn_params = parse_database_url(database_url)
+        conn_params = parse_database_url(database_url)
 
-    return psycopg2.connect(**conn_params)
+        # Using ThreadedConnectionPool for thread-safety in FastAPI sync routes
+        _POOL = psycopg2.pool.ThreadedConnectionPool(
+            minconn=1,
+            maxconn=20,
+            **conn_params,
+        )
+    return _POOL
 
 
 def get_db() -> Generator[_connection, None, None]:
     """
-    FastAPI dependency that yields a database connection.
+    FastAPI dependency that yields a database connection from the pool.
 
-    Ensures proper connection cleanup after request lifecycle.
+    Ensures the connection is returned to the pool after the request lifecycle.
 
     Yields
     ------
     psycopg2.extensions.connection
         Active database connection.
     """
-    conn = get_connection()
+    pool = get_pool()
+    conn = pool.getconn()
 
     try:
         yield conn
     finally:
-        conn.close()
+        pool.putconn(conn)
 
 
 # ---------------------------------------------------------------------------
