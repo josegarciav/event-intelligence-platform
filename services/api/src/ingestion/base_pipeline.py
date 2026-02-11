@@ -372,13 +372,6 @@ class BasePipeline(ABC):
         enrichment_bonus += 0.05 if event.description else 0.0
         score += min(enrichment_bonus, 0.3)
 
-        # Taxonomy confidence (20%)
-        if event.taxonomy_dimensions:
-            avg_confidence = sum(
-                dim.confidence for dim in event.taxonomy_dimensions
-            ) / len(event.taxonomy_dimensions)
-            score += avg_confidence * 0.2
-
         # Penalize validation errors (up to -10%)
         error_penalty = min(len(event.normalization_errors) * 0.02, 0.1)
         score -= error_penalty
@@ -425,7 +418,6 @@ class BasePipeline(ABC):
                         "subcategory": dim.subcategory,
                         "subcategory_name": dim.subcategory_name,
                         "values": dim.values,
-                        "confidence": dim.confidence,
                         "activity_id": dim.activity_id,
                         "activity_name": dim.activity_name,
                         "energy_level": dim.energy_level,
@@ -567,7 +559,7 @@ class BasePipeline(ABC):
                 "source_name": src.source_name if src else None,
                 "source_event_id": src.source_event_id if src else None,
                 "source_url": src.source_url if src else None,
-                "source_last_updated": src.last_updated_from_source if src else None,
+                "source_last_updated": src.updated_at if src else None,
                 "source_ingestion_timestamp": src.ingestion_timestamp if src else None,
                 # ==== MEDIA ====
                 "image_url": event.image_url,
@@ -594,7 +586,6 @@ class BasePipeline(ABC):
                     if primary_dim and primary_dim.values
                     else None
                 ),
-                "taxonomy_confidence": primary_dim.confidence if primary_dim else None,
                 "taxonomy_activity_id": (
                     primary_dim.activity_id if primary_dim else None
                 ),

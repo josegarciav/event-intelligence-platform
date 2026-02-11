@@ -56,7 +56,7 @@ def create_event():
                 source_name="test",
                 source_event_id=str(uuid.uuid4()),
                 source_url="https://test.com/event",
-                last_updated_from_source=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
             ),
         }
 

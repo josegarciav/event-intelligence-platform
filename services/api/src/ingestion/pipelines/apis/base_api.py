@@ -607,7 +607,6 @@ class BaseAPIPipeline(BasePipeline):
                 ),
                 "subcategory": dim.subcategory,
                 "values": dim.values,
-                "confidence": dim.confidence,
             }
             for dim in dimensions
         ]
@@ -626,10 +625,6 @@ class BaseAPIPipeline(BasePipeline):
         Uses configuration for defaults and FeatureExtractor for missing fields.
         """
         source_event_id = str(parsed_event.get("source_event_id", ""))
-        # Generate platform UUID for event_id (source ID lives in source.source_event_id)
-        event_id = str(uuid.uuid4())
-
-        # Parse dates
         start_dt = self._parse_datetime(
             parsed_event.get("start_time") or parsed_event.get("date")
         )
@@ -690,13 +685,21 @@ class BaseAPIPipeline(BasePipeline):
         )
 
         # Build source info
+        source_name = self.source_config.source_name
         source_url = parsed_event.get("source_url") or ""
         source = SourceInfo(
-            source_name=self.source_config.source_name,
+            source_name=source_name,
             source_event_id=source_event_id,
             source_url=source_url,
             updated_at=datetime.now(timezone.utc),
         )
+
+        # Generate platform-wide deterministic UUID for event_id
+        # based on source, source_event_id, title, and start_datetime.
+        # This allows multiple events per source record while maintaining stability.
+        title_for_id = parsed_event.get("title") or "Untitled Event"
+        seed = f"{source_name}:{source_event_id}:{title_for_id}:{start_dt.isoformat()}"
+        event_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, seed))
 
         # Build taxonomy dimensions
         taxonomy_objs = [
@@ -705,7 +708,6 @@ class BaseAPIPipeline(BasePipeline):
                 subcategory=dim.get("subcategory"),
                 subcategory_name=dim.get("subcategory_name"),
                 values=dim.get("values", []),
-                confidence=dim.get("confidence", 0.5),
             )
             for dim in taxonomy_dims
         ]
