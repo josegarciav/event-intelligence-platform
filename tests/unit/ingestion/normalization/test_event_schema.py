@@ -22,7 +22,6 @@ from src.schemas.event import (
     EngagementMetrics,
     EventBatch,
     EventFormat,
-    EventSchema,
     EventType,
     LocationInfo,
     MediaAsset,

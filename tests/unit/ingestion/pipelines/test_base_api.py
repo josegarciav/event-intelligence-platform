@@ -6,7 +6,6 @@ Tests for BaseAPIPipeline, APISourceConfig, and ConfigDrivenAPIAdapter.
 
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
-from typing import Dict, Any
 
 import pytest
 
@@ -19,10 +18,8 @@ from src.ingestion.pipelines.apis.base_api import (
 from src.ingestion.base_pipeline import PipelineConfig
 from src.ingestion.adapters import SourceType
 from src.schemas.event import (
-    EventSchema,
     EventType,
     LocationInfo,
-    PrimaryCategory,
 )
 
 # =============================================================================
@@ -523,7 +520,7 @@ class TestCreateAPIPipelineFromConfig:
             "taxonomy": {"default_primary": "play_and_fun"},
         }
 
-        pipeline = create_api_pipeline_from_config("test_source", config_dict)
+        create_api_pipeline_from_config("test_source", config_dict)
 
         mock_init.assert_called_once()
 
@@ -538,7 +535,7 @@ class TestCreateAPIPipelineFromConfig:
 
         # Should not raise
         with patch.object(BaseAPIPipeline, "__init__", return_value=None):
-            pipeline = create_api_pipeline_from_config("test_source", config_dict)
+            create_api_pipeline_from_config("test_source", config_dict)
 
     def test_extracts_pagination_config(self):
         """Should extract pagination configuration."""
@@ -552,7 +549,7 @@ class TestCreateAPIPipelineFromConfig:
         }
 
         with patch.object(BaseAPIPipeline, "__init__", return_value=None) as mock_init:
-            pipeline = create_api_pipeline_from_config("test_source", config_dict)
+            create_api_pipeline_from_config("test_source", config_dict)
 
             # Check the source config passed to __init__
             call_args = mock_init.call_args
@@ -574,7 +571,7 @@ class TestCreateAPIPipelineFromConfig:
         }
 
         with patch.object(BaseAPIPipeline, "__init__", return_value=None) as mock_init:
-            pipeline = create_api_pipeline_from_config("test_source", config_dict)
+            create_api_pipeline_from_config("test_source", config_dict)
 
             call_args = mock_init.call_args
             source_config = call_args[0][1]

@@ -6,7 +6,7 @@ Tests for BasePipeline, PipelineConfig, and PipelineExecutionResult.
 
 from datetime import datetime, timedelta, timezone
 import uuid
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from typing import Dict, Any, List, Tuple
 
 import pytest

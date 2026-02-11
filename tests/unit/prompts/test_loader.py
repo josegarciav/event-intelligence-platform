@@ -6,7 +6,6 @@ Tests for PromptLoader class.
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch, mock_open
-import yaml
 
 import pytest
 
@@ -132,7 +131,7 @@ class TestPromptLoaderGetPrompt:
         """Should inject all categories summary when no subcategory."""
         with patch.object(Path, "exists", return_value=True):
             with patch("builtins.open", mock_open(read_data=MOCK_PROMPT_YAML)):
-                result = loader.get_prompt(
+                loader.get_prompt(
                     group="classification",
                     feature="test",
                     variables={"title": "Test", "description": "Desc"},
@@ -144,7 +143,7 @@ class TestPromptLoaderGetPrompt:
         """Should inject attribute options string."""
         with patch.object(Path, "exists", return_value=True):
             with patch("builtins.open", mock_open(read_data=MOCK_PROMPT_YAML)):
-                result = loader.get_prompt(
+                loader.get_prompt(
                     group="enrichment",
                     feature="test",
                     variables={"title": "Test", "description": "Desc"},

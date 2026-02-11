@@ -398,17 +398,13 @@ class BaseAPIPipeline(BasePipeline):
                 raw_events = self._fetch_with_date_splitting(
                     area_id=area_id, city_name=city_name, **kwargs
                 )
-                self.logger.info(
-                    f"  {city_name}: {len(raw_events)} raw events fetched"
-                )
+                self.logger.info(f"  {city_name}: {len(raw_events)} raw events fetched")
                 all_raw_events.extend(raw_events)
             except Exception as e:
                 self.logger.error(f"  {city_name}: fetch failed: {e}")
                 fetch_errors.append({"error": str(e), "city": city_name})
 
-        self.logger.info(
-            f"Total raw events across all cities: {len(all_raw_events)}"
-        )
+        self.logger.info(f"Total raw events across all cities: {len(all_raw_events)}")
 
         # Process all events through pipeline stages
         normalized_events = self._process_events_batch(all_raw_events)
@@ -429,9 +425,7 @@ class BaseAPIPipeline(BasePipeline):
                 f"Deduplication: {before_count} -> {len(normalized_events)} events"
             )
 
-        status = (
-            PipelineStatus.SUCCESS if normalized_events else PipelineStatus.FAILED
-        )
+        status = PipelineStatus.SUCCESS if normalized_events else PipelineStatus.FAILED
         if normalized_events and len(normalized_events) < len(all_raw_events):
             status = PipelineStatus.PARTIAL_SUCCESS
 
@@ -650,23 +644,36 @@ class BaseAPIPipeline(BasePipeline):
         cost_max = parsed_event.get("cost_max")
         cost_currency = parsed_event.get("cost_currency")
 
+        from decimal import Decimal
+
+        min_price: Optional[Decimal] = None
+        max_price: Optional[Decimal] = None
+        price_raw: Optional[str] = None
+        currency: str = str(loc_defaults.get("currency", "EUR"))
+
         if cost_min is not None or cost_max is not None:
             # Pre-parsed numeric price fields
-            min_price = float(cost_min) if cost_min is not None else None
-            max_price = float(cost_max) if cost_max is not None else None
-            currency = cost_currency or loc_defaults.get("currency", "EUR")
-            price_raw = f"{min_price}-{max_price} {currency}" if max_price else str(min_price)
+            min_price = Decimal(str(cost_min)) if cost_min is not None else None
+            max_price = Decimal(str(cost_max)) if cost_max is not None else None
+            if cost_currency:
+                currency = str(cost_currency)
+            price_raw = (
+                f"{min_price}-{max_price} {currency}" if max_price else str(min_price)
+            )
             is_free = min_price == 0 and (max_price is None or max_price == 0)
         else:
             # String price (e.g. "10€", "Free")
             price_str = parsed_event.get("cost") or ""
-            min_price, max_price, currency = CurrencyParser.parse_price_string(
+            parsed_min, parsed_max, parsed_currency = CurrencyParser.parse_price_string(
                 str(price_str)
             )
+            min_price = Decimal(str(parsed_min)) if parsed_min is not None else None
+            max_price = Decimal(str(parsed_max)) if parsed_max is not None else None
             is_free = (min_price is None and max_price is None) or str(
                 price_str
             ).lower() in ["free", "0", "gratis"]
-            currency = currency or "EUR"
+            if parsed_currency:
+                currency = str(parsed_currency)
             price_raw = str(price_str) if price_str else None
 
         price = PriceInfo(

@@ -201,7 +201,9 @@ class EventDataWriter:
     # 4. Event (central spine)
     # ------------------------------------------------------------------
 
-    def _persist_event(self, cur, event: EventSchema, location_id, source_id, organizer_id):
+    def _persist_event(
+        self, cur, event: EventSchema, location_id, source_id, organizer_id
+    ):
         # Convert PrimaryCategory enum value to taxonomy ID
         primary_cat_id = self._value_to_id.get(event.primary_category)
 

@@ -4,7 +4,7 @@ Unit tests for the taxonomy_retriever module.
 Tests for TaxonomyRetriever class and related functions.
 """
 
-from unittest.mock import MagicMock, patch, mock_open
+from unittest.mock import patch, mock_open
 import json
 
 import pytest

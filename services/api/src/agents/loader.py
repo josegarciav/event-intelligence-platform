@@ -4,7 +4,7 @@ Loads and renders prompt templates from YAML files using Jinja2.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import yaml
 from jinja2 import Template

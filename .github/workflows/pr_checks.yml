@@ -25,22 +25,24 @@ jobs:
 
       - name: Install dependencies
         # --frozen ensures the lockfile is up to date and isn't modified
-        run: uv sync --frozen
+        run: uv sync --frozen --project services/api
 
       - name: Run ruff (linting check)
-        run: uv run ruff check .
+        run: uv run --project services/api ruff check .
 
       - name: Run black (formatting check)
-        run: uv run black --check .
+        run: uv run --project services/api black --check .
 
       - name: Run pydocstyle (docstrings check)
-        run: uv run pydocstyle .
+        run: uv run --project services/api pydocstyle .
 
       - name: Run mypy (type hints check)
-        run: uv run mypy .
+        run: uv run --project services/api mypy .
 
       - name: Run pytest with coverage
-        run: uv run pytest --cov=. --cov-fail-under=50
+        run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/services/api
+          uv run --project services/api pytest --cov=services/api/src --cov-fail-under=50
 
       - name: Validate commit messages
         uses: gsactions/commit-message-checker@v2
@@ -50,4 +52,4 @@ jobs:
           error: 'Commit message does not follow Conventional Commits format.'
 
       - name: Verify lockfile is in sync
-        run: uv lock --check
+        run: uv lock --check --project services/api
