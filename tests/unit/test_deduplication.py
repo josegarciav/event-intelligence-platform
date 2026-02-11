@@ -11,7 +11,6 @@ Tests all deduplication strategies:
 
 from datetime import datetime, timezone
 
-import pytest
 
 from src.ingestion.deduplication import (
     CompositeDeduplicator,

@@ -22,7 +22,6 @@ from src.schemas.event import (
     EngagementMetrics,
     EventBatch,
     EventFormat,
-    EventSchema,
     EventType,
     LocationInfo,
     MediaAsset,
@@ -359,7 +358,7 @@ class TestSourceInfo:
             source_name="test_source",
             source_event_id="12345",
             source_url="https://source.com/event/12345",
-            last_updated_from_source=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
         assert source.source_name == "test_source"
         assert source.ingestion_timestamp is not None  # Auto-set

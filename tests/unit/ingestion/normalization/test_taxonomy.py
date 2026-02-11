@@ -4,8 +4,6 @@ Unit tests for the taxonomy module.
 Tests for taxonomy loading, indexing, and lookup functions.
 """
 
-import pytest
-
 from src.schemas.taxonomy import (
     build_primary_to_subcategory_index,
     build_taxonomy_index,

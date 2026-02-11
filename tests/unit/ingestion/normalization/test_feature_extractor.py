@@ -5,17 +5,11 @@ Tests for FeatureExtractor rule-based inference methods.
 LLM-based methods are tested with mocked clients.
 """
 
-from unittest.mock import MagicMock, patch
-
 import pytest
 
-from src.ingestion.normalization.feature_extractor import (
+from src.agents.feature_extractor import (
     FeatureExtractor,
     create_feature_extractor_from_config,
-)
-from src.schemas.event import (
-    PrimaryCategory,
-    TaxonomyDimension,
 )
 from src.schemas.taxonomy import get_all_subcategory_ids
 

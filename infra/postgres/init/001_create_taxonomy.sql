@@ -87,8 +87,12 @@ CREATE TABLE IF NOT EXISTS locations (
 
     latitude DOUBLE PRECISION,
     longitude DOUBLE PRECISION,
-    timezone TEXT 
+    timezone TEXT
 );
+
+-- Unique index for locations that handles NULL venue_name
+CREATE UNIQUE INDEX uq_locations_identity
+ON locations (city, country_code, (COALESCE(venue_name, '')));
 
 
 -- ------------------------------------------------------------
@@ -231,6 +235,9 @@ CREATE TABLE IF NOT EXISTS events (
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     is_deleted BOOLEAN DEFAULT FALSE,
     deleted_at TIMESTAMP,
+
+    CONSTRAINT uq_event_source_identity
+        UNIQUE (event_id, source_id),
 
     CONSTRAINT chk_data_quality_range
         CHECK (data_quality_score BETWEEN 0 AND 1),

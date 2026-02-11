@@ -24,11 +24,6 @@ from pydantic import (
 )
 
 
-def _utc_now() -> datetime:
-    """Return current UTC time as timezone-aware datetime."""
-    return datetime.now(timezone.utc)
-
-
 from src.schemas.taxonomy import (
     build_taxonomy_index,
     get_all_subcategory_ids,
@@ -38,6 +33,12 @@ from src.schemas.taxonomy import (
     get_subcategory_by_id,
     validate_subcategory_for_primary,
 )
+
+
+def _utc_now() -> datetime:
+    """Return current UTC time as timezone-aware datetime."""
+    return datetime.now(timezone.utc)
+
 
 # ============================================================================
 # ENUMS: Human Experience Taxonomy Dimensions
@@ -278,6 +279,7 @@ class TaxonomyDimension(BaseModel):
         description="Human-readable subcategory name (e.g. 'Music & Rhythm Play')",
     )
     values: List[str] = Field(default_factory=list)
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
 
     # Activity identification
     activity_id: Optional[str] = Field(

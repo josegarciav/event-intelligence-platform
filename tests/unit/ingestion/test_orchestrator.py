@@ -5,7 +5,7 @@ Tests for PipelineOrchestrator pipeline management and execution.
 """
 
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -17,12 +17,10 @@ from src.ingestion.orchestrator import (
 )
 from src.ingestion.base_pipeline import (
     BasePipeline,
-    PipelineConfig,
     PipelineExecutionResult,
     PipelineStatus,
 )
 from src.ingestion.adapters import SourceType
-from src.schemas.event import EventSchema, LocationInfo
 from src.ingestion.deduplication import ExactMatchDeduplicator
 
 # =============================================================================

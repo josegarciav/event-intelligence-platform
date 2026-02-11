@@ -6,7 +6,7 @@ Tests for BasePipeline, PipelineConfig, and PipelineExecutionResult.
 
 from datetime import datetime, timedelta, timezone
 import uuid
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from typing import Dict, Any, List, Tuple
 
 import pytest
@@ -120,7 +120,7 @@ class ConcretePipeline(BasePipeline):
                 source_name="test",
                 source_event_id="test-123",
                 source_url="https://test.com/event",
-                last_updated_from_source=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
             ),
         )
 

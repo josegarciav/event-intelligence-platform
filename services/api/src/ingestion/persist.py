@@ -108,7 +108,8 @@ class EventDataWriter:
                 venue_name, street_address, city, state_or_region,
                 postal_code, country_code, latitude, longitude, timezone
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT DO NOTHING
+            ON CONFLICT (city, country_code, (COALESCE(venue_name, '')))
+            DO NOTHING
             RETURNING location_id;
             """,
             (
@@ -200,31 +201,35 @@ class EventDataWriter:
     # 4. Event (central spine)
     # ------------------------------------------------------------------
 
-    def _persist_event(self, cur, event: EventSchema, location_id, source_id, organizer_id):
+    def _persist_event(
+        self, cur, event: EventSchema, location_id, source_id, organizer_id
+    ):
         # Convert PrimaryCategory enum value to taxonomy ID
         primary_cat_id = self._value_to_id.get(event.primary_category)
 
         cur.execute(
             """
             INSERT INTO events (
-                title, description, primary_category_id,
+                event_id, title, description, primary_category_id,
                 event_type, event_format, capacity, age_restriction,
                 start_datetime, end_datetime, duration_minutes,
                 is_all_day, is_recurring, recurrence_pattern,
                 location_id, organizer_id, source_id,
                 data_quality_score, updated_at
             ) VALUES (
-                %s, %s, %s,
+                %s, %s, %s, %s,
                 %s, %s, %s, %s,
                 %s, %s, %s,
                 %s, %s, %s,
                 %s, %s, %s,
                 %s, NOW()
             )
-            ON CONFLICT DO NOTHING
+            ON CONFLICT (event_id) DO UPDATE SET
+                data_quality_score = EXCLUDED.data_quality_score
             RETURNING event_id;
             """,
             (
+                event.event_id,
                 event.title,
                 event.description,
                 primary_cat_id,
@@ -243,15 +248,6 @@ class EventDataWriter:
                 source_id,
                 event.data_quality_score,
             ),
-        )
-        res = cur.fetchone()
-        if res:
-            return res[0]
-
-        # Event already exists — fetch by source
-        cur.execute(
-            "SELECT event_id FROM events WHERE source_id = %s",
-            (source_id,),
         )
         return cur.fetchone()[0]
 

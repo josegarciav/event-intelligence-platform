@@ -4,8 +4,7 @@ Unit tests for the api_adapter module.
 Tests for APIAdapterConfig and APIAdapter classes.
 """
 
-from datetime import datetime
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
@@ -14,7 +13,7 @@ from src.ingestion.adapters.api_adapter import (
     APIAdapter,
     APIAdapterConfig,
 )
-from src.ingestion.adapters.base_adapter import SourceType, FetchResult
+from src.ingestion.adapters.base_adapter import SourceType
 
 # =============================================================================
 # TEST DATA

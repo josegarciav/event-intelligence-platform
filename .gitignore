@@ -19,3 +19,6 @@ data/
 .mypy_cache/
 .vscode/
 node_modules
+mypy.ini
+.ruff.toml
+setup.cfg

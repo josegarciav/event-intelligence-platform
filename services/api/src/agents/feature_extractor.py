@@ -16,11 +16,9 @@ import re
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, cast
 
 from src.ingestion.normalization.extraction_models import (
-    EventTypeExtraction,
     MissingFieldsExtraction,
     PrimaryCategoryExtraction,
     SubcategoryExtraction,
-    TaxonomyAttributesExtraction,
 )
 from src.ingestion.normalization.taxonomy_retriever import get_taxonomy_retriever
 from src.schemas.features import (

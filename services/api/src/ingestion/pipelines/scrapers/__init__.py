@@ -8,3 +8,11 @@ This package provides:
 - PageFetchResult: Result dataclass for page fetching
 - Config loading utilities for JSON scraper configs
 """
+
+from .base_scraper import (
+    BaseScraperPipeline as BaseScraperPipeline,
+    EventScraper as EventScraper,
+    PageFetchResult as PageFetchResult,
+    ScraperConfig as ScraperConfig,
+    load_scraper_config as load_scraper_config,
+)

@@ -4,8 +4,6 @@ Unit tests for the field_mapper module.
 Tests for FieldMapper field extraction and transformations.
 """
 
-import pytest
-
 from src.ingestion.normalization.field_mapper import (
     FieldMapper,
     create_field_mapper_from_config,

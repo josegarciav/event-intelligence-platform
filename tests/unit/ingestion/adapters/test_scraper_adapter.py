@@ -4,7 +4,6 @@ Unit tests for the scraper_adapter module.
 Tests for ScraperAdapterConfig and ScraperAdapter classes.
 """
 
-from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -13,7 +12,7 @@ from src.ingestion.adapters.scraper_adapter import (
     ScraperAdapter,
     ScraperAdapterConfig,
 )
-from src.ingestion.adapters.base_adapter import SourceType, FetchResult
+from src.ingestion.adapters.base_adapter import SourceType
 
 # =============================================================================
 # FIXTURES
@@ -289,7 +288,7 @@ class TestScraperAdapterFetch:
         mock_get_scraper.return_value = mock_scraper
 
         adapter = ScraperAdapter(scraper_config)
-        result = adapter.fetch()
+        adapter.fetch()
 
         # Should fetch only unique URLs
         mock_scraper.fetch_event_pages.assert_called_once()

@@ -6,7 +6,6 @@ Tests for Config class path resolution and config loading.
 
 from pathlib import Path
 
-import pytest
 
 from src.configs.config import Config
 

@@ -345,7 +345,7 @@ class TestGetFactory:
 
     def test_get_factory_creates_instance(self):
         """Should create factory instance."""
-        from src.ingestion.factory import get_factory, _factory
+        from src.ingestion.factory import get_factory
         import src.ingestion.factory as factory_module
 
         # Reset module state
@@ -376,7 +376,7 @@ class TestGetFactory:
         # Reset module state
         factory_module._factory = None
 
-        factory1 = get_factory()
+        get_factory()
         factory2 = get_factory(config_path=config_file)
 
         # New factory created with custom path
