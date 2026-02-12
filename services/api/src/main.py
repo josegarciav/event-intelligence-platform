@@ -19,16 +19,22 @@ postgresql://user:password@host:port/event_intelligence
 
 from __future__ import annotations
 
-import os
 from contextlib import asynccontextmanager
 from typing import Generator
-from urllib.parse import urlparse
 
 import psycopg2
 import psycopg2.pool
 from fastapi import Depends, FastAPI, HTTPException
 from psycopg2.extensions import connection as _connection
 from pydantic import BaseModel
+
+from src.configs.settings import get_settings
+
+# ---------------------------------------------------------------------------
+# GLOBAL SETTINGS
+# ---------------------------------------------------------------------------
+
+settings = get_settings()
 
 # ---------------------------------------------------------------------------
 # APP INITIALIZATION
@@ -70,31 +76,6 @@ app = FastAPI(
 _POOL: psycopg2.pool.ThreadedConnectionPool | None = None
 
 
-def parse_database_url(database_url: str) -> dict:
-    """
-    Parse DATABASE_URL into psycopg2 connection parameters.
-
-    Parameters
-    ----------
-    database_url : str
-        SQLAlchemy-style database connection string.
-
-    Returns
-    -------
-    dict
-        psycopg2-compatible connection arguments.
-    """
-    parsed = urlparse(database_url)
-
-    return {
-        "host": parsed.hostname,
-        "port": parsed.port,
-        "dbname": parsed.path.lstrip("/"),
-        "user": parsed.username,
-        "password": parsed.password,
-    }
-
-
 def get_pool() -> psycopg2.pool.ThreadedConnectionPool:
     """
     Get or initialize the database connection pool.
@@ -103,20 +84,10 @@ def get_pool() -> psycopg2.pool.ThreadedConnectionPool:
     -------
     psycopg2.pool.ThreadedConnectionPool
         The active connection pool.
-
-    Raises
-    ------
-    RuntimeError
-        If DATABASE_URL is missing.
     """
     global _POOL
     if _POOL is None:
-        database_url: str | None = os.getenv("DATABASE_URL")
-
-        if not database_url:
-            raise RuntimeError("DATABASE_URL environment variable is not set.")
-
-        conn_params = parse_database_url(database_url)
+        conn_params = settings.get_psycopg2_params()
 
         # Using ThreadedConnectionPool for thread-safety in FastAPI sync routes
         _POOL = psycopg2.pool.ThreadedConnectionPool(

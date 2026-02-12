@@ -9,10 +9,8 @@ This package provides:
 - Config loading utilities for JSON scraper configs
 """
 
-from .base_scraper import (
-    BaseScraperPipeline as BaseScraperPipeline,
-    EventScraper as EventScraper,
-    PageFetchResult as PageFetchResult,
-    ScraperConfig as ScraperConfig,
-    load_scraper_config as load_scraper_config,
-)
+from .base_scraper import BaseScraperPipeline as BaseScraperPipeline
+from .base_scraper import EventScraper as EventScraper
+from .base_scraper import PageFetchResult as PageFetchResult
+from .base_scraper import ScraperConfig as ScraperConfig
+from .base_scraper import load_scraper_config as load_scraper_config

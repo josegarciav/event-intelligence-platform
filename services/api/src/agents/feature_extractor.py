@@ -11,22 +11,22 @@ to ensure accurate classification and attribute selection.
 """
 
 import logging
-import os
 import re
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, cast
 
-from src.ingestion.normalization.extraction_models import (
+from services.api.src.agents.extraction_models import (
     MissingFieldsExtraction,
     PrimaryCategoryExtraction,
     SubcategoryExtraction,
 )
-from src.ingestion.normalization.taxonomy_retriever import get_taxonomy_retriever
+from services.api.src.agents.taxonomy_retriever import get_taxonomy_retriever
 from src.schemas.features import (
     EventTypeOutput,
     FullTaxonomyEnrichmentOutput,
     MusicGenresOutput,
     TagsOutput,
 )
+from src.configs.settings import get_settings
 
 if TYPE_CHECKING:
     from src.schemas.event import TaxonomyDimension
@@ -88,7 +88,12 @@ class FeatureExtractor:
         self.max_tokens = max_tokens
 
         # Get API key
-        self._api_key: Optional[str] = api_key or os.getenv("OPENAI_API_KEY")
+        settings = get_settings()
+        self._api_key: Optional[str] = api_key or (
+            settings.OPENAI_API_KEY.get_secret_value()
+            if settings.OPENAI_API_KEY
+            else None
+        )
 
         # Initialize Instructor client (lazy)
         self._client = None

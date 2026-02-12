@@ -6,11 +6,12 @@ Supports OpenAI and Anthropic providers with structured output.
 """
 
 import logging
-import os
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Type, TypeVar
 
 from pydantic import BaseModel
+
+from src.configs.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -71,13 +72,22 @@ class LangChainLLMClient(BaseLLMClient):
         self.max_tokens = max_tokens
 
         # Get API key
+        settings = get_settings()
         self.api_key: Optional[str] = None
         if api_key:
             self.api_key = api_key
         elif provider == "openai":
-            self.api_key = os.getenv("OPENAI_API_KEY")
+            self.api_key = (
+                settings.OPENAI_API_KEY.get_secret_value()
+                if settings.OPENAI_API_KEY
+                else None
+            )
         elif provider == "anthropic":
-            self.api_key = os.getenv("ANTHROPIC_API_KEY")
+            self.api_key = (
+                settings.ANTHROPIC_API_KEY.get_secret_value()
+                if settings.ANTHROPIC_API_KEY
+                else None
+            )
 
         self._llm = None
         self._initialized = False

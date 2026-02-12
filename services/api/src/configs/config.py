@@ -5,21 +5,21 @@ from pathlib import Path
 
 import yaml
 
+from src.configs.settings import get_settings
+
+settings = get_settings()
+
 
 class Config:
     """Configuration for the event intelligence platform."""
 
     # 1. Setup Base Paths
-    # This points to src/configs/
     CONFIG_DIR = Path(__file__).parent.resolve()
-    # This points to the project root
-    PROJECT_ROOT = CONFIG_DIR.parent.parent
+    PROJECT_ROOT = settings.BASE_DIR
 
     # 2. Define File Paths
-    INGESTION_CONFIG_PATH = CONFIG_DIR / "ingestion.yaml"
-    TAXONOMY_DATA_PATH = (
-        PROJECT_ROOT / "src" / "assets" / "human_experience_taxonomy_master.json"
-    )
+    INGESTION_CONFIG_PATH = settings.INGESTION_CONFIG_PATH
+    TAXONOMY_DATA_PATH = settings.TAXONOMY_DATA_PATH
 
     @classmethod
     @lru_cache
@@ -29,7 +29,22 @@ class Config:
             raise FileNotFoundError(f"Missing config at {cls.INGESTION_CONFIG_PATH}")
 
         with open(cls.INGESTION_CONFIG_PATH, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f)
+            content = f.read()
+
+            # Substitute environment variables from settings
+            # This handles placeholders like ${DATABASE_URL} in the YAML
+            for key, value in settings.model_dump().items():
+                placeholder = f"${{{key}}}"
+                if placeholder in content:
+                    # Handle SecretStr
+                    val_str = (
+                        value.get_secret_value()
+                        if hasattr(value, "get_secret_value")
+                        else str(value)
+                    )
+                    content = content.replace(placeholder, val_str)
+
+            return yaml.safe_load(content)
 
     @classmethod
     def get_taxonomy_path(cls) -> Path:
