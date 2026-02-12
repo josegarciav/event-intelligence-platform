@@ -1,4 +1,5 @@
 """Configuration loader for the event intelligence platform."""
+
 from functools import lru_cache
 from pathlib import Path
 

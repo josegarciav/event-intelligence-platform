@@ -45,6 +45,7 @@ except Exception as e:
     # Lightweight fallbacks so module import doesn't explode
     def flow(*args, **kwargs):  # type: ignore
         """Perform the operation."""
+
         def _decorator(fn):
             return fn
 
@@ -52,6 +53,7 @@ except Exception as e:
 
     def task(*args, **kwargs):  # type: ignore
         """Perform the operation."""
+
         def _decorator(fn):
             return fn
 

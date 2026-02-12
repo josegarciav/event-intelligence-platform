@@ -656,9 +656,7 @@ class TestLoadOrchestratorFromConfig:
             }
         }
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config, f)
             config_path = f.name
 
@@ -728,8 +726,9 @@ class TestRunFullIngestion:
         orchestrator.register_pipeline("test", pipe)
 
         # Mock database persistence
-        with patch("src.ingestion.orchestrator.get_connection"), \
-             patch("src.ingestion.orchestrator.EventDataWriter") as mock_writer:
+        with patch("src.ingestion.orchestrator.get_connection"), patch(
+            "src.ingestion.orchestrator.EventDataWriter"
+        ) as mock_writer:
             mock_writer_instance = MagicMock()
             mock_writer_instance.persist_batch.return_value = 5
             mock_writer.return_value = mock_writer_instance
@@ -787,8 +786,9 @@ class TestRunFullIngestion:
         orchestrator.register_pipeline("source1", pipe1)
         orchestrator.register_pipeline("source2", pipe2)
 
-        with patch("src.ingestion.orchestrator.get_connection"), \
-             patch("src.ingestion.orchestrator.EventDataWriter") as mock_writer:
+        with patch("src.ingestion.orchestrator.get_connection"), patch(
+            "src.ingestion.orchestrator.EventDataWriter"
+        ) as mock_writer:
             mock_writer_instance = MagicMock()
             mock_writer_instance.persist_batch.return_value = 2
             mock_writer.return_value = mock_writer_instance

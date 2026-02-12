@@ -492,9 +492,7 @@ class TestRealConfigPipelineCreation:
         rules = pipeline.source_config.event_type_rules
         assert len(rules) > 0
         # Check that festival rule is present
-        festival_rules = [
-            r for r in rules if r.get("type") == "festival"
-        ]
+        festival_rules = [r for r in rules if r.get("type") == "festival"]
         assert len(festival_rules) == 1
 
     def test_factory_disabled_source_raises(self):
