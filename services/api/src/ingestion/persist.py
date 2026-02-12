@@ -9,6 +9,8 @@ PostgreSQL schema, managing foreign key relationships and transactions.
 import logging
 from typing import List
 
+from psycopg2.extras import execute_values
+
 from src.schemas.event import EventSchema
 from src.schemas.taxonomy import get_primary_category_value_to_id_map
 
@@ -316,8 +318,16 @@ class EventDataWriter:
     # ------------------------------------------------------------------
 
     def _persist_taxonomy_mappings(self, cur, event: EventSchema, event_id):
+        # 1. Cleanup existing mappings (cascades to event_emotional_outputs)
+        cur.execute("DELETE FROM event_taxonomy_mappings WHERE event_id = %s", (event_id,))
+
+        if not event.taxonomy_dimensions:
+            return
+
+        # 2. Filter and prepare mapping data
+        valid_dims_with_act = []
+        mapping_rows = []
         for dim in event.taxonomy_dimensions:
-            # Issue #8: Verify subcategory_id and activity_id
             sub_id = dim.subcategory
             if sub_id and sub_id not in self._valid_subcategories:
                 logger.warning(
@@ -334,16 +344,8 @@ class EventDataWriter:
                 )
                 act_id = None
 
-            cur.execute(
-                """
-                INSERT INTO event_taxonomy_mappings (
-                    event_id, subcategory_id, activity_id, activity_name,
-                    energy_level, social_intensity, cognitive_load,
-                    physical_involvement, cost_level, time_scale,
-                    environment, risk_level, age_accessibility, repeatability
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING mapping_id;
-                """,
+            valid_dims_with_act.append((dim, act_id))
+            mapping_rows.append(
                 (
                     event_id,
                     sub_id,
@@ -359,44 +361,73 @@ class EventDataWriter:
                     dim.risk_level,
                     dim.age_accessibility,
                     dim.repeatability,
-                ),
+                )
             )
-            mapping_id = cur.fetchone()[0]
 
-            # Persist emotional outputs for this mapping
-            for emotion in dim.emotional_output:
-                if not act_id:
-                    # Cannot link emotion to non-existent activity metadata
-                    continue
+        if not mapping_rows:
+            return
 
-                cur.execute(
-                    """
-                    INSERT INTO activity_emotional_outputs (activity_id, emotion_name)
-                    VALUES (%s, %s)
-                    ON CONFLICT (activity_id, emotion_name) DO NOTHING
-                    RETURNING emotional_output_id;
-                    """,
-                    (act_id, emotion),
-                )
-                res = cur.fetchone()
-                if res:
-                    emo_id = res[0]
-                else:
-                    cur.execute(
-                        "SELECT emotional_output_id FROM activity_emotional_outputs "
-                        "WHERE activity_id = %s AND emotion_name = %s",
-                        (act_id, emotion),
-                    )
-                    emo_id = cur.fetchone()[0]
+        # 3. Bulk insert mappings
+        execute_values(
+            cur,
+            """
+            INSERT INTO event_taxonomy_mappings (
+                event_id, subcategory_id, activity_id, activity_name,
+                energy_level, social_intensity, cognitive_load,
+                physical_involvement, cost_level, time_scale,
+                environment, risk_level, age_accessibility, repeatability
+            ) VALUES %s
+            RETURNING mapping_id;
+            """,
+            mapping_rows,
+        )
+        mapping_ids = [row[0] for row in cur.fetchall()]
 
-                cur.execute(
-                    """
-                    INSERT INTO event_emotional_outputs (mapping_id, emotional_output_id)
-                    VALUES (%s, %s)
-                    ON CONFLICT DO NOTHING;
-                    """,
-                    (mapping_id, emo_id),
-                )
+        # 4. Handle Emotional Outputs
+        # Collect all unique (activity_id, emotion) pairs to upsert into metadata
+        emotion_metadata_pairs = set()
+        for dim, act_id in valid_dims_with_act:
+            if act_id:
+                for emotion in dim.emotional_output:
+                    emotion_metadata_pairs.add((act_id, emotion))
+
+        if not emotion_metadata_pairs:
+            return
+
+        # Bulk upsert emotional outputs metadata
+        emotion_metadata_rows = list(emotion_metadata_pairs)
+        execute_values(
+            cur,
+            """
+            INSERT INTO activity_emotional_outputs (activity_id, emotion_name)
+            VALUES %s
+            ON CONFLICT (activity_id, emotion_name) DO UPDATE SET emotion_name = EXCLUDED.emotion_name
+            RETURNING emotional_output_id, activity_id, emotion_name;
+            """,
+            emotion_metadata_rows,
+        )
+        # Create map of (str(activity_id), emotion_name) -> emotional_output_id
+        emo_id_map = {(str(row[1]), row[2]): row[0] for row in cur.fetchall()}
+
+        # 5. Bulk insert event_emotional_outputs associations
+        event_emo_rows = []
+        for i, (dim, act_id) in enumerate(valid_dims_with_act):
+            if act_id:
+                mapping_id = mapping_ids[i]
+                for emotion in dim.emotional_output:
+                    emo_id = emo_id_map.get((str(act_id), emotion))
+                    if emo_id:
+                        event_emo_rows.append((mapping_id, emo_id))
+
+        if event_emo_rows:
+            execute_values(
+                cur,
+                """
+                INSERT INTO event_emotional_outputs (mapping_id, emotional_output_id)
+                VALUES %s ON CONFLICT DO NOTHING;
+                """,
+                event_emo_rows,
+            )
 
     # ------------------------------------------------------------------
     # 7. Engagement snapshot
@@ -459,109 +490,126 @@ class EventDataWriter:
     # ------------------------------------------------------------------
 
     def _persist_media_assets(self, cur, event: EventSchema, event_id):
-        for asset in event.media_assets:
-            cur.execute(
-                """
-                INSERT INTO media_assets (
-                    event_id, type, url, title, description, width, height
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s);
-                """,
-                (
-                    event_id,
-                    asset.type,
-                    asset.url,
-                    asset.title,
-                    asset.description,
-                    asset.width,
-                    asset.height,
-                ),
-            )
+        # 1. Cleanup existing records
+        cur.execute("DELETE FROM media_assets WHERE event_id = %s", (event_id,))
+
+        if not event.media_assets:
+            return
+
+        # 2. Bulk insert
+        asset_data = [
+            (event_id, a.type, a.url, a.title, a.description, a.width, a.height)
+            for a in event.media_assets
+        ]
+        execute_values(
+            cur,
+            """
+            INSERT INTO media_assets (
+                event_id, type, url, title, description, width, height
+            ) VALUES %s;
+            """,
+            asset_data,
+        )
 
     # ------------------------------------------------------------------
     # 10. Tags
     # ------------------------------------------------------------------
 
     def _persist_tags(self, cur, event: EventSchema, event_id):
-        for tag_name in event.tags:
-            cur.execute(
-                """
-                INSERT INTO tags (tag_name) VALUES (%s)
-                ON CONFLICT (tag_name) DO NOTHING
-                RETURNING tag_id;
-                """,
-                (tag_name,),
-            )
-            res = cur.fetchone()
-            if res:
-                tag_id = res[0]
-            else:
-                cur.execute(
-                    "SELECT tag_id FROM tags WHERE tag_name = %s",
-                    (tag_name,),
-                )
-                tag_id = cur.fetchone()[0]
+        # 1. Cleanup existing associations
+        cur.execute("DELETE FROM event_tags WHERE event_id = %s", (event_id,))
 
-            cur.execute(
-                """
-                INSERT INTO event_tags (event_id, tag_id)
-                VALUES (%s, %s)
-                ON CONFLICT DO NOTHING;
-                """,
-                (event_id, tag_id),
-            )
+        if not event.tags:
+            return
+
+        # 2. Bulk upsert tags to get IDs
+        unique_tags = list(set(event.tags))
+        tag_data = [(t,) for t in unique_tags]
+
+        # We use DO UPDATE SET tag_name = EXCLUDED.tag_name to ensure RETURNING tag_id
+        # works for both new and existing records.
+        execute_values(
+            cur,
+            """
+            INSERT INTO tags (tag_name) VALUES %s
+            ON CONFLICT (tag_name) DO UPDATE SET tag_name = EXCLUDED.tag_name
+            RETURNING tag_id;
+            """,
+            tag_data,
+        )
+        tag_ids = [row[0] for row in cur.fetchall()]
+
+        # 3. Bulk insert event_tags relationships
+        rel_data = [(event_id, tid) for tid in tag_ids]
+        execute_values(
+            cur,
+            "INSERT INTO event_tags (event_id, tag_id) VALUES %s ON CONFLICT DO NOTHING;",
+            rel_data,
+        )
 
     # ------------------------------------------------------------------
     # 11. Artists
     # ------------------------------------------------------------------
 
     def _persist_artists(self, cur, event: EventSchema, event_id):
-        for artist in event.artists:
-            cur.execute(
-                """
-                INSERT INTO artists (
-                    name, soundcloud_url, spotify_url, instagram_url, genre
-                ) VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT DO NOTHING
-                RETURNING artist_id;
-                """,
-                (
-                    artist.name,
-                    artist.soundcloud_url,
-                    artist.spotify_url,
-                    artist.instagram_url,
-                    artist.genre,
-                ),
-            )
-            res = cur.fetchone()
-            if res:
-                artist_id = res[0]
-            else:
-                cur.execute(
-                    "SELECT artist_id FROM artists WHERE name = %s",
-                    (artist.name,),
-                )
-                artist_id = cur.fetchone()[0]
+        # 1. Cleanup existing associations
+        cur.execute("DELETE FROM event_artists WHERE event_id = %s", (event_id,))
 
-            cur.execute(
-                """
-                INSERT INTO event_artists (event_id, artist_id)
-                VALUES (%s, %s)
-                ON CONFLICT DO NOTHING;
-                """,
-                (event_id, artist_id),
-            )
+        if not event.artists:
+            return
+
+        # 2. Bulk upsert artists to get IDs
+        seen_names = set()
+        unique_artists = []
+        for a in event.artists:
+            if a.name not in seen_names:
+                unique_artists.append(a)
+                seen_names.add(a.name)
+
+        artist_data = [
+            (a.name, a.soundcloud_url, a.spotify_url, a.instagram_url, a.genre)
+            for a in unique_artists
+        ]
+
+        execute_values(
+            cur,
+            """
+            INSERT INTO artists (name, soundcloud_url, spotify_url, instagram_url, genre)
+            VALUES %s
+            ON CONFLICT (name) DO UPDATE SET
+                soundcloud_url = COALESCE(EXCLUDED.soundcloud_url, artists.soundcloud_url),
+                spotify_url = COALESCE(EXCLUDED.spotify_url, artists.spotify_url),
+                instagram_url = COALESCE(EXCLUDED.instagram_url, artists.instagram_url),
+                genre = COALESCE(EXCLUDED.genre, artists.genre)
+            RETURNING artist_id;
+            """,
+            artist_data,
+        )
+        artist_ids = [row[0] for row in cur.fetchall()]
+
+        # 3. Bulk insert event_artists relationships
+        rel_data = [(event_id, aid) for aid in artist_ids]
+        execute_values(
+            cur,
+            "INSERT INTO event_artists (event_id, artist_id) VALUES %s ON CONFLICT DO NOTHING;",
+            rel_data,
+        )
 
     # ------------------------------------------------------------------
     # 12. Normalization errors
     # ------------------------------------------------------------------
 
     def _persist_normalization_errors(self, cur, event: EventSchema, event_id):
-        for error_msg in event.normalization_errors:
-            cur.execute(
-                """
-                INSERT INTO normalization_errors (
-                    event_id, error_message
-                ) VALUES (%s, %s);
-                """,
-                (event_id, error_msg),
-            )
+        # 1. Cleanup existing records
+        cur.execute("DELETE FROM normalization_errors WHERE event_id = %s", (event_id,))
+
+        if not event.normalization_errors:
+            return
+
+        # 2. Bulk insert
+        error_data = [(event_id, msg) for msg in event.normalization_errors]
+        execute_values(
+            cur,
+            "INSERT INTO normalization_errors (event_id, error_message) VALUES %s;",
+            error_data,
+        )
