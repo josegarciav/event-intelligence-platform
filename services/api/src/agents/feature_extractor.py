@@ -15,12 +15,12 @@ import os
 import re
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, cast
 
-from src.ingestion.normalization.extraction_models import (
+from services.api.src.agents.extraction_models import (
     MissingFieldsExtraction,
     PrimaryCategoryExtraction,
     SubcategoryExtraction,
 )
-from src.ingestion.normalization.taxonomy_retriever import get_taxonomy_retriever
+from services.api.src.agents.taxonomy_retriever import get_taxonomy_retriever
 from src.schemas.features import (
     EventTypeOutput,
     FullTaxonomyEnrichmentOutput,

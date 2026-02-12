@@ -6,7 +6,7 @@ Supports:
 - Title/description keyword matching
 - Field value matching
 - Default assignments
-- Multiple taxonomy dimensions per event
+- Multiple taxonomy dimensions per event (always with the same primary category)
 """
 
 import logging
