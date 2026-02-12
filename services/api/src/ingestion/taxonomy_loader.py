@@ -13,67 +13,25 @@ Tables populated:
 from __future__ import annotations
 
 import json
-import os
-from pathlib import Path
-from urllib.parse import urlparse
 
 import psycopg2
-from dotenv import load_dotenv
+
+from src.configs.settings import get_settings
 
 # ---------------------------------------------------------------------------
-# ENV
+# SETTINGS
 # ---------------------------------------------------------------------------
 
-load_dotenv()
-
-
-# ---------------------------------------------------------------------------
-# PATHS
-# ---------------------------------------------------------------------------
-
-BASE_DIR = Path(__file__).resolve().parents[2]
-
-TAXONOMY_PATH = BASE_DIR / "src/assets/human_experience_taxonomy_master.json"
-
+settings = get_settings()
 
 # ---------------------------------------------------------------------------
 # DB CONNECTION
 # ---------------------------------------------------------------------------
 
 
-def parse_database_url(database_url: str) -> dict:
-    """
-    Parse SQLAlchemy-style DATABASE_URL into psycopg2 parameters.
-
-    Parameters
-    ----------
-    database_url : str
-        Database connection string.
-
-    Returns
-    -------
-    dict
-        psycopg2 connection configuration.
-    """
-    parsed = urlparse(database_url)
-
-    return {
-        "host": parsed.hostname,
-        "port": parsed.port,
-        "dbname": parsed.path.lstrip("/"),
-        "user": parsed.username,
-        "password": parsed.password,
-    }
-
-
 def get_connection() -> psycopg2.extensions.connection:
-    """Establish a new database connection using DATABASE_URL."""
-    database_url = os.getenv("DATABASE_URL")
-
-    if not database_url:
-        raise ValueError("DATABASE_URL not set")
-
-    return psycopg2.connect(**parse_database_url(database_url))
+    """Establish a new database connection using settings.DATABASE_URL."""
+    return psycopg2.connect(**settings.get_psycopg2_params())
 
 
 # ---------------------------------------------------------------------------
@@ -83,10 +41,10 @@ def get_connection() -> psycopg2.extensions.connection:
 
 def load_taxonomy() -> dict:
     """Load taxonomy JSON file."""
-    if not TAXONOMY_PATH.exists():
-        raise FileNotFoundError(TAXONOMY_PATH)
+    if not settings.TAXONOMY_DATA_PATH.exists():
+        raise FileNotFoundError(settings.TAXONOMY_DATA_PATH)
 
-    with open(TAXONOMY_PATH, encoding="utf-8") as f:
+    with open(settings.TAXONOMY_DATA_PATH, encoding="utf-8") as f:
         return json.load(f)
 
 

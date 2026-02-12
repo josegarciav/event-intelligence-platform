@@ -11,7 +11,6 @@ to ensure accurate classification and attribute selection.
 """
 
 import logging
-import os
 import re
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, cast
 
@@ -88,7 +87,12 @@ class FeatureExtractor:
         self.max_tokens = max_tokens
 
         # Get API key
-        self._api_key: Optional[str] = api_key or os.getenv("OPENAI_API_KEY")
+        settings = get_settings()
+        self._api_key: Optional[str] = api_key or (
+            settings.OPENAI_API_KEY.get_secret_value()
+            if settings.OPENAI_API_KEY
+            else None
+        )
 
         # Initialize Instructor client (lazy)
         self._client = None

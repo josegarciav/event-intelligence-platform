@@ -82,3 +82,51 @@ class TestLoadIngestionConfig:
         config2 = Config.load_ingestion_config()
         # LRU cache means same object is returned
         assert config1 is config2
+
+    def test_env_substitution(self, monkeypatch):
+        """Test environment variable substitution in config."""
+        from src.configs.settings import Settings
+
+        # We need to make sure Config uses a Settings object that has our test value
+        test_db_url = "postgresql://test_user:test_pass@test_host:5432/test_db"
+
+        # Mock Settings in config.py
+        import src.configs.config
+
+        monkeypatch.setattr(
+            src.configs.config, "settings", Settings(DATABASE_URL=test_db_url)
+        )
+
+        # Clear cache to ensure re-load
+        Config.load_ingestion_config.cache_clear()
+
+        config = Config.load_ingestion_config()
+
+        # Check if DATABASE_URL was substituted
+        assert config["global"]["storage"]["url"] == test_db_url
+
+    def test_secret_substitution(self, monkeypatch):
+        """Test that SecretStr values are correctly substituted."""
+        from src.configs.settings import Settings
+
+        test_key = "test-api-key"
+
+        # Mock Settings in config.py
+        import src.configs.config
+
+        monkeypatch.setattr(
+            src.configs.config,
+            "settings",
+            Settings(
+                DATABASE_URL="postgresql://localhost/db",
+                TICKETMASTER_API_KEY=test_key,
+            ),
+        )
+
+        # Clear cache to ensure re-load
+        Config.load_ingestion_config.cache_clear()
+
+        config = Config.load_ingestion_config()
+
+        # Check if TICKETMASTER_API_KEY was substituted
+        assert config["sources"]["ticketmaster"]["query"]["params"]["apikey"] == test_key
