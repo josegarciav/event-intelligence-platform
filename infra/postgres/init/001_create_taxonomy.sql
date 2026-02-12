@@ -159,7 +159,7 @@ CREATE TABLE IF NOT EXISTS sources (
     source_url TEXT,
     compressed_html TEXT,
     ingestion_timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    source_updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE (source_name, source_event_id)
 );
 
@@ -326,7 +326,8 @@ CREATE TABLE IF NOT EXISTS engagement_snapshots (
     comments_count INT,
     likes_count INT,
 
-    captured_at TIMESTAMP NOT NULL DEFAULT NOW()
+    captured_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 
@@ -589,6 +590,7 @@ CREATE TABLE IF NOT EXISTS normalization_errors (
 
     event_id UUID,
 
+    category TEXT DEFAULT 'data_validation',
     error_message TEXT NOT NULL,
 
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),

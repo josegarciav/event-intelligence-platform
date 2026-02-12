@@ -32,11 +32,15 @@ from src.ingestion.normalization.currency import CurrencyParser
 from src.ingestion.normalization.field_mapper import FieldMapper
 from src.ingestion.normalization.taxonomy_mapper import TaxonomyMapper
 from src.schemas.event import (
+    ArtistInfo,
+    Coordinates,
     EngagementMetrics,
     EventFormat,
     EventSchema,
     EventType,
     LocationInfo,
+    NormalizationCategory,
+    NormalizationError,
     OrganizerInfo,
     PriceInfo,
     PrimaryCategory,
@@ -105,6 +109,9 @@ class APISourceConfig:
 
     # HTML enrichment (compressed_html scraping)
     html_enrichment: Dict[str, Any] = field(default_factory=dict)
+
+    # Detail query configuration (per-event enrichment)
+    detail_query: Dict[str, Any] = field(default_factory=dict)
 
 
 class ConfigDrivenAPIAdapter(APIAdapter):
@@ -339,6 +346,53 @@ class ConfigDrivenAPIAdapter(APIAdapter):
         )
 
 
+    def fetch_detail(self, event_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Fetch detail data for a single event using the detail query config.
+
+        Args:
+            event_id: Source event ID to query
+
+        Returns:
+            Raw response dict from the detail query, or None on failure.
+        """
+        detail_config = self.source_config.detail_query
+        if not detail_config or not detail_config.get("enabled"):
+            return None
+
+        import requests
+
+        template = detail_config.get("template", "")
+        variables = self._substitute_variables(
+            detail_config.get("variables", {}),
+            {"source_event_id": event_id},
+        )
+
+        endpoint = self.source_config.endpoint
+        try:
+            resp = requests.post(
+                endpoint,
+                json={"query": template, "variables": variables},
+                timeout=self.source_config.timeout_seconds,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+            # Navigate to response using response_path
+            response_path = detail_config.get("response_path", "data")
+            result = data
+            for part in response_path.split("."):
+                if isinstance(result, dict):
+                    result = result.get(part)
+                else:
+                    return None
+            return result if isinstance(result, dict) else None
+
+        except Exception as e:
+            logger.warning(f"Detail query failed for event {event_id}: {e}")
+            return None
+
+
 class BaseAPIPipeline(BasePipeline):
     """
     Generic API pipeline for ALL sources.
@@ -469,6 +523,16 @@ class BaseAPIPipeline(BasePipeline):
 
         # Process all events through pipeline stages
         normalized_events = self._process_events_batch(all_raw_events)
+
+        # Add informational normalization note for traceability
+        total_raw_fetched = len(all_raw_events)
+        for event in normalized_events:
+            event.normalization_errors.append(
+                NormalizationError(
+                    message=f"Info: Batch contained {total_raw_fetched} raw events from API ingestion",
+                    category=NormalizationCategory.API_INGESTION,
+                )
+            )
 
         # Deduplication
         if self.config.deduplicate and normalized_events:
@@ -786,7 +850,7 @@ class BaseAPIPipeline(BasePipeline):
             source_name=source_name,
             source_event_id=source_event_id,
             source_url=source_url,
-            updated_at=datetime.now(timezone.utc),
+            source_updated_at=datetime.now(timezone.utc),
         )
 
         # Generate platform-wide deterministic UUID for event_id
@@ -845,12 +909,20 @@ class BaseAPIPipeline(BasePipeline):
         # Get tags from extracted fields or parsed event
         tags = extracted_fields.get("tags") or parsed_event.get("tags", [])
 
+        # Build artists list
+        artist_names = parsed_event.get("artists", [])
+        artists = [ArtistInfo(name=name) for name in artist_names if name]
+
         # Build engagement metrics from API fields
         attending = parsed_event.get("attending")
+        interested = parsed_event.get("interested_count")
         engagement = None
-        if attending is not None:
+        if attending is not None or interested is not None:
             try:
-                engagement = EngagementMetrics(going_count=int(attending))
+                engagement = EngagementMetrics(
+                    going_count=int(attending) if attending is not None else None,
+                    interested_count=int(interested) if interested is not None else None,
+                )
             except (ValueError, TypeError):
                 pass
 
@@ -859,6 +931,24 @@ class BaseAPIPipeline(BasePipeline):
         capacity = None
         if isinstance(venue_live, int) and venue_live > 0:
             capacity = venue_live
+
+        # Image URL with flyer_front fallback
+        image_url = parsed_event.get("image_url")
+        if not image_url:
+            flyer_front = parsed_event.get("flyer_front")
+            if flyer_front:
+                image_url = flyer_front
+
+        # Build custom_fields (RA-specific metadata)
+        custom_fields = {}
+        if parsed_event.get("is_ticketed"):
+            custom_fields["is_ticketed"] = True
+        pick_blurb = parsed_event.get("pick_blurb")
+        if pick_blurb:
+            custom_fields["pick_blurb"] = pick_blurb
+        pick_id = parsed_event.get("pick_id")
+        if pick_id:
+            custom_fields["pick_id"] = pick_id
 
         return EventSchema(
             event_id=event_id,
@@ -873,15 +963,13 @@ class BaseAPIPipeline(BasePipeline):
             format=EventFormat.IN_PERSON,
             price=price,
             organizer=organizer,
-            image_url=parsed_event.get("image_url"),
+            artists=artists,
+            image_url=image_url,
             source=source,
             tags=tags,
             engagement=engagement,
             capacity=capacity,
-            custom_fields={
-                "artists": parsed_event.get("artists", []),
-                **({"is_ticketed": True} if parsed_event.get("is_ticketed") else {}),
-            },
+            custom_fields=custom_fields,
         )
 
     def _determine_event_type(
@@ -942,9 +1030,11 @@ class BaseAPIPipeline(BasePipeline):
         logger.warning(f"Could not parse datetime: {dt_value}")
         return datetime.now(timezone.utc)
 
-    def validate_event(self, event: EventSchema) -> Tuple[bool, List[str]]:
+    def validate_event(
+        self, event: EventSchema
+    ) -> Tuple[bool, List[NormalizationError]]:
         """Validate event using configured rules."""
-        errors = []
+        errors: List[NormalizationError] = []
         validation_config = self.source_config.validation
 
         # Required fields
@@ -955,24 +1045,51 @@ class BaseAPIPipeline(BasePipeline):
             if field_name == "title" and (
                 not event.title or event.title == "Untitled Event"
             ):
-                errors.append("Title is required")
+                errors.append(
+                    NormalizationError(
+                        message="Title is required",
+                        category=NormalizationCategory.MISSING_REQUIRED,
+                    )
+                )
             elif field_name == "source_event_id" and not event.source.source_event_id:
-                errors.append("Source event ID is required")
+                errors.append(
+                    NormalizationError(
+                        message="Source event ID is required",
+                        category=NormalizationCategory.MISSING_REQUIRED,
+                    )
+                )
 
         # Future events only
         if validation_config.get("future_events_only", True):
             if event.start_datetime < datetime.now(timezone.utc):
-                errors.append("Warning: Event start time is in the past")
+                errors.append(
+                    NormalizationError(
+                        message="Warning: Event start time is in the past",
+                        category=NormalizationCategory.DATA_VALIDATION,
+                    )
+                )
 
         # Location validation
         if not event.location.city:
-            errors.append("City is required")
+            errors.append(
+                NormalizationError(
+                    message="City is required",
+                    category=NormalizationCategory.MISSING_REQUIRED,
+                )
+            )
 
         # Price validation
         if event.price.minimum_price and event.price.minimum_price < 0:
-            errors.append("Minimum price cannot be negative")
+            errors.append(
+                NormalizationError(
+                    message="Minimum price cannot be negative",
+                    category=NormalizationCategory.DATA_VALIDATION,
+                )
+            )
 
-        is_valid = not any("Error:" in e for e in errors)
+        is_valid = not any(
+            e.category == NormalizationCategory.MISSING_REQUIRED for e in errors
+        )
         return is_valid, errors
 
     def enrich_event(self, event: EventSchema) -> EventSchema:
@@ -983,11 +1100,86 @@ class BaseAPIPipeline(BasePipeline):
             and event.source.source_url
             and not event.source.compressed_html
         ):
-            compressed = self.html_enrichment_scraper.fetch_compressed_html(
-                event.source.source_url
-            )
-            if compressed:
-                event.source.compressed_html = compressed
+            try:
+                compressed = self.html_enrichment_scraper.fetch_compressed_html(
+                    event.source.source_url
+                )
+                if compressed:
+                    event.source.compressed_html = compressed
+                else:
+                    logger.warning(
+                        f"HTML enrichment returned None for {event.source.source_url}"
+                    )
+                    event.normalization_errors.append(
+                        NormalizationError(
+                            message=f"HTML enrichment returned no content for {event.source.source_url}",
+                            category=NormalizationCategory.ENRICHMENT_FAILURE,
+                        )
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"HTML enrichment failed for {event.source.source_url}: {e}"
+                )
+                event.normalization_errors.append(
+                    NormalizationError(
+                        message=f"HTML enrichment error: {e}",
+                        category=NormalizationCategory.ENRICHMENT_FAILURE,
+                    )
+                )
+
+        # Detail query enrichment (coordinates, minimumAge)
+        detail_config = self.source_config.detail_query
+        if detail_config and detail_config.get("enabled") and event.source.source_event_id:
+            try:
+                # Rate limit detail calls
+                import time
+
+                rate = detail_config.get("rate_limit_per_second", 2.0)
+                if rate > 0:
+                    time.sleep(1.0 / rate)
+
+                detail_data = self.adapter.fetch_detail(event.source.source_event_id)
+                if detail_data:
+                    field_mappings = detail_config.get("field_mappings", {})
+
+                    # Extract fields using dot-path navigation
+                    def _extract(data, path):
+                        for part in path.split("."):
+                            if isinstance(data, dict):
+                                data = data.get(part)
+                            else:
+                                return None
+                        return data
+
+                    # minimum_age -> age_restriction
+                    min_age = _extract(detail_data, field_mappings.get("minimum_age", ""))
+                    if min_age is not None and not event.age_restriction:
+                        event.age_restriction = str(min_age)
+
+                    # venue coordinates
+                    lat = _extract(detail_data, field_mappings.get("venue_latitude", ""))
+                    lng = _extract(detail_data, field_mappings.get("venue_longitude", ""))
+                    if lat is not None and lng is not None and not event.location.coordinates:
+                        try:
+                            event.location.coordinates = Coordinates(
+                                latitude=float(lat), longitude=float(lng)
+                            )
+                        except (ValueError, TypeError) as e:
+                            logger.warning(f"Invalid coordinates for event {event.source.source_event_id}: {e}")
+                else:
+                    logger.debug(
+                        f"Detail query returned no data for event {event.source.source_event_id}"
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"Detail enrichment failed for event {event.source.source_event_id}: {e}"
+                )
+                event.normalization_errors.append(
+                    NormalizationError(
+                        message=f"Detail query enrichment error: {e}",
+                        category=NormalizationCategory.ENRICHMENT_FAILURE,
+                    )
+                )
 
         # Calculate duration
         if event.end_datetime and event.start_datetime:

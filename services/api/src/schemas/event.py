@@ -524,9 +524,9 @@ class SourceInfo(BaseModel):
         default=None,
         description="Parsed HTML or JSON data from source for debugging/validation",
     )
-    updated_at: datetime = Field(
+    source_updated_at: datetime = Field(
         default_factory=_utc_now,
-        description="When we last updated this event from the source",
+        description="Timestamp of last update at the source platform",
     )
     ingestion_timestamp: datetime = Field(
         default_factory=_utc_now, description="When we ingested this event"
@@ -580,7 +580,30 @@ class EngagementMetrics(BaseModel):
     shares_count: Optional[int] = None
     comments_count: Optional[int] = None
     likes_count: Optional[int] = None
-    last_updated: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class NormalizationCategory(str, Enum):
+    """Categories for normalization error/info messages. Designed for LLM classification."""
+
+    FIELD_MAPPING = "field_mapping"
+    DATA_VALIDATION = "data_validation"
+    TYPE_COERCION = "type_coercion"
+    MISSING_REQUIRED = "missing_required"
+    FORMAT_MISMATCH = "format_mismatch"
+    TAXONOMY_MAPPING = "taxonomy_mapping"
+    ENRICHMENT_FAILURE = "enrichment_failure"
+    SOURCE_QUALITY = "source_quality"
+    API_INGESTION = "api_ingestion"
+    DEDUPLICATION = "deduplication"
+    INFO = "info"
+
+
+class NormalizationError(BaseModel):
+    """Structured normalization error/info message."""
+
+    message: str
+    category: NormalizationCategory = NormalizationCategory.DATA_VALIDATION
 
 
 # ============================================================================
@@ -680,7 +703,7 @@ class EventSchema(BaseModel):
         le=1.0,
         description="Quality assessment of normalized data (0.0-1.0)",
     )
-    normalization_errors: List[str] = Field(
+    normalization_errors: List[NormalizationError] = Field(
         default_factory=list,
         description="Warnings/errors encountered during normalization",
     )

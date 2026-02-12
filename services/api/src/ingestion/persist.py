@@ -177,7 +177,10 @@ class EventDataWriter:
                 compressed_html, ingestion_timestamp
             ) VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (source_name, source_event_id)
-            DO UPDATE SET updated_at = NOW()
+            DO UPDATE SET
+                compressed_html = COALESCE(EXCLUDED.compressed_html, sources.compressed_html),
+                source_url = COALESCE(EXCLUDED.source_url, sources.source_url),
+                source_updated_at = NOW()
             RETURNING source_id;
             """,
             (
@@ -605,9 +608,12 @@ class EventDataWriter:
             return
 
         # 2. Bulk insert
-        error_data = [(event_id, msg) for msg in event.normalization_errors]
+        error_data = [
+            (event_id, err.category, err.message)
+            for err in event.normalization_errors
+        ]
         execute_values(
             cur,
-            "INSERT INTO normalization_errors (event_id, error_message) VALUES %s;",
+            "INSERT INTO normalization_errors (event_id, category, error_message) VALUES %s;",
             error_data,
         )

@@ -22,7 +22,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.ingestion.adapters import BaseSourceAdapter, SourceType
-from src.schemas.event import EventSchema
+from src.schemas.event import EventSchema, NormalizationCategory
 
 
 class PipelineStatus(str, Enum):
@@ -372,11 +372,16 @@ class BasePipeline(ABC):
         enrichment_bonus += 0.05 if event.description else 0.0
         score += min(enrichment_bonus, 0.3)
 
-        # Penalize validation errors (up to -10%)
-        error_penalty = min(len(event.normalization_errors) * 0.02, 0.1)
+        # Penalize validation errors (up to -10%), excluding INFO category
+        real_errors = [
+            e
+            for e in event.normalization_errors
+            if e.category != NormalizationCategory.INFO
+        ]
+        error_penalty = min(len(real_errors) * 0.02, 0.1)
         score -= error_penalty
 
-        return max(0.0, min(score, 1.0))
+        return round(max(0.0, min(score, 1.0)), 2)
 
     def _generate_execution_id(self) -> str:
         """Generate unique execution identifier."""
@@ -403,12 +408,8 @@ class BasePipeline(ABC):
 
         rows = []
         for event in events:
-            # ---- ARTISTS (from custom_fields) ----
-            artists_list = event.custom_fields.get("artists", [])
-            artists_str = ", ".join(
-                a.get("name", "") if isinstance(a, dict) else str(a)
-                for a in artists_list
-            )
+            # ---- ARTISTS ----
+            artists_str = ", ".join(a.name for a in event.artists)
 
             # ---- TAXONOMY DIMENSIONS (JSON + flattened primary) ----
             taxonomy_json = json.dumps(
@@ -559,7 +560,7 @@ class BasePipeline(ABC):
                 "source_name": src.source_name if src else None,
                 "source_event_id": src.source_event_id if src else None,
                 "source_url": src.source_url if src else None,
-                "source_last_updated": src.updated_at if src else None,
+                "source_updated_at": src.source_updated_at if src else None,
                 "source_ingestion_timestamp": src.ingestion_timestamp if src else None,
                 # ==== MEDIA ====
                 "image_url": event.image_url,
@@ -571,7 +572,7 @@ class BasePipeline(ABC):
                 "engagement_shares_count": eng.shares_count if eng else None,
                 "engagement_comments_count": eng.comments_count if eng else None,
                 "engagement_likes_count": eng.likes_count if eng else None,
-                "engagement_last_updated": eng.last_updated if eng else None,
+                "engagement_updated_at": eng.updated_at if eng else None,
                 # ==== TAXONOMY - PRIMARY CATEGORY ====
                 "primary_category": get_enum_value(event.primary_category),
                 # ==== TAXONOMY - PRIMARY DIMENSION (flattened) ====
@@ -626,7 +627,7 @@ class BasePipeline(ABC):
                 # ==== QUALITY & ERRORS ====
                 "data_quality_score": event.data_quality_score,
                 "normalization_errors": (
-                    ", ".join(event.normalization_errors)
+                    ", ".join(e.message for e in event.normalization_errors)
                     if event.normalization_errors
                     else None
                 ),

@@ -104,7 +104,8 @@ class FieldMapper:
             if remaining_path.startswith("."):
                 remaining_path = remaining_path[1:]
 
-            items = self._get_value(data, field_name)
+            # Use _extract_field for nested paths (e.g. "event.artists")
+            items = self._extract_field(data, field_name)
             if not isinstance(items, list):
                 return []
 
@@ -125,7 +126,8 @@ class FieldMapper:
             if remaining_path.startswith("."):
                 remaining_path = remaining_path[1:]
 
-            items = self._get_value(data, field_name)
+            # Use _extract_field for nested paths (e.g. "event.images")
+            items = self._extract_field(data, field_name)
             if not isinstance(items, list) or index >= len(items):
                 return None
 

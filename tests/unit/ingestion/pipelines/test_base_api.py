@@ -478,7 +478,7 @@ class TestBaseAPIPipelineValidateEvent:
 
         is_valid, errors = pipeline.validate_event(event)
 
-        assert "Title is required" in errors
+        assert any(e.message == "Title is required" for e in errors)
 
     def test_validate_future_event(self, sample_source_config, create_event):
         """Should warn for past events."""
@@ -494,7 +494,7 @@ class TestBaseAPIPipelineValidateEvent:
 
         is_valid, errors = pipeline.validate_event(event)
 
-        assert any("past" in e.lower() for e in errors)
+        assert any("past" in e.message.lower() for e in errors)
 
     def test_validate_city_required(self, sample_source_config, create_event):
         """Should require city."""
@@ -510,7 +510,7 @@ class TestBaseAPIPipelineValidateEvent:
 
         is_valid, errors = pipeline.validate_event(event)
 
-        assert "City is required" in errors
+        assert any(e.message == "City is required" for e in errors)
 
 
 class TestBaseAPIPipelineEnrichEvent:

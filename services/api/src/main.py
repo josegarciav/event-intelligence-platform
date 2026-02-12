@@ -1,5 +1,5 @@
 """
-services.api.src.main.
+src.main.
 
 FastAPI entrypoint for the Event Intelligence Platform.
 

@@ -22,6 +22,7 @@ from src.schemas.event import (
     EventSchema,
     EventFormat,
     LocationInfo,
+    NormalizationError,
     OrganizerInfo,
     PrimaryCategory,
     SourceInfo,
@@ -120,7 +121,7 @@ class ConcretePipeline(BasePipeline):
                 source_name="test",
                 source_event_id="test-123",
                 source_url="https://test.com/event",
-                updated_at=datetime.now(timezone.utc),
+                source_updated_at=datetime.now(timezone.utc),
             ),
         )
 
@@ -357,11 +358,11 @@ class TestCalculateQualityScore:
         event = create_event(
             title="Test Event",
             normalization_errors=[
-                "Error 1",
-                "Error 2",
-                "Error 3",
-                "Error 4",
-                "Error 5",
+                NormalizationError(message="Error 1"),
+                NormalizationError(message="Error 2"),
+                NormalizationError(message="Error 3"),
+                NormalizationError(message="Error 4"),
+                NormalizationError(message="Error 5"),
             ],
         )
         score = pipeline._calculate_quality_score(event)
@@ -377,7 +378,7 @@ class TestCalculateQualityScore:
         event = create_event(
             title="",
             location=LocationInfo(city="", venue_name=""),
-            normalization_errors=["Error"] * 20,
+            normalization_errors=[NormalizationError(message="Error")] * 20,
         )
         score = pipeline._calculate_quality_score(event)
         assert 0.0 <= score <= 1.0

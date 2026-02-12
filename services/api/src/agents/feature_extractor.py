@@ -14,12 +14,12 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, cast
 
-from services.api.src.agents.extraction_models import (
+from src.agents.extraction_models import (
     MissingFieldsExtraction,
     PrimaryCategoryExtraction,
     SubcategoryExtraction,
 )
-from services.api.src.agents.taxonomy_retriever import get_taxonomy_retriever
+from src.agents.taxonomy_retriever import get_taxonomy_retriever
 from src.schemas.features import (
     EventTypeOutput,
     FullTaxonomyEnrichmentOutput,
