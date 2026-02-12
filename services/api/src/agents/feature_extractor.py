@@ -26,6 +26,7 @@ from src.schemas.features import (
     MusicGenresOutput,
     TagsOutput,
 )
+from src.configs.settings import get_settings
 
 if TYPE_CHECKING:
     from src.schemas.event import TaxonomyDimension
