@@ -16,6 +16,10 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
+from src.agents.feature_extractor import (
+    FeatureExtractor,
+    create_feature_extractor_from_config,
+)
 from src.ingestion.adapters import FetchResult, SourceType
 from src.ingestion.adapters.api_adapter import APIAdapter, APIAdapterConfig
 from src.ingestion.base_pipeline import (
@@ -25,10 +29,6 @@ from src.ingestion.base_pipeline import (
     PipelineStatus,
 )
 from src.ingestion.normalization.currency import CurrencyParser
-from src.agents.feature_extractor import (
-    FeatureExtractor,
-    create_feature_extractor_from_config,
-)
 from src.ingestion.normalization.field_mapper import FieldMapper
 from src.ingestion.normalization.taxonomy_mapper import TaxonomyMapper
 from src.schemas.event import (

@@ -6,7 +6,6 @@ Tests for Config class path resolution and config loading.
 
 from pathlib import Path
 
-
 from src.configs.config import Config
 
 
@@ -129,4 +128,6 @@ class TestLoadIngestionConfig:
         config = Config.load_ingestion_config()
 
         # Check if TICKETMASTER_API_KEY was substituted
-        assert config["sources"]["ticketmaster"]["query"]["params"]["apikey"] == test_key
+        assert (
+            config["sources"]["ticketmaster"]["query"]["params"]["apikey"] == test_key
+        )

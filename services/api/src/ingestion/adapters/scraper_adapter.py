@@ -227,8 +227,8 @@ class HtmlEnrichmentScraper:
         engine_type = self.config.engine_type
 
         if engine_type == "hybrid":
-            from scrapping.engines.hybrid import HybridEngine, HybridEngineOptions
             from scrapping.engines.http import HttpEngineOptions
+            from scrapping.engines.hybrid import HybridEngine, HybridEngineOptions
 
             http_opts = HttpEngineOptions(
                 timeout_s=self.config.timeout_s,
