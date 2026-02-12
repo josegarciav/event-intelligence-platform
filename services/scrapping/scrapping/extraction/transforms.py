@@ -1,8 +1,6 @@
-"""
-scrapping.extraction.transforms
+"""Normalization utilities used after parsing and extraction.
 
-Normalization utilities used after parsing/extraction.
-Keep these pure (input -> output), so they're easy to test.
+Keep these pure (input -> output), so they are easy to test.
 
 Examples:
 - clean text
@@ -23,10 +21,12 @@ _WS = re.compile(r"\s+")
 
 
 def normalize_ws(text: str) -> str:
+    """Collapse whitespace to single spaces and strip."""
     return _WS.sub(" ", (text or "").strip())
 
 
 def strip_or_none(x: Any) -> str | None:
+    """Strip and return the value, or None if empty."""
     if x is None:
         return None
     s = str(x).strip()
@@ -34,6 +34,7 @@ def strip_or_none(x: Any) -> str | None:
 
 
 def safe_int(x: Any) -> int | None:
+    """Safely convert a value to int, returning None on failure."""
     try:
         if x is None:
             return None
@@ -43,6 +44,7 @@ def safe_int(x: Any) -> int | None:
 
 
 def safe_float(x: Any) -> float | None:
+    """Safely convert a value to float, returning None on failure."""
     try:
         if x is None:
             return None
@@ -52,8 +54,8 @@ def safe_float(x: Any) -> float | None:
 
 
 def parse_date_any(x: Any) -> str | None:
-    """
-    Best-effort date parsing. Returns ISO 8601 string if possible.
+    """Parse a date string and return ISO 8601 format if possible.
+
     This is intentionally conservative. Team can expand with dateutil later.
     """
     s = strip_or_none(x)
@@ -88,9 +90,10 @@ def canonicalize_url(
         "mc_eid",
     ),
 ) -> str:
-    """
+    """Canonicalize a URL for deduplication.
+
     Same concept as in link_extractors, duplicated here for convenience.
-    It’s okay to later unify these into one canonical function.
+    It's okay to later unify these into one canonical function.
     """
     url = (url or "").strip()
     if not url:
@@ -126,8 +129,8 @@ def canonicalize_url(
 def normalize_item_fields(
     item: dict[str, Any], *, url_fields: Sequence[str] = ("url",)
 ) -> dict[str, Any]:
-    """
-    Apply common cleaning rules to an item dict:
+    """Apply common cleaning rules to an item dict.
+
     - normalize whitespace in strings
     - canonicalize urls
     """

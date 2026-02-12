@@ -1,5 +1,5 @@
 """
-scrapping.config.migration
+scrapping.config.migration.
 
 Minimal config migration system.
 """
@@ -12,8 +12,8 @@ CURRENT_CONFIG_VERSION = 1
 
 
 def migrate_config(cfg: dict[str, Any]) -> tuple[dict[str, Any], bool]:
-    """
-    Migrate config to current version.
+    """Migrate config to current version.
+
     Returns (migrated_cfg, was_migrated).
     """
     if not isinstance(cfg, dict):

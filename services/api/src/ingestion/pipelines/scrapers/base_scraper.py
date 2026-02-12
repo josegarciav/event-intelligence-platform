@@ -467,9 +467,11 @@ class EventScraper:
         return results
 
     def __enter__(self) -> "EventScraper":
+        """Enter context manager and return scraper instance."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Exit context manager and close browser."""
         self.close()
 
 
@@ -540,7 +542,7 @@ class BaseScraperPipeline(BasePipeline):
 
     def _default_html_parser(self, html: str, url: str) -> Dict[str, Any]:
         """
-        Default HTML parser - delegates to parse_event_html.
+        Delegate to parse_event_html for HTML parsing.
 
         Override parse_event_html in subclasses for custom parsing.
         """

@@ -547,7 +547,7 @@ CREATE TABLE IF NOT EXISTS event_tags (
 CREATE TABLE IF NOT EXISTS artists (
     artist_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 
-    name TEXT NOT NULL,
+    name TEXT NOT NULL UNIQUE,
     soundcloud_url TEXT,
     spotify_url TEXT,
     instagram_url TEXT,

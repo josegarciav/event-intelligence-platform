@@ -1,7 +1,4 @@
-"""
-scrapping.actions.human_like
-
-Human-like interaction helpers.
+"""Human-like interaction helpers.
 
 These helpers are intentionally dependency-light and should work with:
 - Playwright Page/Mouse/Keyboard
@@ -20,9 +17,7 @@ from typing import Any
 
 @dataclass
 class HumanLikeOptions:
-    """
-    Controls how "human" the interactions feel.
-    """
+    """Controls how "human" the interactions feel."""
 
     seed: int | None = None
 
@@ -47,7 +42,10 @@ class HumanLikeOptions:
 
 
 class HumanLike:
+    """Provide human-like timing and interaction patterns."""
+
     def __init__(self, opts: HumanLikeOptions | None = None) -> None:
+        """Initialize the instance."""
         self.opts = opts or HumanLikeOptions()
         self._rnd = random.Random(self.opts.seed)
 
@@ -56,24 +54,26 @@ class HumanLike:
     # -------------------------
 
     def sleep_range(self, lo_hi: tuple[float, float]) -> None:
+        """Sleep for a random duration within the given range."""
         lo, hi = lo_hi
         if hi <= 0:
             return
         time.sleep(self._rnd.uniform(max(0.0, lo), max(0.0, hi)))
 
     def micro_pause(self) -> None:
+        """Pause for a very short random duration."""
         self.sleep_range(self.opts.micro_delay_s)
 
     def short_pause(self) -> None:
+        """Pause for a short random duration."""
         self.sleep_range(self.opts.short_delay_s)
 
     def medium_pause(self) -> None:
+        """Pause for a medium random duration."""
         self.sleep_range(self.opts.medium_delay_s)
 
     def jitter(self, base_s: float, jitter_frac: float = 0.25) -> float:
-        """
-        Return base_s with +- jitter_frac randomness.
-        """
+        """Return base_s with +- jitter_frac randomness."""
         if base_s <= 0:
             return 0.0
         j = (self._rnd.random() * 2 - 1) * jitter_frac
@@ -84,13 +84,15 @@ class HumanLike:
     # -------------------------
 
     def random_scroll_delta(self) -> int:
+        """Generate a random scroll delta within configured range."""
         return self._rnd.randint(self.opts.scroll_min_px, self.opts.scroll_max_px)
 
     def scroll_wheel(
         self, page: Any, *, repeats: int = 5, direction: str = "down"
     ) -> None:
-        """
-        Playwright: page.mouse.wheel(0, delta)
+        """Scroll using mouse wheel events.
+
+        Uses Playwright page.mouse.wheel(0, delta).
         For other drivers, wrap/adapter later.
         """
         repeats = max(1, int(repeats))

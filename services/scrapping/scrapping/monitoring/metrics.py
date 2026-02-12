@@ -1,10 +1,4 @@
-"""
-scrapping.monitoring.metrics
-
-A tiny metrics system:
-- counters
-- gauges
-- timers (context manager)
+"""Lightweight metrics system with counters, gauges, and timers.
 
 Export to dict for run reporting.
 Later can be adapted to Prometheus.
@@ -28,6 +22,8 @@ def _key(name: str, labels: dict[str, str] | None) -> str:
 
 @dataclass
 class MetricsRegistry:
+    """Registry for counters, gauges, and timers."""
+
     counters: dict[str, float] = field(default_factory=dict)
     gauges: dict[str, float] = field(default_factory=dict)
     timers: dict[str, dict[str, float]] = field(
@@ -37,18 +33,21 @@ class MetricsRegistry:
     def inc(
         self, name: str, value: float = 1.0, *, labels: dict[str, str] | None = None
     ) -> None:
+        """Increment a counter by the given value."""
         k = _key(name, labels)
         self.counters[k] = float(self.counters.get(k, 0.0)) + float(value)
 
     def set_gauge(
         self, name: str, value: float, *, labels: dict[str, str] | None = None
     ) -> None:
+        """Set a gauge to the given value."""
         k = _key(name, labels)
         self.gauges[k] = float(value)
 
     def observe(
         self, name: str, value: float, *, labels: dict[str, str] | None = None
     ) -> None:
+        """Record a timer observation."""
         k = _key(name, labels)
         d = self.timers.get(k)
         if d is None:
@@ -63,6 +62,7 @@ class MetricsRegistry:
     def time(
         self, name: str, *, labels: dict[str, str] | None = None
     ) -> Iterator[None]:
+        """Time a block and record the elapsed duration as an observation."""
         t0 = time.time()
         try:
             yield
@@ -70,6 +70,7 @@ class MetricsRegistry:
             self.observe(name, time.time() - t0, labels=labels)
 
     def as_dict(self) -> dict[str, Any]:
+        """Export all metrics as a JSON-friendly dictionary."""
         # shallow, json-friendly
         return {
             "counters": dict(self.counters),

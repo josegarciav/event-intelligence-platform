@@ -1,5 +1,4 @@
-"""
-scrapping.runtime.resilience
+"""scrapping.runtime.resilience.
 
 Shared resilience utilities: retries, rate limiting.
 """
@@ -14,6 +13,8 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class RetryPolicy:
+    """Policy for retry behavior with configurable backoff."""
+
     max_retries: int = 3
     backoff_mode: str = "exp"  # exp | fixed | none
     base_delay_s: float = 0.5
@@ -22,9 +23,7 @@ class RetryPolicy:
     retry_on_status: tuple[int, ...] = (408, 429, 500, 502, 503, 504)
 
     def compute_backoff_s(self, attempt: int) -> float:
-        """
-        attempt: 1..N
-        """
+        """Compute backoff delay in seconds for the given attempt (1..N)."""
         if self.backoff_mode == "none":
             return 0.0
         if self.backoff_mode == "fixed":
@@ -40,9 +39,7 @@ class RetryPolicy:
 
 
 class RateLimiter:
-    """
-    Simple process-local leaky bucket.
-    """
+    """Simple process-local leaky bucket."""
 
     def __init__(
         self,
@@ -52,6 +49,7 @@ class RateLimiter:
         jitter_s: float | None = None,
         burst: int | None = None,
     ) -> None:
+        """Initialize the instance."""
         self.rps = rps
         self.min_delay_s = min_delay_s or 0.0
         self.jitter_s = jitter_s or 0.0
@@ -69,6 +67,7 @@ class RateLimiter:
         self._last_refill_s = now
 
     def wait(self) -> None:
+        """Wait to enforce rate limiting before the next call."""
         # Enforce min delay + jitter between calls
         now = time.time()
         since_last = now - self._last_call_s
@@ -90,6 +89,7 @@ class RateLimiter:
         self._last_call_s = time.time()
 
     async def await_wait(self) -> None:
+        """Wait asynchronously to enforce rate limiting before the next call."""
         # Enforce min delay + jitter between calls
         now = time.time()
         since_last = now - self._last_call_s

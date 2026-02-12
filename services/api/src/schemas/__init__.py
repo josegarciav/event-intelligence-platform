@@ -1,1 +1,1 @@
-# Initialization for the schemas package
+"""Schema definitions for the event intelligence platform."""

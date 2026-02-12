@@ -1,7 +1,6 @@
-"""
-scrapping.extraction.parsers
+"""Resilient HTML parsing helpers.
 
-Resilient HTML parsing helpers:
+Includes:
 - BeautifulSoup-based helpers (always nice to have)
 - lxml-based helpers when installed (faster XPath)
 - trafilatura extraction when installed (HTML -> structured text/metadata)
@@ -18,6 +17,8 @@ from typing import Any
 
 @dataclass
 class TextExtractResult:
+    """Hold structured text extraction results."""
+
     ok: bool
     text: str
     title: str | None = None
@@ -29,6 +30,7 @@ class TextExtractResult:
 
 
 def bs4_soup(html: str):
+    """Parse HTML with BeautifulSoup, returning None if unavailable."""
     try:
         from bs4 import BeautifulSoup  # type: ignore
     except Exception:
@@ -37,6 +39,7 @@ def bs4_soup(html: str):
 
 
 def get_text_bs4(html: str) -> str:
+    """Extract visible text from HTML using BeautifulSoup."""
     soup = bs4_soup(html)
     if soup is None:
         return ""
@@ -51,6 +54,7 @@ def get_text_bs4(html: str) -> str:
 
 
 def select_text_bs4(html: str, selector: str) -> str:
+    """Extract text from elements matching a CSS selector."""
     soup = bs4_soup(html)
     if soup is None:
         return ""
@@ -60,6 +64,7 @@ def select_text_bs4(html: str, selector: str) -> str:
 
 
 def select_attr_bs4(html: str, selector: str, attr: str) -> list[str]:
+    """Extract attribute values from elements matching a CSS selector."""
     soup = bs4_soup(html)
     if soup is None:
         return []
@@ -73,9 +78,7 @@ def select_attr_bs4(html: str, selector: str, attr: str) -> list[str]:
 
 
 def xpath_values(html: str, xpath: str) -> list[str]:
-    """
-    Returns string values from XPath. Requires lxml.
-    """
+    """Return string values from XPath evaluation using lxml."""
     try:
         from lxml import html as lxml_html  # type: ignore
     except Exception:

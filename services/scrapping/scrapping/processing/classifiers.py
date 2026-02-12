@@ -1,5 +1,4 @@
-"""
-scrapping.processing.classifiers
+"""scrapping.processing.classifiers.
 
 Lightweight classification hooks for QA and enrichment.
 
@@ -24,15 +23,21 @@ from scrapping.extraction.transforms import normalize_ws
 
 @dataclass
 class Classification:
+    """Single classification result with label, score, and metadata."""
+
     label: str
     score: float  # 0..1
     meta: dict[str, Any] = None
 
 
 class BaseClassifier(Protocol):
+    """Protocol for content classifiers."""
+
     name: str
 
-    def predict(self, item: dict[str, Any]) -> Classification: ...
+    def predict(self, item: dict[str, Any]) -> Classification:
+        """Predict a classification for the given item."""
+        ...
 
 
 # ---------------------------------------------------------------------
@@ -62,6 +67,7 @@ class KeywordClassifier:
     weight_neg: float = 1.0
 
     def predict(self, item: dict[str, Any]) -> Classification:
+        """Predict a classification for the given item."""
         title = normalize_ws(str(item.get("title", "") or "")).lower()
         text = normalize_ws(str(item.get("text", "") or "")).lower()
         blob = (title + "\n" + text).strip()
@@ -99,8 +105,8 @@ class KeywordClassifier:
 
 @dataclass
 class SklearnTextClassifier:
-    """
-    Wrapper around a joblib-loaded sklearn pipeline.
+    """Wrapper around a joblib-loaded sklearn pipeline.
+
     Expected model interface:
       - predict_proba([text]) -> [[p0, p1]]
       - classes_ -> labels
@@ -125,6 +131,7 @@ class SklearnTextClassifier:
         self._model = joblib.load(self.model_path)
 
     def predict(self, item: dict[str, Any]) -> Classification:
+        """Predict a classification for the given item."""
         self._load()
         title = normalize_ws(str(item.get(self.title_field, "") or ""))
         text = normalize_ws(str(item.get(self.text_field, "") or ""))
@@ -158,9 +165,7 @@ class SklearnTextClassifier:
 
 
 def apply_classifiers(item: dict[str, Any], classifiers: list[Any]) -> dict[str, Any]:
-    """
-    Run a list of classifiers and attach outputs under _classifications.
-    """
+    """Run a list of classifiers and attach outputs under _classifications."""
     out = dict(item)
     res: dict[str, Any] = {}
 

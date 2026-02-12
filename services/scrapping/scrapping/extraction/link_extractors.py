@@ -1,12 +1,11 @@
-"""
-scrapping.extraction.link_extractors
+"""Extract links from HTML using different strategies.
 
-Extract links from HTML using different strategies:
+Strategies supported:
 - regex
 - css selector
 - xpath
 
-Also provides URL normalization helpers for stable dedupe.
+Also provide URL normalization helpers for stable dedupe.
 """
 
 from __future__ import annotations
@@ -19,6 +18,8 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
 @dataclass(frozen=True)
 class LinkExtractRequest:
+    """Configure a link extraction request."""
+
     html: str
     base_url: str | None = None
 
@@ -46,9 +47,7 @@ class LinkExtractRequest:
 
 
 def extract_links(req: LinkExtractRequest) -> list[str]:
-    """
-    Main entrypoint. Returns a list of unique links in stable order.
-    """
+    """Return a list of unique links in stable order."""
     if not req.html:
         return []
 
@@ -221,8 +220,8 @@ def canonicalize_url(
     drop_tracking_params: bool = True,
     tracking_params: Sequence[str] = (),
 ) -> str:
-    """
-    Normalize URLs for dedupe:
+    """Normalize a URL for deduplication.
+
     - lowercase scheme+host
     - remove default ports
     - remove fragments (optional)
@@ -265,9 +264,7 @@ def canonicalize_url(
 
 
 def normalize_url(url: str, **kwargs) -> str:
-    """
-    Alias for canonicalize_url with notebook-friendly parameter mapping.
-    """
+    """Alias for canonicalize_url with notebook-friendly parameter mapping."""
     if "drop_fragments" in kwargs:
         kwargs["allow_fragments"] = not kwargs.pop("drop_fragments")
     return canonicalize_url(url, **kwargs)

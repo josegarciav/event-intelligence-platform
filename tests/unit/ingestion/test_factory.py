@@ -421,7 +421,7 @@ class TestRealConfigPipelineCreation:
 
     def test_factory_reads_real_config(self):
         """Factory should successfully load the real ingestion.yaml."""
-        from src.ingestion.factory import PipelineFactory, DEFAULT_CONFIG_PATH
+        from src.ingestion.factory import PipelineFactory
 
         factory = PipelineFactory()
         config = factory.config
@@ -492,9 +492,7 @@ class TestRealConfigPipelineCreation:
         rules = pipeline.source_config.event_type_rules
         assert len(rules) > 0
         # Check that festival rule is present
-        festival_rules = [
-            r for r in rules if r.get("type") == "festival"
-        ]
+        festival_rules = [r for r in rules if r.get("type") == "festival"]
         assert len(festival_rules) == 1
 
     def test_factory_disabled_source_raises(self):
@@ -523,9 +521,6 @@ class TestRESTAPIPipelineConfig:
     def test_ticketmaster_config_parses_correctly(self):
         """Should parse Ticketmaster config correctly."""
         from src.ingestion.factory import PipelineFactory
-        from src.ingestion.pipelines.apis.base_api import (
-            create_api_pipeline_from_config,
-        )
 
         factory = PipelineFactory()
         config = factory.get_source_config("ticketmaster")

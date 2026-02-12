@@ -1,3 +1,5 @@
+"""Module implementation."""
+
 from __future__ import annotations
 
 import json
@@ -7,7 +9,10 @@ from typing import Any
 
 
 class TrackingStore:
+    """Class definition."""
+
     def __init__(self, tracking_path: str):
+        """Initialize the instance."""
         self.path = Path(tracking_path)
         self.data = self._load()
 
@@ -18,11 +23,13 @@ class TrackingStore:
         return {"items": {}}
 
     def save(self):
+        """Perform the operation."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("w", encoding="utf-8") as f:
             json.dump(self.data, f, indent=2)
 
     def update_item(self, key: str, status: str, **kwargs):
+        """Perform the operation."""
         item = self.data["items"].get(key, {})
         item.update({"status": status, "updated_at": time.time(), **kwargs})
         if "started_at" not in item and status == "running":
@@ -34,4 +41,5 @@ class TrackingStore:
         self.save()
 
     def get_item(self, key: str) -> dict[str, Any] | None:
+        """Perform the operation."""
         return self.data["items"].get(key)

@@ -25,17 +25,17 @@ def _normalize_primary_key(label: str) -> str:
 
 @lru_cache
 def load_taxonomy() -> dict:
-    """
-    Load and cache the Human Experience Taxonomy.
-    """
+    """Load and cache the Human Experience Taxonomy."""
     with open(TAXONOMY_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
 def build_taxonomy_index() -> Dict[str, Set[str]]:
     """
-    Builds a mapping:
-    primary_category -> set(subcategory_ids)
+    Build a mapping of primary_category to set of subcategory_ids.
+
+    Returns:
+        Dict mapping primary category key to set of subcategory IDs.
     """
     taxonomy = load_taxonomy()
     index: Dict[str, Set[str]] = {}
@@ -172,7 +172,7 @@ def validate_subcategory_for_primary(subcategory_id: str, primary_id: str) -> bo
 @lru_cache
 def get_all_subcategory_options() -> List[Dict[str, Any]]:
     """
-    Returns a flat list of all subcategory options from the taxonomy.
+    Return a flat list of all subcategory options from the taxonomy.
 
     Each option is a dict with:
       - "id": subcategory id (e.g. "1.4")
@@ -195,9 +195,7 @@ def get_all_subcategory_options() -> List[Dict[str, Any]]:
 
 
 def get_all_subcategory_ids() -> Set[str]:
-    """
-    Returns the set of all valid subcategory ids (all available options).
-    """
+    """Return the set of all valid subcategory ids."""
     return {opt["id"] for opt in get_all_subcategory_options()}
 
 

@@ -650,9 +650,7 @@ Also suggest relevant emotional outputs (e.g., "joy", "excitement", "connection"
     # =========================================================================
 
     def _enrich_with_rules(self, event_context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Rule-based fallback for attribute selection when LLM is unavailable.
-        """
+        """Apply rule-based fallback for attribute selection when LLM is unavailable."""
         title = (event_context.get("title") or "").lower()
         description = (event_context.get("description") or "").lower()
         text = f"{title} {description}"
@@ -1025,7 +1023,7 @@ def create_feature_extractor_from_config(
     config: Dict[str, Any],
 ) -> FeatureExtractor:
     """
-    Factory function to create FeatureExtractor from config.
+    Create a FeatureExtractor from config.
 
     Args:
         config: Dict with feature extraction settings

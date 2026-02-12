@@ -1,8 +1,6 @@
-"""
-scrapping.engines.browser
+"""Playwright-based browser engine for rendering JS-heavy pages.
 
-Playwright-based browser engine for rendering JS-heavy pages.
-Supports a simple action DSL (scroll/click/wait_for/close_popup/type/hover).
+Support a simple action DSL (scroll/click/wait_for/close_popup/type/hover).
 
 Notes:
 - This module uses optional dependency: playwright
@@ -32,6 +30,8 @@ from .base import BaseEngine, EngineContext, Headers
 
 @dataclass
 class BrowserEngineOptions:
+    """Configuration options for the browser engine."""
+
     browser_name: str = "chromium"  # chromium | firefox | webkit
     headless: bool = True
     nav_timeout_s: float = 30.0
@@ -68,13 +68,14 @@ class BrowserEngineOptions:
 
 
 class BrowserEngine(BaseEngine):
-    """
-    Sync façade for BrowserEngine.
+    """Sync facade for BrowserEngine.
+
     If an asyncio loop is already running (e.g. Jupyter), it can use AsyncBrowserEngine
     via aget_rendered() or by running sync calls in a thread (Option B).
     """
 
     def __init__(self, *, options: BrowserEngineOptions | None = None) -> None:
+        """Initialize the instance."""
         super().__init__(name="browser")
         self.options = options or BrowserEngineOptions()
         self._limiter = RateLimiter(
@@ -168,6 +169,7 @@ class BrowserEngine(BaseEngine):
             raise
 
     def close(self) -> None:
+        """Close the browser, context, and Playwright instance."""
         try:
             asyncio.get_running_loop()
             import concurrent.futures
@@ -212,6 +214,7 @@ class BrowserEngine(BaseEngine):
             pass
 
     async def close_async(self) -> None:
+        """Close the async engine and then the sync resources."""
         if self._async_engine:
             await self._async_engine.close()
             self._async_engine = None
@@ -222,6 +225,7 @@ class BrowserEngine(BaseEngine):
     # -------------------------
 
     def get(self, url: str, *, ctx: EngineContext | None = None) -> FetchResult:
+        """Fetch a URL by rendering it in the browser."""
         # For browser engine, plain get just renders without actions.
         return self.get_rendered(url, ctx=ctx, actions=None, wait_for=None)
 
@@ -233,6 +237,7 @@ class BrowserEngine(BaseEngine):
         actions: Sequence[dict[str, Any]] | None = None,
         wait_for: str | None = None,
     ) -> FetchResult:
+        """Render a URL with optional actions and wait-for selector."""
         # Check if we are in a notebook loop
         try:
             asyncio.get_running_loop()
@@ -265,6 +270,7 @@ class BrowserEngine(BaseEngine):
         actions: Sequence[dict[str, Any]] | None = None,
         wait_for: str | None = None,
     ) -> FetchResult:
+        """Render a URL asynchronously using the async browser engine."""
         if not self._async_engine:
             self._async_engine = AsyncBrowserEngine(options=self.options)
         return await self._async_engine.get_rendered(
@@ -316,6 +322,7 @@ class BrowserEngine(BaseEngine):
                             if route.request.resource_type in types:
                                 return route.abort()
                             return route.continue_()
+
                         return _route_filter
 
                     page.route("**/*", _make_route_filter())
@@ -488,11 +495,10 @@ class BrowserEngine(BaseEngine):
 
 
 class AsyncBrowserEngine(BaseEngine):
-    """
-    Playwright-based browser engine using Async API.
-    """
+    """Playwright-based browser engine using Async API."""
 
     def __init__(self, *, options: BrowserEngineOptions | None = None) -> None:
+        """Initialize the instance."""
         super().__init__(name="browser_async")
         self.options = options or BrowserEngineOptions()
         self._limiter = RateLimiter(
@@ -564,6 +570,7 @@ class AsyncBrowserEngine(BaseEngine):
             raise
 
     async def close(self) -> None:
+        """Close the browser, context, and Playwright instance."""
         try:
             if self._context is not None:
                 if self.options.trace:
@@ -592,9 +599,8 @@ class AsyncBrowserEngine(BaseEngine):
         finally:
             self._pw = None
 
-    async def get(
-        self, url: str, *, ctx: EngineContext | None = None
-    ) -> FetchResult:
+    async def get(self, url: str, *, ctx: EngineContext | None = None) -> FetchResult:
+        """Fetch a URL by rendering it in the browser."""
         return await self.get_rendered(url, ctx=ctx, actions=None, wait_for=None)
 
     async def get_rendered(
@@ -605,6 +611,7 @@ class AsyncBrowserEngine(BaseEngine):
         actions: Sequence[dict[str, Any]] | None = None,
         wait_for: str | None = None,
     ) -> FetchResult:
+        """Render a URL asynchronously with optional actions and wait-for selector."""
         ctx = ctx or EngineContext()
         nav_timeout_s = float(ctx.timeout_s or self.options.nav_timeout_s)
         render_timeout_s = float(self.options.render_timeout_s)
@@ -642,6 +649,7 @@ class AsyncBrowserEngine(BaseEngine):
                             if route.request.resource_type in types:
                                 return await route.abort()
                             return await route.continue_()
+
                         return _route_filter
 
                     await page.route("**/*", _make_route_filter())

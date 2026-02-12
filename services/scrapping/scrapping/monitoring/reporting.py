@@ -1,7 +1,4 @@
-"""
-scrapping.monitoring.reporting
-
-Builds run + per-source reports.
+"""Build run and per-source reports.
 
 A report is a JSON-friendly dict that contains:
 - run metadata (timestamps, run_id)
@@ -20,6 +17,8 @@ from scrapping.monitoring.metrics import MetricsRegistry
 
 @dataclass
 class SourceReport:
+    """Hold the report for a single source run."""
+
     source_id: str
     ok: bool
     meta: dict[str, Any] = field(default_factory=dict)
@@ -32,6 +31,8 @@ class SourceReport:
 
 @dataclass
 class RunReportBuilder:
+    """Build a run report incrementally."""
+
     run_id: str
     started_at_s: float = field(default_factory=lambda: time.time())
     finished_at_s: float | None = None
@@ -42,13 +43,16 @@ class RunReportBuilder:
     meta: dict[str, Any] = field(default_factory=dict)
 
     def add_source(self, sr: SourceReport) -> None:
+        """Add a source report to the run."""
         self.sources.append(sr)
 
     def finish(self) -> None:
+        """Mark the run as finished."""
         if self.finished_at_s is None:
             self.finished_at_s = time.time()
 
     def as_dict(self) -> dict[str, Any]:
+        """Export the run report as a JSON-friendly dictionary."""
         self.finish()
 
         total = len(self.sources)
@@ -91,4 +95,5 @@ class RunReportBuilder:
 
 
 def exception_to_error_dict(e: Exception) -> dict[str, Any]:
+    """Convert an exception to a serializable error dictionary."""
     return {"type": type(e).__name__, "message": str(e)}

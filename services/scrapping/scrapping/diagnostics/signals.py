@@ -1,5 +1,5 @@
 """
-scrapping.diagnostics.signals
+scrapping.diagnostics.signals.
 
 Standardized diagnosis labels for scraper results.
 """
@@ -8,6 +8,8 @@ from enum import Enum
 
 
 class DiagnosisLabel(str, Enum):
+    """Class definition."""
+
     OK = "ok"
     JS_REQUIRED_OR_MISSING_CONTENT = "js_required_or_missing_content"
     RATE_LIMITED = "rate_limited"
@@ -18,6 +20,8 @@ class DiagnosisLabel(str, Enum):
 
 
 class NextStep(str, Enum):
+    """Class definition."""
+
     TRY_HTTP_TUNING = "try_http_tuning"
     SWITCH_TO_BROWSER = "switch_to_browser"
     STOP_FOR_HUMAN = "stop_for_human"

@@ -1,5 +1,5 @@
 """
-scrapping.scheduling.schedule
+scrapping.scheduling.schedule.
 
 Scheduling semantics for scraping sources.
 Supports interval-based and cron-based schedules.
@@ -14,16 +14,19 @@ from typing import Any
 
 @dataclass(frozen=True)
 class Schedule:
+    """Class definition."""
+
     type: str  # "interval" | "cron"
     value: str | int
 
     def summary(self) -> str:
+        """Perform the operation."""
         return f"{self.type}: {self.value}"
 
 
 def parse_schedule(spec: dict[str, Any]) -> Schedule | None:
-    """
-    Parse schedule from config dict.
+    """Parse schedule from config dict.
+
     Expected formats:
       {"frequency": "1h"}
       {"frequency": "3600"} (seconds)
@@ -60,9 +63,7 @@ def parse_schedule(spec: dict[str, Any]) -> Schedule | None:
 def next_run_times(
     schedule: Schedule, start_ts: float, n: int = 5
 ) -> list[datetime.datetime]:
-    """
-    Calculate next N run times starting from start_ts.
-    """
+    """Calculate next N run times starting from start_ts."""
     out = []
     base_dt = datetime.datetime.fromtimestamp(start_ts, tz=datetime.timezone.utc)
 

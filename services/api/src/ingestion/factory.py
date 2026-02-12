@@ -200,7 +200,7 @@ def create_pipeline(
     source_name: str, config_path: Optional[str] = None
 ) -> BasePipeline:
     """
-    Convenience function to create a pipeline by source name.
+    Create a pipeline by source name.
 
     Args:
         source_name: Name of the source (e.g., "ra_co")
@@ -220,7 +220,7 @@ def create_pipeline(
 
 def create_all_pipelines(config_path: Optional[str] = None) -> Dict[str, BasePipeline]:
     """
-    Convenience function to create all enabled pipelines.
+    Create all enabled pipelines.
 
     Args:
         config_path: Optional path to ingestion.yaml

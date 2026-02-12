@@ -19,9 +19,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class APIAdapterConfig(AdapterConfig):
-    """
-    Configuration for API-based adapters.
-    """
+    """Configuration for API-based adapters."""
 
     base_url: str = ""
     api_key: Optional[str] = None
@@ -32,6 +30,7 @@ class APIAdapterConfig(AdapterConfig):
     graphql_query: Optional[str] = None
 
     def __post_init__(self):
+        """Set source type to API."""
         self.source_type = SourceType.API
 
 
@@ -207,11 +206,11 @@ class APIAdapter(BaseSourceAdapter):
         return response.get("totalResults", len(data))
 
     def _default_query_builder(self, **kwargs) -> Dict:
-        """Default query builder - override or provide custom."""
+        """Build a default query from keyword arguments."""
         return kwargs
 
     def _default_response_parser(self, response: Dict) -> List[Dict]:
-        """Default response parser - override or provide custom."""
+        """Parse a default response structure into a list of dicts."""
         if "data" in response:
             return (
                 response["data"]

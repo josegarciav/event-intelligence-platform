@@ -1,5 +1,5 @@
 """
-scrapping.ai.config_agent
+scrapping.ai.config_agent.
 
 Roadmap module: AI-assisted config generation.
 
@@ -36,9 +36,7 @@ from scrapping.extraction.transforms import canonicalize_url
 
 @dataclass
 class ConfigProposal:
-    """
-    The output of the agent: a source config dict + rationale and confidence.
-    """
+    """The output of the agent: a source config dict + rationale and confidence."""
 
     source_config: dict[str, Any]
     rationale: list[str]
@@ -46,6 +44,7 @@ class ConfigProposal:
     warnings: list[str]
 
     def as_dict(self) -> dict[str, Any]:
+        """Perform the operation."""
         return {
             "source_config": self.source_config,
             "rationale": self.rationale,
@@ -56,9 +55,9 @@ class ConfigProposal:
 
 @dataclass
 class UrlHint:
-    """
-    Optional hints you can pass from a manual/automated probe step.
-    (Later, tests_agent can generate this by fetching a sample page.)
+    """Optional hints from a manual or automated probe step.
+
+    Later, tests_agent can generate this by fetching a sample page.
     """
 
     url: str
@@ -85,6 +84,7 @@ class ConfigAgent:
     """
 
     def __init__(self) -> None:
+        """Initialize the instance."""
         pass
 
     def propose_for_urls(
@@ -142,9 +142,7 @@ class ConfigAgent:
         output_items_format: str = "jsonl",
         hints: Sequence[UrlHint] | None = None,
     ) -> ConfigProposal:
-        """
-        Create a single source config proposal given one/many URLs belonging to a site.
-        """
+        """Create a single source config proposal given one/many URLs belonging to a site."""
         urls = [canonicalize_url(u) for u in urls if u and str(u).strip()]
         base = _guess_base(urls[0]) if urls else None
         dom = _domain(urls[0]) if urls else "unknown"
@@ -280,9 +278,7 @@ class ConfigAgent:
     def _decide_engine(
         self, urls: Sequence[str], *, hints: Sequence[UrlHint] | None = None
     ) -> tuple[str, float, list[str]]:
-        """
-        Pick engine based on URL patterns and hints.
-        """
+        """Pick engine based on URL patterns and hints."""
         rationale: list[str] = []
         # If hints say JS heavy => browser/hybrid
         if hints:
@@ -322,9 +318,7 @@ class ConfigAgent:
         base_url: str | None,
         hints: Sequence[UrlHint] | None = None,
     ) -> tuple[dict[str, Any], float, list[str]]:
-        """
-        Draft discovery.link_extract config.
-        """
+        """Draft discovery.link_extract config."""
         rationale: list[str] = []
 
         # If probe hints provided patterns, use them

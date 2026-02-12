@@ -1,3 +1,5 @@
+"""Recipe phase runner for orchestrating sequential pipeline phases."""
+
 from __future__ import annotations
 
 import logging
@@ -12,13 +14,19 @@ logger = logging.getLogger("scrapping.recipes.core.phases")
 
 
 class Phase(Protocol):
+    """Protocol for a single pipeline phase."""
+
     name: str
 
-    def run(self, ctx: Any) -> Any: ...
+    def run(self, ctx: Any) -> Any:
+        """Run this phase with the given context."""
+        ...
 
 
 @dataclass
 class PhaseResult:
+    """Result of a single phase execution."""
+
     name: str
     ok: bool
     elapsed_ms: float
@@ -27,12 +35,16 @@ class PhaseResult:
 
 
 class PhaseRunner:
+    """Run a sequence of phases with logging and error handling."""
+
     def __init__(self, ctx: Any, log: Any = None):
+        """Initialize the instance."""
         self.ctx = ctx
         self.log = log or logger
         self.results: list[PhaseResult] = []
 
     def run_phases(self, phases: Sequence[Phase], start_at: str | None = None):
+        """Run all phases in order, optionally starting at a named phase."""
         skip = start_at is not None
         for phase in phases:
             if skip:

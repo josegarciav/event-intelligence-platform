@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""
-cli.py
-
-Command-line interface for the Scrapping library.
+"""Command-line interface for the Scrapping library.
 
 Commands:
   - scrap run       : Run scraping pipeline(s) for configured sources
@@ -159,6 +156,7 @@ def _read_json(path: str) -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the CLI with the given arguments."""
     try:
         return _main_impl(argv)
     except FileNotFoundError as e:

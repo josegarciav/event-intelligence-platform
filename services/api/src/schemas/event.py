@@ -150,6 +150,7 @@ class PrimaryCategory(str, Enum):
 class Subcategory:
     """
     Subcategories from Human Experience Taxonomy.
+
     Reads dynamically from the taxonomy file. Use `Subcategory.all_options()` for
     the full list of {id, name, primary_category}; use `Subcategory.all_ids()` to
     validate that a subcategory id is one of the available options; use
@@ -222,9 +223,7 @@ class Subcategory:
 
 
 class EventFormat(str, Enum):
-    """
-    Format/medium of the event.
-    """
+    """Format/medium of the event."""
 
     IN_PERSON = "in_person"
     VIRTUAL = "virtual"
@@ -233,9 +232,7 @@ class EventFormat(str, Enum):
 
 
 class EventType(str, Enum):
-    """
-    High-level event type.
-    """
+    """High-level event type."""
 
     CONCERT = "concert"  # music related
     ART_SHOW = "art_show"
@@ -344,6 +341,7 @@ class TaxonomyDimension(BaseModel):
     @field_validator("subcategory")
     @classmethod
     def validate_subcategory_id(cls, v: Optional[str]) -> Optional[str]:
+        """Validate that subcategory ID exists in taxonomy."""
         if v is None or v == "":
             return None
         allowed = Subcategory.all_ids()
@@ -374,30 +372,28 @@ class TaxonomyDimension(BaseModel):
 
 
 class Coordinates(BaseModel):
-    """
-    Geographic coordinates.
-    """
+    """Geographic coordinates."""
 
     latitude: float
     longitude: float
 
     @field_validator("latitude")
     def validate_latitude(cls, v):
+        """Validate latitude is within range."""
         if not -90 <= v <= 90:
             raise ValueError("Latitude must be between -90 and 90")
         return v
 
     @field_validator("longitude")
     def validate_longitude(cls, v):
+        """Validate longitude is within range."""
         if not -180 <= v <= 180:
             raise ValueError("Longitude must be between -180 and 180")
         return v
 
 
 class LocationInfo(BaseModel):
-    """
-    Normalized location information.
-    """
+    """Normalized location information."""
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -432,9 +428,7 @@ class LocationInfo(BaseModel):
 
 
 class PriceInfo(BaseModel):
-    """
-    Pricing details for the event.
-    """
+    """Pricing details for the event."""
 
     currency: str = Field(default="USD", description="ISO 4217 currency code")
     is_free: bool = False
@@ -469,6 +463,7 @@ class PriceInfo(BaseModel):
 
     @model_validator(mode="after")
     def validate_price_range(self):
+        """Validate that maximum price is not less than minimum price."""
         if (
             self.minimum_price is not None
             and self.maximum_price is not None
@@ -492,9 +487,7 @@ class PriceInfo(BaseModel):
 
 
 class TicketInfo(BaseModel):
-    """
-    Ticket availability and link information.
-    """
+    """Ticket availability and link information."""
 
     url: Optional[str] = None
     is_sold_out: bool = False
@@ -508,9 +501,7 @@ class TicketInfo(BaseModel):
 
 
 class OrganizerInfo(BaseModel):
-    """
-    Information about the event organizer.
-    """
+    """Information about the event organizer."""
 
     name: str
     url: Optional[str] = None
@@ -522,9 +513,7 @@ class OrganizerInfo(BaseModel):
 
 
 class SourceInfo(BaseModel):
-    """
-    Metadata about where the event came from.
-    """
+    """Metadata about where the event came from."""
 
     source_name: str = Field(
         description="Name of the source (e.g., 'fever', 'meetup', 'ticketmaster')"
@@ -552,6 +541,7 @@ class SourceInfo(BaseModel):
 class MediaAsset(BaseModel):
     """
     Media asset associated with the event.
+
     TODO: Implement multimodal media handling in the future
     to capture features/insights from various media types.
     Like the image, video, flyer, of last year's event, etc.
@@ -570,6 +560,7 @@ class MediaAsset(BaseModel):
 class ArtistInfo(BaseModel):
     """
     Artist information associated with an event.
+
     Maps to the artists and event_artists SQL tables.
     """
 
@@ -581,9 +572,7 @@ class ArtistInfo(BaseModel):
 
 
 class EngagementMetrics(BaseModel):
-    """
-    Engagement metrics from the source.
-    """
+    """Engagement metrics from the source."""
 
     going_count: Optional[int] = None
     interested_count: Optional[int] = None
@@ -714,9 +703,7 @@ class EventSchema(BaseModel):
 
 
 class EventBatch(BaseModel):
-    """
-    Container for batch operations on multiple events.
-    """
+    """Container for batch operations on multiple events."""
 
     source_name: str
     batch_id: str = Field(description="Unique identifier for this batch")

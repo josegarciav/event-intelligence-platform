@@ -1,3 +1,5 @@
+"""Module implementation."""
+
 from __future__ import annotations
 
 import time
@@ -7,6 +9,8 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class ProductItem(BaseModel):
+    """Class definition."""
+
     source_id: str
     url: str
     title: str
@@ -23,6 +27,7 @@ class ProductItem(BaseModel):
     @field_validator("url")
     @classmethod
     def validate_url_not_empty(cls, v: str) -> str:
+        """Perform the operation."""
         if not v or not v.strip():
             raise ValueError("URL cannot be empty")
         return v
@@ -30,6 +35,7 @@ class ProductItem(BaseModel):
     @field_validator("title")
     @classmethod
     def validate_title_not_empty(cls, v: str) -> str:
+        """Perform the operation."""
         if not v or not v.strip():
             raise ValueError("Title cannot be empty")
         return v

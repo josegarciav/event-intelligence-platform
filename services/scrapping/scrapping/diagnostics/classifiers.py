@@ -1,5 +1,5 @@
 """
-scrapping.diagnostics.classifiers
+scrapping.diagnostics.classifiers.
 
 Heuristics for classifying HTTP responses and rendered DOMs.
 """
@@ -14,6 +14,8 @@ from .signals import DiagnosisLabel, NextStep
 
 @dataclass(frozen=True)
 class Diagnosis:
+    """Class definition."""
+
     label: DiagnosisLabel
     reason: str
     next_step: NextStep
@@ -23,9 +25,7 @@ class Diagnosis:
 def diagnose_http_response(
     status_code: int, headers: dict[str, str], text: str | None = None
 ) -> Diagnosis:
-    """
-    Classify a raw HTTP response.
-    """
+    """Classify a raw HTTP response."""
     text = (text or "").lower()
     headers_low = {k.lower(): v.lower() for k, v in headers.items()}
 
@@ -110,9 +110,7 @@ def diagnose_http_response(
 
 
 def diagnose_rendered_dom(text: str) -> Diagnosis:
-    """
-    Classify a DOM that has already been rendered by a browser.
-    """
+    """Classify a DOM that has already been rendered by a browser."""
     text_low = text.lower()
 
     # 1. Challenge detection (even in browser)
@@ -161,9 +159,7 @@ def diagnose_rendered_dom(text: str) -> Diagnosis:
 
 
 def recommend_next_step(diagnosis: Diagnosis) -> str:
-    """
-    Human-friendly recommendation string.
-    """
+    """Human-friendly recommendation string."""
     mapping = {
         NextStep.PROCEED: "Continue with extraction.",
         NextStep.TRY_HTTP_TUNING: "Try adjusting User-Agent, adding delays, or using proxies.",

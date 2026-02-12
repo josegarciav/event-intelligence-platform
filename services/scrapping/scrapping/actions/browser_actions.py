@@ -1,7 +1,4 @@
-"""
-scrapping.actions.browser_actions
-
-Declarative action runner for browser pages.
+"""Declarative action runner for browser pages.
 
 The goal:
 - Make browser behavior configurable via JSON:
@@ -30,6 +27,8 @@ from .human_like import HumanLike, HumanLikeOptions
 
 @dataclass
 class ActionResult:
+    """Hold the result of a single browser action."""
+
     type: str
     ok: bool = True
     elapsed_ms: float = 0.0
@@ -39,9 +38,7 @@ class ActionResult:
 
 @dataclass
 class ActionRunnerOptions:
-    """
-    Behavior for how strictly we treat failures.
-    """
+    """Behavior for how strictly we treat failures."""
 
     strict: bool = False  # if True, unknown actions or failures raise
     default_timeout_s: float = 20.0
@@ -51,16 +48,17 @@ class ActionRunnerOptions:
 
 
 class BrowserActionRunner:
+    """Execute browser actions from a declarative action list."""
+
     def __init__(self, *, options: ActionRunnerOptions | None = None) -> None:
+        """Initialize the instance."""
         self.options = options or ActionRunnerOptions()
         self.human = HumanLike(self.options.human)
 
     async def arun(
         self, page: Any, actions: Sequence[dict[str, Any]]
     ) -> list[ActionResult]:
-        """
-        Executes a list of action dicts on an Async Playwright `page`.
-        """
+        """Execute a list of action dicts on an Async Playwright `page`."""
         results = []
         for idx, act in enumerate(actions):
             atype = str(act.get("type", "")).strip()
@@ -153,11 +151,7 @@ class BrowserActionRunner:
         return results
 
     def run(self, page: Any, actions: Sequence[dict[str, Any]]) -> list[ActionResult]:
-        """
-        Executes a list of action dicts on a Playwright-like `page`.
-
-        Returns a list of ActionResult objects.
-        """
+        """Execute a list of action dicts on a Playwright-like page."""
         results = []
         for idx, act in enumerate(actions):
             atype = str(act.get("type", "")).strip()
@@ -262,8 +256,8 @@ class BrowserActionRunner:
         self.human.short_pause()
 
     def _close_popup(self, page: Any, selector: str | None) -> None:
-        """
-        Best-effort click; ignore if not found.
+        """Click a popup selector with best-effort; ignore if not found.
+
         Useful for cookie banners.
         """
         if not selector:
@@ -277,7 +271,8 @@ class BrowserActionRunner:
             return
 
     def _scroll(self, page: Any, params: dict[str, Any]) -> None:
-        """
+        """Scroll the page with configurable parameters.
+
         params:
           - repeat: int
           - direction: down|up
@@ -315,7 +310,8 @@ class BrowserActionRunner:
             )
 
     def _sleep(self, params: dict[str, Any]) -> None:
-        """
+        """Sleep for a specified duration.
+
         params:
           - seconds: float (exact)
           - range_s: [lo,hi] (random range)
@@ -347,7 +343,8 @@ class BrowserActionRunner:
             time.sleep(self.human.jitter(seconds, 0.25))
 
     def _mouse_drift(self, page: Any, params: dict[str, Any]) -> None:
-        """
+        """Drift the mouse cursor randomly.
+
         params:
           - bounds: [w,h] optional
         """

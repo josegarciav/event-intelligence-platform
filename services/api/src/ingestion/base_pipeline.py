@@ -116,7 +116,7 @@ class BasePipeline(ABC):
         self.execution_start_time: Optional[datetime] = None
 
     def _setup_logger(self) -> logging.Logger:
-        """Setup source-specific logger."""
+        """Set up source-specific logger."""
         logger = logging.getLogger(f"pipeline.{self.config.source_name}")
         logger.setLevel(logging.INFO)
         return logger

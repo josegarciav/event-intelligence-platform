@@ -1,7 +1,6 @@
 """
-src.schemas.user
-
 Pydantic schemas for platform users.
+
 Used for API validation, serialization, and DB interaction.
 """
 
@@ -40,9 +39,7 @@ class OrganizerRole(str, Enum):
 
 
 class UserBase(BaseModel):
-    """
-    Base user attributes shared across schemas.
-    """
+    """Base user attributes shared across schemas."""
 
     email: EmailStr = Field(
         ...,
@@ -76,9 +73,7 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    """
-    Schema used when creating a new user.
-    """
+    """Schema used when creating a new user."""
 
     password: str = Field(
         ...,
@@ -95,6 +90,7 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     """
     Schema for updating user attributes.
+
     All fields optional.
     """
 
@@ -111,9 +107,7 @@ class UserUpdate(BaseModel):
 
 
 class UserRead(UserBase):
-    """
-    Schema returned in API responses.
-    """
+    """Schema returned in API responses."""
 
     user_id: UUID
     is_active: bool
@@ -125,6 +119,8 @@ class UserRead(UserBase):
     updated_at: datetime
 
     class Config:
+        """Pydantic model configuration."""
+
         from_attributes = True
 
 
@@ -151,6 +147,8 @@ class EventAttendeeRead(BaseModel):
     updated_at: datetime
 
     class Config:
+        """Pydantic model configuration."""
+
         from_attributes = True
 
 
@@ -176,4 +174,6 @@ class OrganizerUserRead(BaseModel):
     created_at: datetime
 
     class Config:
+        """Pydantic model configuration."""
+
         from_attributes = True

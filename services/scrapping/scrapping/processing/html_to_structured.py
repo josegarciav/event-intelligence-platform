@@ -1,5 +1,5 @@
 """
-scrapping.processing.html_to_structured
+scrapping.processing.html_to_structured.
 
 Convert raw HTML to a structured document representation.
 
@@ -27,6 +27,8 @@ from scrapping.extraction.transforms import normalize_ws, strip_or_none
 
 @dataclass
 class StructuredDoc:
+    """Class definition."""
+
     ok: bool
     url: str | None
     title: str | None
@@ -42,6 +44,7 @@ class StructuredDoc:
     error: str | None = None
 
     def as_item(self) -> dict[str, Any]:
+        """Perform the operation."""
         return {
             "url": self.url,
             "title": self.title,

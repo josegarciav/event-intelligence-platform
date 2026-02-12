@@ -1,7 +1,4 @@
-"""
-scrapping.pipeline.stages
-
-Pipeline stage implementations (V1).
+"""Pipeline stage implementations (V1).
 
 Stages included:
 - discover listing URLs from entrypoints + paging
@@ -36,6 +33,8 @@ from scrapping.pipeline.validators import validate_item
 
 @dataclass
 class StageStats:
+    """Track statistics for pipeline stages."""
+
     pages_attempted: int = 0
     pages_succeeded: int = 0
     detail_attempted: int = 0
@@ -49,18 +48,24 @@ class StageStats:
 
 @dataclass
 class ListingPage:
+    """Represent a fetched listing page."""
+
     url: str
     fetch: FetchResult
 
 
 @dataclass
 class DetailPage:
+    """Represent a fetched detail page."""
+
     url: str
     fetch: FetchResult
 
 
 @dataclass
 class PipelineArtifacts:
+    """Hold all artifacts produced by a pipeline run."""
+
     listing_pages: list[ListingPage]
     detail_pages: list[DetailPage]
     extracted_links: list[str]
@@ -144,6 +149,7 @@ def fetch_pages(
     actions: Sequence[dict[str, Any]] | None = None,
     wait_for: str | None = None,
 ) -> list[FetchResult]:
+    """Fetch multiple pages in parallel using the given engine."""
     if not urls:
         return []
 
@@ -180,6 +186,7 @@ def run_pipeline_v1(
     parallelism: int = 16,
     dedupe_store: DedupeStore | None = None,
 ) -> PipelineArtifacts:
+    """Run the V1 scraping pipeline for a single source configuration."""
     stats = StageStats()
     diagnostics: dict[str, Any] = {}
 

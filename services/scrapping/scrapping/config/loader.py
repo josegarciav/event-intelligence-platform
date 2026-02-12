@@ -1,7 +1,5 @@
-"""
-scrapping.config.loader
+"""Load JSON config(s) from one file or multiple files via glob.
 
-Load JSON config(s) from one file or multiple files via glob.
 Supports:
 - file contains a single object  -> one SourceConfig
 - file contains an array of objects -> many SourceConfig
@@ -34,6 +32,8 @@ JsonDict = dict[str, Any]
 
 @dataclass(frozen=True)
 class LoadOptions:
+    """Control source filtering and strictness when loading configs."""
+
     only_source_id_contains: str | None = None
     max_sources: int | None = None
     strict: bool = False  # treat warnings as errors
@@ -41,6 +41,8 @@ class LoadOptions:
 
 @dataclass(frozen=True)
 class LoadResult:
+    """Hold the result of config loading with metadata."""
+
     sources: list[SourceConfig]
     meta: JsonDict
     warnings: list[str]

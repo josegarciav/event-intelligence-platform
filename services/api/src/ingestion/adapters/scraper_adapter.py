@@ -18,9 +18,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ScraperAdapterConfig(AdapterConfig):
-    """
-    Configuration for scraper-based adapters.
-    """
+    """Configuration for scraper-based adapters."""
 
     base_url: str = ""
     url_pattern: str = ""
@@ -33,6 +31,7 @@ class ScraperAdapterConfig(AdapterConfig):
     country_code: str = "es"
 
     def __post_init__(self):
+        """Set source type to SCRAPER."""
         self.source_type = SourceType.SCRAPER
 
 
@@ -214,6 +213,7 @@ class HtmlEnrichmentScraper:
     """
 
     def __init__(self, config: HtmlEnrichmentConfig):
+        """Initialize with HTML enrichment configuration."""
         self.config = config
         self._engine = None
         self._last_request_time: float = 0.0
@@ -260,7 +260,7 @@ class HtmlEnrichmentScraper:
         return self._engine
 
     def _rate_limit(self) -> None:
-        """Simple rate limiting between requests."""
+        """Enforce rate limiting between requests."""
         if self.config.rate_limit_per_second <= 0:
             return
         min_interval = 1.0 / self.config.rate_limit_per_second

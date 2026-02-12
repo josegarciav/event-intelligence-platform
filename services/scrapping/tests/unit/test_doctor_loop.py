@@ -1,4 +1,3 @@
-
 import pytest
 
 from scrapping.orchestrator import doctor_environment

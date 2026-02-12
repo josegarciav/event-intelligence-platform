@@ -1,7 +1,4 @@
-"""
-scrapping.pipeline.dedupe
-
-Deduplication helpers.
+"""Deduplication helpers.
 
 We dedupe by:
 - canonical URL (primary)
@@ -21,9 +18,7 @@ from scrapping.extraction.transforms import canonicalize_url, normalize_ws
 
 
 def fingerprint_text(text: str) -> str:
-    """
-    Stable content fingerprint for dedupe / replay.
-    """
+    """Compute a stable content fingerprint for dedupe and replay."""
     t = normalize_ws(text or "")
     h = hashlib.sha256(t.encode("utf-8", errors="ignore")).hexdigest()
     return h
@@ -32,6 +27,7 @@ def fingerprint_text(text: str) -> str:
 def fingerprint_item(
     item: dict[str, Any], *, fields: Sequence[str] = ("title", "text")
 ) -> str:
+    """Compute a fingerprint from selected item fields."""
     parts: list[str] = []
     for f in fields:
         v = item.get(f)
@@ -51,25 +47,34 @@ class DedupeStore:
     """
 
     def seen(self, key: str) -> bool:
+        """Check if the key has already been seen."""
         raise NotImplementedError
 
     def add(self, key: str) -> None:
+        """Add a key to the store."""
         raise NotImplementedError
 
 
 class InMemoryDedupeStore(DedupeStore):
+    """In-memory implementation of the dedupe store."""
+
     def __init__(self) -> None:
+        """Initialize with an empty set."""
         self._seen: set[str] = set()
 
     def seen(self, key: str) -> bool:
+        """Check if the key has already been seen."""
         return key in self._seen
 
     def add(self, key: str) -> None:
+        """Add a key to the store."""
         self._seen.add(key)
 
 
 @dataclass
 class DedupeResult:
+    """Hold the result of deduplication."""
+
     kept: list[dict[str, Any]]
     dropped: list[dict[str, Any]]
     stats: dict[str, int]
@@ -83,6 +88,7 @@ def dedupe_items(
     content_fields: Sequence[str] | None = ("title", "text"),
     drop_tracking_params: bool = True,
 ) -> DedupeResult:
+    """Deduplicate items by URL and optional content fingerprint."""
     store = store or InMemoryDedupeStore()
 
     kept: list[dict[str, Any]] = []

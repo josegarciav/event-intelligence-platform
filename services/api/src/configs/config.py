@@ -1,4 +1,5 @@
-# src/configs/config.py
+"""Configuration loader for the event intelligence platform."""
+
 from functools import lru_cache
 from pathlib import Path
 
@@ -6,9 +7,7 @@ import yaml
 
 
 class Config:
-    """
-    Configuration for the event intelligence platform.
-    """
+    """Configuration for the event intelligence platform."""
 
     # 1. Setup Base Paths
     # This points to src/configs/
@@ -25,9 +24,7 @@ class Config:
     @classmethod
     @lru_cache
     def load_ingestion_config(cls) -> dict:
-        """
-        Loads the YAML configuration for ingestion pipelines.
-        """
+        """Load the YAML configuration for ingestion pipelines."""
         if not cls.INGESTION_CONFIG_PATH.exists():
             raise FileNotFoundError(f"Missing config at {cls.INGESTION_CONFIG_PATH}")
 
@@ -36,7 +33,5 @@ class Config:
 
     @classmethod
     def get_taxonomy_path(cls) -> Path:
-        """
-        Returns the absolute path to the taxonomy JSON.
-        """
+        """Return the absolute path to the taxonomy JSON."""
         return cls.TAXONOMY_DATA_PATH

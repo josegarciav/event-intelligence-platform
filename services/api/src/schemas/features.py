@@ -173,9 +173,7 @@ class FullTaxonomyEnrichmentOutput(BaseModel):
 
 
 class EventTypeOutput(BaseModel):
-    """
-    Structured output for event type classification.
-    """
+    """Structured output for event type classification."""
 
     event_type: Literal[
         "concert",
@@ -200,9 +198,7 @@ class EventTypeOutput(BaseModel):
 
 
 class MusicGenresOutput(BaseModel):
-    """
-    Structured output for music genre extraction.
-    """
+    """Structured output for music genre extraction."""
 
     genres: List[str] = Field(
         default_factory=list,
@@ -214,9 +210,7 @@ class MusicGenresOutput(BaseModel):
 
 
 class TagsOutput(BaseModel):
-    """
-    Structured output for tag generation.
-    """
+    """Structured output for tag generation."""
 
     tags: List[str] = Field(
         default_factory=list,

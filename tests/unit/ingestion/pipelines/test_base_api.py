@@ -5,7 +5,7 @@ Tests for BaseAPIPipeline, APISourceConfig, and ConfigDrivenAPIAdapter.
 """
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -710,8 +710,8 @@ class TestFetchWithDateSplitting:
         # Second call: non-saturated after halving to ~3.5d
         pipeline.adapter.fetch.side_effect = [
             _make_fetch_result(50, total_available=100),  # saturated, retry
-            _make_fetch_result(40, total_available=40),    # ok, advance
-            _make_fetch_result(35, total_available=35),    # ok, advance
+            _make_fetch_result(40, total_available=40),  # ok, advance
+            _make_fetch_result(35, total_available=35),  # ok, advance
         ]
 
         events = pipeline._fetch_with_date_splitting(
@@ -732,10 +732,10 @@ class TestFetchWithDateSplitting:
 
         # 7d → saturated → 3.5d (84h) → saturated → 1.75d (42h) → ok
         pipeline.adapter.fetch.side_effect = [
-            _make_fetch_result(50, total_available=200),   # 168h window, saturated
-            _make_fetch_result(50, total_available=150),   # 84h window, saturated
-            _make_fetch_result(40, total_available=40),    # 42h window, ok
-            _make_fetch_result(30, total_available=30),    # next window, ok
+            _make_fetch_result(50, total_available=200),  # 168h window, saturated
+            _make_fetch_result(50, total_available=150),  # 84h window, saturated
+            _make_fetch_result(40, total_available=40),  # 42h window, ok
+            _make_fetch_result(30, total_available=30),  # next window, ok
         ]
 
         events = pipeline._fetch_with_date_splitting(
@@ -761,12 +761,12 @@ class TestFetchWithDateSplitting:
         # After accepting at 6h, cursor advances to 06:00.
         # Window restores to 12h → fetch [06:00..18:00], then 24h → [18:00..June 2].
         pipeline.adapter.fetch.side_effect = [
-            saturated,      # 168h, retry
-            saturated,      # 84h, retry
-            saturated,      # 42h, retry
-            saturated,      # 21h, retry
-            saturated,      # 10h, retry (10//2=5, clamped to 6)
-            saturated,      # 6h (min), accept + warn, advance to 06:00
+            saturated,  # 168h, retry
+            saturated,  # 84h, retry
+            saturated,  # 42h, retry
+            saturated,  # 21h, retry
+            saturated,  # 10h, retry (10//2=5, clamped to 6)
+            saturated,  # 6h (min), accept + warn, advance to 06:00
             non_saturated,  # 12h [06:00..18:00], ok, advance to 18:00
             non_saturated,  # 24h [18:00..June 2], ok, done
         ]
@@ -782,7 +782,8 @@ class TestFetchWithDateSplitting:
         assert len(events) == 50 + 10 + 10
         # Verify warning was logged for the saturated-at-min case
         warning_calls = [
-            c for c in pipeline.logger.warning.call_args_list
+            c
+            for c in pipeline.logger.warning.call_args_list
             if "SATURATED at min window" in str(c)
         ]
         assert len(warning_calls) >= 1
@@ -818,7 +819,7 @@ class TestFetchWithDateSplitting:
         pipeline = _make_pipeline_for_date_splitting()
 
         pipeline.adapter.fetch.side_effect = [
-            _make_fetch_result(0, success=True),   # empty
+            _make_fetch_result(0, success=True),  # empty
             _make_fetch_result(20, total_available=20),  # next window ok
         ]
 
@@ -837,7 +838,7 @@ class TestFetchWithDateSplitting:
         pipeline = _make_pipeline_for_date_splitting()
 
         pipeline.adapter.fetch.side_effect = [
-            _make_fetch_result(0, success=False),       # failed
+            _make_fetch_result(0, success=False),  # failed
             _make_fetch_result(15, total_available=15),  # ok
         ]
 
@@ -857,9 +858,7 @@ class TestFetchWithDateSplitting:
         pipeline.source_config.defaults = {"days_ahead": 14}
         pipeline.adapter.fetch.return_value = _make_fetch_result(10, 10)
 
-        with patch(
-            "src.ingestion.pipelines.apis.base_api.datetime"
-        ) as mock_dt:
+        with patch("src.ingestion.pipelines.apis.base_api.datetime") as mock_dt:
             mock_dt.now.return_value = datetime(2025, 6, 1, tzinfo=timezone.utc)
             mock_dt.strptime = datetime.strptime
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
@@ -976,9 +975,7 @@ class TestMultiCityExecution:
     @patch.object(BaseAPIPipeline, "_process_events_batch", return_value=[])
     @patch.object(BaseAPIPipeline, "_fetch_with_date_splitting")
     @patch.object(BaseAPIPipeline, "__init__", return_value=None)
-    def test_execute_iterates_over_areas(
-        self, mock_init, mock_fetch, mock_process
-    ):
+    def test_execute_iterates_over_areas(self, mock_init, mock_fetch, mock_process):
         """Should call _fetch_with_date_splitting for each city in areas."""
         pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
         pipeline.source_config = APISourceConfig(
@@ -998,7 +995,7 @@ class TestMultiCityExecution:
 
         mock_fetch.return_value = [{"id": "1"}, {"id": "2"}]
 
-        result = pipeline.execute()
+        pipeline.execute()
 
         # Should have been called twice — once per city
         assert mock_fetch.call_count == 2

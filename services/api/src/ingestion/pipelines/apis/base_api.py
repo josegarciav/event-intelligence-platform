@@ -1024,7 +1024,7 @@ def create_api_pipeline_from_config(
     pipeline_config: Optional[PipelineConfig] = None,
 ) -> BaseAPIPipeline:
     """
-    Factory function to create a BaseAPIPipeline from YAML config dict.
+    Create a BaseAPIPipeline from YAML config dict.
 
     Args:
         source_name: Name of the source (e.g., "ra_co")

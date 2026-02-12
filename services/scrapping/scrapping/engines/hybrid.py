@@ -1,10 +1,9 @@
-"""
-scrapping.engines.hybrid
+"""Hybrid engine combining HTTP and browser strategies.
 
-Hybrid engine:
-- uses HttpEngine for fast fetches
-- uses BrowserEngine for rendering/detail pages or as fallback
-- consistent output with full trace
+Features:
+- Use HttpEngine for fast fetches.
+- Use BrowserEngine for rendering/detail pages or as fallback.
+- Consistent output with full trace.
 """
 
 from __future__ import annotations
@@ -20,6 +19,8 @@ from .http import HttpEngine, HttpEngineOptions
 
 @dataclass
 class HybridEngineOptions:
+    """Configuration options for the hybrid engine."""
+
     http: HttpEngineOptions = field(default_factory=HttpEngineOptions)
     browser: BrowserEngineOptions = field(default_factory=BrowserEngineOptions)
 
@@ -32,17 +33,22 @@ class HybridEngineOptions:
 
 
 class HybridEngine(BaseEngine):
+    """Engine that combine HTTP with browser fallback."""
+
     def __init__(self, *, options: HybridEngineOptions | None = None) -> None:
+        """Initialize the instance."""
         super().__init__(name="hybrid")
         self.options = options or HybridEngineOptions()
         self.http = HttpEngine(options=self.options.http)
         self.browser = BrowserEngine(options=self.options.browser)
 
     def close(self) -> None:
+        """Close both HTTP and browser engines."""
         self.http.close()
         self.browser.close()
 
     def get(self, url: str, *, ctx: EngineContext | None = None) -> FetchResult:
+        """Fetch a URL using HTTP with optional browser fallback."""
         if self.options.default_get == "browser":
             return self.browser.get(url, ctx=ctx)
 
@@ -81,6 +87,7 @@ class HybridEngine(BaseEngine):
         actions: Sequence[dict[str, Any]] | None = None,
         wait_for: str | None = None,
     ) -> FetchResult:
+        """Render a URL using the browser engine."""
         # get_rendered always goes to browser
         return self.browser.get_rendered(
             url, ctx=ctx, actions=actions, wait_for=wait_for

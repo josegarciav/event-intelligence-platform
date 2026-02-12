@@ -151,7 +151,7 @@ def get_deduplicator(
     strategy: DeduplicationStrategy = DeduplicationStrategy.EXACT,
 ) -> EventDeduplicator:
     """
-    Factory function to get a deduplicator by strategy.
+    Create a deduplicator instance for the given strategy.
 
     Args:
         strategy: DeduplicationStrategy enum value
