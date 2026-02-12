@@ -1,8 +1,4 @@
-"""
-scrapping.monitoring.events
-
-Standardized run events for better traceability.
-"""
+"""Standardized run events for better traceability."""
 
 from __future__ import annotations
 
@@ -18,10 +14,7 @@ def emit_event(
     level: str = "info",
     stage: str | None = None,
 ) -> None:
-    """
-    Emit a structured event to the logger.
-    The logger is expected to have run_id and source_id in its context if applicable.
-    """
+    """Emit a structured event to the logger."""
     lvl = getattr(logging, level.upper(), logging.INFO)
 
     # We use 'extra' to pass structured data to the formatter

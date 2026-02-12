@@ -1,7 +1,4 @@
-"""
-scrapping.pipeline.validators
-
-Validation helpers for extracted items.
+"""Validation helpers for extracted items.
 
 We keep this as:
 - Pure functions
@@ -23,6 +20,8 @@ from scrapping.extraction.transforms import normalize_ws
 
 @dataclass(frozen=True)
 class ValidationIssue:
+    """Represent a single validation issue with severity level."""
+
     level: str  # "warning" or "error"
     code: str
     message: str
@@ -31,21 +30,24 @@ class ValidationIssue:
 
 @dataclass
 class ValidationResult:
+    """Hold the result of item validation."""
+
     ok: bool
     issues: list[ValidationIssue]
 
     def warnings(self) -> list[ValidationIssue]:
+        """Return all warning-level issues."""
         return [i for i in self.issues if i.level == "warning"]
 
     def errors(self) -> list[ValidationIssue]:
+        """Return all error-level issues."""
         return [i for i in self.issues if i.level == "error"]
 
 
 def validate_item(
     item: dict[str, Any], *, rules: dict[str, Any] | None = None
 ) -> ValidationResult:
-    """
-    Generic item validation.
+    """Validate an item against configurable rules.
 
     Default expectations (light):
       - url must exist and be valid

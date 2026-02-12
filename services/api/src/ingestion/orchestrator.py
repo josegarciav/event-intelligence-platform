@@ -45,7 +45,7 @@ PIPELINE_REGISTRY: Dict[str, PipelineFactory] = {}
 
 def register_pipeline(source_name: str):
     """
-    Decorator to register a pipeline factory.
+    Decorate a function to register it as a pipeline factory.
 
     Usage:
         @register_pipeline("ra_co")
@@ -277,8 +277,7 @@ class PipelineOrchestrator:
     # ========================================================================
     def run_full_ingestion(self, **kwargs) -> Dict[str, Any]:
         """
-        Executes all registered pipelines, deduplicates the results,
-        and persists the unique events to the database.
+        Execute all registered pipelines, deduplicate, and persist.
 
         Returns:
             Dict containing stats about the ingestion run.
@@ -338,7 +337,7 @@ class PipelineOrchestrator:
 
 def load_orchestrator_from_config(config_path: str) -> PipelineOrchestrator:
     """
-    Factory function to create orchestrator from YAML config.
+    Create an orchestrator from YAML config.
 
     Uses PipelineFactory to create all enabled pipelines from configuration.
     No hardcoded source names — fully config-driven.

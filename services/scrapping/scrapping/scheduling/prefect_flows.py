@@ -1,5 +1,5 @@
 """
-scrapping.scheduling.prefect_flows
+scrapping.scheduling.prefect_flows.
 
 Optional: Prefect flows for orchestrating scrapes.
 
@@ -44,18 +44,21 @@ except Exception as e:
 
     # Lightweight fallbacks so module import doesn't explode
     def flow(*args, **kwargs):  # type: ignore
+        """Perform the operation."""
         def _decorator(fn):
             return fn
 
         return _decorator
 
     def task(*args, **kwargs):  # type: ignore
+        """Perform the operation."""
         def _decorator(fn):
             return fn
 
         return _decorator
 
     def get_run_logger():  # type: ignore
+        """Perform the operation."""
         import logging
 
         return logging.getLogger("prefect_missing")
@@ -101,9 +104,7 @@ class PrefectFlowOptions:
 
 @task(name="validate_config", retries=0)
 def validate_config_task(cfg: dict[str, Any]) -> dict[str, Any]:
-    """
-    Validate config inside Prefect.
-    """
+    """Validate config inside Prefect."""
     _require_prefect()
     res = validate_config(cfg, verbose=False)
     if not res.get("ok", False):
@@ -114,9 +115,7 @@ def validate_config_task(cfg: dict[str, Any]) -> dict[str, Any]:
 
 @task(name="run_sources", retries=0)
 def run_sources_task(cfg: dict[str, Any], opts: PrefectFlowOptions) -> dict[str, Any]:
-    """
-    Run full orchestrator for all sources in a single task.
-    """
+    """Run full orchestrator for all sources in a single task."""
     _require_prefect()
     logger = get_run_logger()
     logger.info("Starting orchestrator run (single task)")
@@ -141,9 +140,7 @@ def run_sources_task(cfg: dict[str, Any], opts: PrefectFlowOptions) -> dict[str,
 def run_one_source_task(
     cfg: dict[str, Any], source_id: str, opts: PrefectFlowOptions
 ) -> dict[str, Any]:
-    """
-    Run orchestrator but restricted to a single source.
-    """
+    """Run orchestrator but restricted to a single source."""
     _require_prefect()
     logger = get_run_logger()
     logger.info(f"Running source: {source_id}")
@@ -178,8 +175,7 @@ def build_scrap_flow(
     name: str = "scrap_flow",
     options: PrefectFlowOptions | None = None,
 ):
-    """
-    Returns a Prefect flow function.
+    """Return a Prefect flow function.
 
     If Prefect isn't installed, calling the returned function will raise a helpful error.
     """
@@ -227,8 +223,9 @@ def run_prefect_flow_from_config_path(
     only_sources: list[str] | None = None,
     per_source_tasks: bool = True,
 ) -> Any:
-    """
-    Convenience for local usage:
+    """Provide convenience wrapper for local usage.
+
+    Example:
         python -c "from scrapping.scheduling.prefect_flows import run_prefect_flow_from_config_path; run_prefect_flow_from_config_path('config.json')"
     """
     p = Path(config_path)

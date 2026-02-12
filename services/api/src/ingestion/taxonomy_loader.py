@@ -1,7 +1,5 @@
 """
-taxonomy_loader.py
-
-Loads Human Experience Taxonomy into relational ontology tables.
+Load Human Experience Taxonomy into relational ontology tables.
 
 Tables populated:
 
@@ -69,10 +67,7 @@ def parse_database_url(database_url: str) -> dict:
 
 
 def get_connection() -> psycopg2.extensions.connection:
-    """
-    Establish a new database connection using DATABASE_URL.
-    """
-
+    """Establish a new database connection using DATABASE_URL."""
     database_url = os.getenv("DATABASE_URL")
 
     if not database_url:
@@ -235,7 +230,7 @@ def insert_activity_emotion(
 
 
 def run_etl():
-
+    """Run the full taxonomy ETL pipeline."""
     print("Loading taxonomy...")
     data = load_taxonomy()
 

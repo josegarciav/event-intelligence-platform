@@ -1,7 +1,4 @@
-"""
-scrapping.config.schema
-
-Pydantic models defining the V1 config contract.
+"""Pydantic models defining the V1 config contract.
 
 Design goals:
 - strict enough to prevent silent failures
@@ -25,12 +22,16 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class EngineType(str, Enum):
+    """Supported engine types."""
+
     http = "http"
     browser = "browser"
     hybrid = "hybrid"
 
 
 class LinkExtractMethod(str, Enum):
+    """Supported link extraction methods."""
+
     regex = "regex"
     css = "css"
     xpath = "xpath"
@@ -38,24 +39,32 @@ class LinkExtractMethod(str, Enum):
 
 
 class RobotsPolicy(str, Enum):
+    """Policy for handling robots.txt."""
+
     respect = "respect"
     ignore = "ignore"
     unknown = "unknown"
 
 
 class DataRightsStatus(str, Enum):
+    """Data rights classification for a source."""
+
     allowed = "allowed"
     restricted = "restricted"
     unknown = "unknown"
 
 
 class PollingStrategy(str, Enum):
+    """Strategy for polling frequency adjustment."""
+
     fixed = "fixed"
     backoff = "backoff"
     adaptive = "adaptive"
 
 
 class ActionType(str, Enum):
+    """Supported browser action types."""
+
     scroll = "scroll"
     click = "click"
     wait_for = "wait_for"
@@ -70,6 +79,8 @@ class ActionType(str, Enum):
 
 
 class ScheduleConfig(BaseModel):
+    """Configure schedule for a scraping source."""
+
     frequency: str | None = Field(
         default=None, description="Human-friendly frequency like '15m', '2h', 'daily'."
     )
@@ -86,6 +97,8 @@ class ScheduleConfig(BaseModel):
 
 
 class PagingConfig(BaseModel):
+    """Configure pagination behavior for entrypoints."""
+
     mode: str = Field(default="page", description="page | offset | cursor | custom")
     start: int | None = None
     end: int | None = None
@@ -95,6 +108,8 @@ class PagingConfig(BaseModel):
 
 
 class EntryPoint(BaseModel):
+    """Define an entry point URL with optional paging and parameters."""
+
     url: str = Field(
         ..., description="Entrypoint URL template. May include {page} etc."
     )
@@ -105,6 +120,8 @@ class EntryPoint(BaseModel):
 
 
 class RateLimitPolicy(BaseModel):
+    """Configure rate limiting for requests."""
+
     rps: float | None = Field(default=None, ge=0.0)
     burst: int | None = Field(default=None, ge=1)
     min_delay_s: float | None = Field(default=None, ge=0.0)
@@ -112,6 +129,8 @@ class RateLimitPolicy(BaseModel):
 
 
 class RetryPolicy(BaseModel):
+    """Configure retry behavior for failed requests."""
+
     max_retries: int = Field(default=3, ge=0, le=20)
     backoff: str = Field(default="exp", description="exp | fixed | none")
     retry_on_status: list[int] = Field(
@@ -120,11 +139,15 @@ class RetryPolicy(BaseModel):
 
 
 class CaptchaConfig(BaseModel):
+    """Configure captcha handling expectations."""
+
     expected: str = Field(default="possible", description="none|possible|likely")
     handler: str = Field(default="skip", description="manual|service|skip")
 
 
 class EngineConfig(BaseModel):
+    """Configure the scraping engine."""
+
     type: EngineType = Field(default=EngineType.http)
     browser: str | None = Field(default=None, description="seleniumbase|playwright")
     headless: bool = True
@@ -141,6 +164,8 @@ class EngineConfig(BaseModel):
 
 
 class BrowserAction(BaseModel):
+    """Define a browser action to execute during rendering."""
+
     type: ActionType
     selector: str | None = None
     timeout_s: float | None = Field(default=None, ge=0.0)
@@ -150,6 +175,8 @@ class BrowserAction(BaseModel):
 
 
 class LinkExtractConfig(BaseModel):
+    """Configure link extraction from listing pages."""
+
     method: LinkExtractMethod = Field(default=LinkExtractMethod.regex)
     pattern: str | None = Field(default=None, description="For regex method")
     selector: str | None = Field(default=None, description="For css/xpath/js method")
@@ -159,11 +186,15 @@ class LinkExtractConfig(BaseModel):
 
 
 class DiscoveryConfig(BaseModel):
+    """Configure link discovery for a source."""
+
     link_extract: LinkExtractConfig = Field(default_factory=LinkExtractConfig)
     dedupe: dict[str, Any] = Field(default_factory=dict)
 
 
 class StorageTarget(BaseModel):
+    """Configure a single storage output target."""
+
     enabled: bool = True
     format: str = Field(default="parquet", description="parquet|jsonl|csv|db")
     compression: str | None = Field(default="snappy")
@@ -171,6 +202,8 @@ class StorageTarget(BaseModel):
 
 
 class StorageConfig(BaseModel):
+    """Configure storage targets for pipeline output."""
+
     raw_pages: StorageTarget = Field(
         default_factory=lambda: StorageTarget(enabled=True, format="parquet")
     )
@@ -184,6 +217,8 @@ class StorageConfig(BaseModel):
 
 
 class AntiBotConfig(BaseModel):
+    """Configure anti-bot handling policies."""
+
     robots_policy: RobotsPolicy = Field(default=RobotsPolicy.unknown)
     data_rights_status: DataRightsStatus = Field(default=DataRightsStatus.unknown)
     recaptcha: bool | None = None
@@ -195,6 +230,8 @@ class AntiBotConfig(BaseModel):
 
 
 class SourceConfig(BaseModel):
+    """Top-level source configuration model."""
+
     config_version: str = Field(default="1.0")
     source_id: str = Field(..., min_length=1)
 
@@ -262,8 +299,8 @@ ConfigFile = SourceConfig | list[SourceConfig]
 
 
 def export_json_schema() -> dict[str, Any]:
-    """
-    Export a JSON schema for SourceConfig.
+    """Export a JSON schema for SourceConfig.
+
     Useful for docs, linting, or external validation.
     """
     return SourceConfig.model_json_schema()

@@ -247,7 +247,7 @@ def create_llm_client(
     fallback_to_rules: bool = True,
 ) -> BaseLLMClient:
     """
-    Factory function to create an LLM client.
+    Create an LLM client for the specified provider.
 
     Args:
         provider: "openai" or "anthropic"

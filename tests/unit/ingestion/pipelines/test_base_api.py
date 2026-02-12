@@ -5,7 +5,7 @@ Tests for BaseAPIPipeline, APISourceConfig, and ConfigDrivenAPIAdapter.
 """
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -998,7 +998,7 @@ class TestMultiCityExecution:
 
         mock_fetch.return_value = [{"id": "1"}, {"id": "2"}]
 
-        result = pipeline.execute()
+        pipeline.execute()
 
         # Should have been called twice — once per city
         assert mock_fetch.call_count == 2

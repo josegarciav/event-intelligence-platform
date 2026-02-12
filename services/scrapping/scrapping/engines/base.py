@@ -1,7 +1,4 @@
-"""
-scrapping.engines.base
-
-Engine interfaces + shared primitives.
+"""Engine interfaces and shared primitives.
 
 Goals:
 - One standard response shape across HTTP and Browser engines.
@@ -23,8 +20,8 @@ Headers = dict[str, str]
 
 @dataclass
 class EngineContext:
-    """
-    The minimum execution context engines may need.
+    """Represent the minimum execution context engines may need.
+
     Keep it small. If you need more, add fields deliberately.
     """
 
@@ -45,10 +42,12 @@ class BaseEngine(ABC):
     """
 
     def __init__(self, *, name: str = "base") -> None:
+        """Initialize the instance."""
         self.name = name
 
     @abstractmethod
     def get(self, url: str, *, ctx: EngineContext | None = None) -> FetchResult:
+        """Perform the operation."""
         raise NotImplementedError
 
     def get_rendered(
@@ -59,13 +58,9 @@ class BaseEngine(ABC):
         actions: Sequence[dict[str, Any]] | None = None,
         wait_for: str | None = None,
     ) -> FetchResult:
-        """
-        Engines that don't support rendering can override or raise.
-        """
+        """Engines that don't support rendering can override or raise."""
         return self.get(url, ctx=ctx)
 
     def close(self) -> None:
-        """
-        Allow engines to release resources (sessions, browser contexts).
-        """
+        """Allow engines to release resources (sessions, browser contexts)."""
         return

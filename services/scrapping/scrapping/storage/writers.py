@@ -1,5 +1,4 @@
-"""
-scrapping.storage.writers
+"""scrapping.storage.writers.
 
 Writers for pipeline artifacts:
 - JSON
@@ -24,6 +23,8 @@ from scrapping.storage.layouts import Layout, ensure_parent
 
 @dataclass(frozen=True)
 class WriterOptions:
+    """Configuration options for artifact writers."""
+
     strict: bool = False  # if True, missing optional deps raises
     default_encoding: str = "utf-8"
 
@@ -37,6 +38,7 @@ class WriterOptions:
 
 
 def write_json(path: Path, obj: Any, *, encoding: str = "utf-8") -> None:
+    """Write an object as formatted JSON to the given path."""
     ensure_parent(path)
     with path.open("w", encoding=encoding) as f:
         json.dump(obj, f, indent=2, ensure_ascii=False)
@@ -45,6 +47,7 @@ def write_json(path: Path, obj: Any, *, encoding: str = "utf-8") -> None:
 def write_jsonl(
     path: Path, rows: Iterable[dict[str, Any]], *, encoding: str = "utf-8"
 ) -> None:
+    """Write rows as newline-delimited JSON to the given path."""
     ensure_parent(path)
     with path.open("w", encoding=encoding) as f:
         for r in rows:
@@ -54,6 +57,7 @@ def write_jsonl(
 def append_jsonl(
     path: Path, rows: Iterable[dict[str, Any]], *, encoding: str = "utf-8"
 ) -> None:
+    """Append rows as newline-delimited JSON to the given path."""
     ensure_parent(path)
     with path.open("a", encoding=encoding) as f:
         for r in rows:
@@ -63,9 +67,7 @@ def append_jsonl(
 def write_csv(
     path: Path, rows: list[dict[str, Any]], *, options: WriterOptions
 ) -> None:
-    """
-    CSV needs stable columns; pandas makes it easier.
-    """
+    """Write rows as CSV using pandas for stable column handling."""
     try:
         import pandas as pd  # type: ignore
     except Exception as e:
@@ -83,9 +85,7 @@ def write_csv(
 def write_parquet(
     path: Path, rows: list[dict[str, Any]], *, options: WriterOptions
 ) -> None:
-    """
-    Parquet writing: prefer pyarrow, fallback to pandas if it can.
-    """
+    """Write rows as Parquet, preferring pyarrow with pandas fallback."""
     # Try pyarrow directly
     try:
         import pyarrow as pa  # type: ignore
@@ -123,6 +123,7 @@ def write_parquet(
 def write_run_meta(
     layout: Layout, run_id: str, meta: dict[str, Any], *, options: WriterOptions
 ) -> Path:
+    """Write run metadata JSON for the given run."""
     path = layout.run_meta_path(run_id)
     write_json(path, meta, encoding=options.default_encoding)
     return path
@@ -131,6 +132,7 @@ def write_run_meta(
 def write_run_report(
     layout: Layout, run_id: str, report: dict[str, Any], *, options: WriterOptions
 ) -> Path:
+    """Write run report JSON for the given run."""
     path = layout.run_report_path(run_id)
     write_json(path, report, encoding=options.default_encoding)
     return path
@@ -144,6 +146,7 @@ def write_source_meta(
     *,
     options: WriterOptions,
 ) -> Path:
+    """Write source metadata JSON for the given source."""
     path = layout.source_meta_path(run_id, source_id)
     write_json(path, meta, encoding=options.default_encoding)
     return path
@@ -157,6 +160,7 @@ def write_links(
     *,
     options: WriterOptions,
 ) -> Path:
+    """Write extracted links as JSONL for the given source."""
     path = layout.extracted_links_path(run_id, source_id, ext="jsonl")
     rows = [{"url": u} for u in links]
     write_jsonl(path, rows, encoding=options.default_encoding)
@@ -241,9 +245,7 @@ def write_items(
 
 
 def fetchresult_to_raw_record(fr: Any) -> dict[str, Any]:
-    """
-    Convert FetchResult (from engines/base.py) to a serializable dict.
-    """
+    """Convert a FetchResult to a serializable dict."""
     try:
         timings = getattr(fr, "timings", None)
         tdict = None

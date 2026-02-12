@@ -1,7 +1,6 @@
-"""
-scrapping.monitoring.logging
+"""Structured logging with context injection.
 
-Structured logging with:
+Features:
 - console handler
 - file handler (per run + per source optional)
 - JSON logs optional (easy ingestion)
@@ -26,7 +25,10 @@ from scrapping.storage.layouts import Layout, ensure_parent
 
 
 class JsonFormatter(logging.Formatter):
+    """Format log records as JSON."""
+
     def format(self, record: logging.LogRecord) -> str:
+        """Perform the operation."""
         base = {
             "ts": time.time(),
             "level": record.levelname,
@@ -50,7 +52,10 @@ class JsonFormatter(logging.Formatter):
 
 
 class TextFormatter(logging.Formatter):
+    """Format log records as human-readable text."""
+
     def format(self, record: logging.LogRecord) -> str:
+        """Perform the operation."""
         parts = [record.levelname, record.name]
 
         run_id = getattr(record, "run_id", None)
@@ -84,6 +89,8 @@ class TextFormatter(logging.Formatter):
 
 @dataclass(frozen=True)
 class LoggingOptions:
+    """Configure logging behavior for runs."""
+
     level: str = "INFO"
     json_logs: bool = False
 
@@ -101,11 +108,7 @@ def setup_run_logger(
     run_id: str,
     options: LoggingOptions | None = None,
 ) -> logging.Logger:
-    """
-    Creates a base logger for the run.
-    File paths:
-      run_dir/run.log
-    """
+    """Create a base logger for the run."""
     options = options or LoggingOptions()
     logger = logging.getLogger("scrapping")
     logger.setLevel(getattr(logging, options.level.upper(), logging.INFO))
@@ -140,6 +143,7 @@ def setup_run_logger(
 
 
 def get_source_log_path(layout: Layout, run_id: str, source_id: str) -> Path:
+    """Return the log file path for a specific source."""
     return layout.source_dir(run_id, source_id) / "source.log"
 
 
@@ -151,9 +155,7 @@ def add_source_file_handler(
     source_id: str,
     options: LoggingOptions | None = None,
 ) -> logging.Handler | None:
-    """
-    Adds a per-source file handler to an existing logger.
-    """
+    """Add a per-source file handler to an existing logger."""
     options = options or LoggingOptions()
     if not options.enable_file or not options.per_source_file:
         return None
@@ -181,7 +183,10 @@ def add_source_file_handler(
 
 
 class ContextAdapter(logging.LoggerAdapter):
+    """Inject context fields into log records."""
+
     def process(self, msg: str, kwargs: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+        """Perform the operation."""
         extra = kwargs.get("extra", {})
         merged = dict(self.extra)
         merged.update(extra)
@@ -196,6 +201,7 @@ def with_context(
     source_id: str | None = None,
     stage: str | None = None,
 ) -> ContextAdapter:
+    """Create a context adapter with run, source, and stage info."""
     extra: dict[str, Any] = {}
     if run_id:
         extra["run_id"] = run_id

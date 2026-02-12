@@ -1,7 +1,6 @@
-"""
-scrapping.engines.http
+"""Requests-based HTTP engine.
 
-Requests-based engine:
+Features:
 - session reuse + connection pooling
 - retry with backoff (shared policy)
 - rate limiting (shared bucket)
@@ -31,6 +30,8 @@ from .base import BaseEngine, EngineContext, Headers
 
 @dataclass
 class HttpEngineOptions:
+    """Configuration options for the HTTP engine."""
+
     timeout_s: float = 15.0
     verify_ssl: bool = True
 
@@ -55,7 +56,10 @@ class HttpEngineOptions:
 
 
 class HttpEngine(BaseEngine):
+    """HTTP engine using the requests library."""
+
     def __init__(self, *, options: HttpEngineOptions | None = None) -> None:
+        """Initialize the instance."""
         super().__init__(name="http")
         self.options = options or HttpEngineOptions()
         self._session = requests.Session()
@@ -81,12 +85,14 @@ class HttpEngine(BaseEngine):
         )
 
     def close(self) -> None:
+        """Perform the operation."""
         try:
             self._session.close()
         except Exception:
             pass
 
     def get(self, url: str, *, ctx: EngineContext | None = None) -> FetchResult:
+        """Perform the operation."""
         ctx = ctx or EngineContext()
         timeout_s = float(ctx.timeout_s or self.options.timeout_s)
         verify_ssl = bool(

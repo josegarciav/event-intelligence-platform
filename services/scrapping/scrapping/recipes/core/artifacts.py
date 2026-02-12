@@ -1,3 +1,5 @@
+"""Artifact writers for recipe pipeline outputs."""
+
 from __future__ import annotations
 
 import csv
@@ -8,6 +10,7 @@ from typing import Any
 
 
 def write_jsonl(path: Path, items: Sequence[dict[str, Any]], append: bool = True):
+    """Write items as newline-delimited JSON to the given path."""
     mode = "a" if append else "w"
     with path.open(mode, encoding="utf-8") as f:
         for item in items:
@@ -17,6 +20,7 @@ def write_jsonl(path: Path, items: Sequence[dict[str, Any]], append: bool = True
 def write_summary_csv(
     path: Path, items: Sequence[dict[str, Any]], fields: Sequence[str] | None = None
 ):
+    """Write items as a summary CSV, appending to the file if it exists."""
     if not items:
         return
 
@@ -33,6 +37,7 @@ def write_summary_csv(
 
 
 def register_artifact(run_report: dict[str, Any], source_id: str, name: str, path: str):
+    """Register an artifact path in the run report for a given source."""
     # This is a helper to update a standard run_report dict with custom recipe artifacts
     if "sources" not in run_report:
         run_report["sources"] = {}

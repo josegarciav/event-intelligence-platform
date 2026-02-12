@@ -26,9 +26,7 @@ class EventDataWriter:
     """
 
     def __init__(self, db_connection) -> None:
-        """
-        Initialize with an active psycopg2 connection.
-        """
+        """Initialize with an active psycopg2 connection."""
         self.conn = db_connection
         self._value_to_id = get_primary_category_value_to_id_map()
         # Metadata cache for foreign key verification (issue #8)
@@ -54,7 +52,7 @@ class EventDataWriter:
 
     def persist_batch(self, events: List[EventSchema]) -> int:
         """
-        Persists a list of events to the database.
+        Persist a list of events to the database.
 
         Each event is persisted in its own transaction. If one event fails,
         it is rolled back, but previously successful events remain committed
@@ -77,9 +75,7 @@ class EventDataWriter:
         return success_count
 
     def _persist_single_event(self, event: EventSchema) -> None:
-        """
-        Handles the atomic insertion of a single event and its related child records.
-        """
+        """Handle the atomic insertion of a single event and its related child records."""
         with self.conn.cursor() as cur:
             # 1. Location
             location_id = self._persist_location(cur, event)
@@ -319,7 +315,9 @@ class EventDataWriter:
 
     def _persist_taxonomy_mappings(self, cur, event: EventSchema, event_id):
         # 1. Cleanup existing mappings (cascades to event_emotional_outputs)
-        cur.execute("DELETE FROM event_taxonomy_mappings WHERE event_id = %s", (event_id,))
+        cur.execute(
+            "DELETE FROM event_taxonomy_mappings WHERE event_id = %s", (event_id,)
+        )
 
         if not event.taxonomy_dimensions:
             return

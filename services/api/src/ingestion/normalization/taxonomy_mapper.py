@@ -302,7 +302,7 @@ class TaxonomyMapper:
 
 def create_taxonomy_mapper_from_config(config: Dict[str, Any]) -> TaxonomyMapper:
     """
-    Factory function to create TaxonomyMapper from YAML config section.
+    Create a TaxonomyMapper from YAML config section.
 
     Args:
         config: Dict with taxonomy configuration

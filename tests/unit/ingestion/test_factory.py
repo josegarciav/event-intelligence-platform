@@ -421,7 +421,7 @@ class TestRealConfigPipelineCreation:
 
     def test_factory_reads_real_config(self):
         """Factory should successfully load the real ingestion.yaml."""
-        from src.ingestion.factory import PipelineFactory, DEFAULT_CONFIG_PATH
+        from src.ingestion.factory import PipelineFactory
 
         factory = PipelineFactory()
         config = factory.config
@@ -523,9 +523,6 @@ class TestRESTAPIPipelineConfig:
     def test_ticketmaster_config_parses_correctly(self):
         """Should parse Ticketmaster config correctly."""
         from src.ingestion.factory import PipelineFactory
-        from src.ingestion.pipelines.apis.base_api import (
-            create_api_pipeline_from_config,
-        )
 
         factory = PipelineFactory()
         config = factory.get_source_config("ticketmaster")

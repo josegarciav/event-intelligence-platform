@@ -1,7 +1,4 @@
-"""
-orchestrator.py
-
-Loads configs, schedules work, aggregates results.
+"""Load configs, schedule work, and aggregate results.
 
 Core responsibilities:
 - Validate config (lightweight V1 checks)
@@ -74,6 +71,8 @@ from scrapping.storage.writers import (
 
 @dataclass(frozen=True)
 class OrchestratorOptions:
+    """Configuration options for the orchestrator."""
+
     results_dir: str = "results"
     parallelism: int = 16
     only_sources: list[str] | None = None
@@ -276,9 +275,7 @@ def validate_config(cfg: dict[str, Any], *, verbose: bool = False) -> dict[str, 
 
 
 def doctor_environment(*, verbose: bool = False) -> dict[str, Any]:
-    """
-    Checks environment readiness and optional dependencies.
-    """
+    """Check environment readiness and optional dependencies."""
     info: dict[str, Any] = {
         "python": sys.version,
         "platform": platform.platform(),
@@ -381,10 +378,14 @@ def doctor_environment(*, verbose: bool = False) -> dict[str, Any]:
 
 
 class Orchestrator:
+    """Coordinate scraping runs across multiple sources."""
+
     def __init__(self, *, options: OrchestratorOptions | None = None) -> None:
+        """Initialize the orchestrator with the given options."""
         self.options = options or OrchestratorOptions()
 
     def run(self, cfg: dict[str, Any]) -> dict[str, Any]:
+        """Execute the scraping pipeline for all configured sources."""
         # Validate
         v = validate_config(cfg, verbose=False)
         if not v.get("ok", False):

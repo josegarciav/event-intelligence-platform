@@ -129,7 +129,9 @@ class BaseSourceAdapter(ABC):
         pass
 
     def __enter__(self) -> "BaseSourceAdapter":
+        """Enter context manager and return adapter instance."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Exit context manager and release resources."""
         self.close()

@@ -1,5 +1,5 @@
 """
-scrapping.runtime.blocks
+scrapping.runtime.blocks.
 
 Minimal block detection classifier.
 """
@@ -31,6 +31,7 @@ _PATTERNS = {
 
 
 def classify_blocks(text: str | None) -> list[BlockSignal]:
+    """Perform the operation."""
     if not text:
         return []
 

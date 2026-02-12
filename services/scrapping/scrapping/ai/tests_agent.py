@@ -1,5 +1,5 @@
 """
-scrapping.ai.tests_agent
+scrapping.ai.tests_agent.
 
 Roadmap module: AI-assisted test generation for scraping configs.
 
@@ -43,6 +43,8 @@ from scrapping.processing.quality_filters import evaluate_quality
 
 @dataclass
 class TestCase:
+    """Class definition."""
+
     test_id: str
     kind: str  # "listing_links" | "detail_quality" | "blocked_page" | "smoke_pipeline"
     target_url: str
@@ -52,11 +54,14 @@ class TestCase:
 
 @dataclass
 class TestPlan:
+    """Class definition."""
+
     source_id: str
     created_at_s: float
     tests: list[TestCase]
 
     def as_dict(self) -> dict[str, Any]:
+        """Perform the operation."""
         return {
             "source_id": self.source_id,
             "created_at_s": self.created_at_s,
@@ -79,13 +84,14 @@ class TestPlan:
 
 
 class TestsAgent:
+    """Class definition."""
+
     def __init__(self) -> None:
+        """Initialize the instance."""
         pass
 
     def generate_plan(self, source_cfg: dict[str, Any]) -> TestPlan:
-        """
-        Generate a lightweight plan from a single source config.
-        """
+        """Generate a lightweight plan from a single source config."""
         source_id = str(source_cfg.get("source_id", "unknown_source"))
         entrypoints = source_cfg.get("entrypoints") or []
         first_url = None

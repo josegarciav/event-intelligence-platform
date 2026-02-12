@@ -294,7 +294,7 @@ class FieldMapper:
 
 def create_field_mapper_from_config(config: Dict[str, Any]) -> FieldMapper:
     """
-    Factory function to create FieldMapper from YAML config section.
+    Create a FieldMapper from YAML config section.
 
     Args:
         config: Dict with "field_mappings" and optional "transformations"

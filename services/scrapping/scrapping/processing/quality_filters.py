@@ -1,5 +1,5 @@
 """
-scrapping.processing.quality_filters
+scrapping.processing.quality_filters.
 
 Rule-based QA filters for items/docs.
 
@@ -24,6 +24,8 @@ from scrapping.extraction.transforms import normalize_ws, strip_or_none
 
 @dataclass(frozen=True)
 class QualityIssue:
+    """Class definition."""
+
     level: str  # "warning"|"error"
     code: str
     message: str
@@ -31,13 +33,17 @@ class QualityIssue:
 
 @dataclass
 class QualityResult:
+    """Class definition."""
+
     keep: bool
     issues: list[QualityIssue]
 
     def errors(self) -> list[QualityIssue]:
+        """Perform the operation."""
         return [i for i in self.issues if i.level == "error"]
 
     def warnings(self) -> list[QualityIssue]:
+        """Perform the operation."""
         return [i for i in self.issues if i.level == "warning"]
 
 
@@ -173,9 +179,9 @@ def evaluate_quality(
 
 
 def _boilerplate_ratio(text: str) -> float:
-    """
-    Heuristic for boilerplate / placeholder pages.
-    Returns value in [0..1] where higher => more boilerplate-y.
+    """Heuristic for boilerplate and placeholder pages.
+
+    Return value in [0..1] where higher => more boilerplate-y.
 
     We use a blend of:
     - repeated token ratio

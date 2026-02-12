@@ -1,1 +1,1 @@
-# Init file for the root of the entire project.
+"""Root package for the event intelligence platform API."""
