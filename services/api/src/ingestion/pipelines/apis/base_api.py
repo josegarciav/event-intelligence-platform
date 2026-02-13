@@ -45,6 +45,7 @@ from src.schemas.event import (
     PriceInfo,
     PrimaryCategory,
     SourceInfo,
+    TicketInfo,
     TaxonomyDimension,
 )
 
@@ -109,9 +110,6 @@ class APISourceConfig:
 
     # HTML enrichment (compressed_html scraping)
     html_enrichment: Dict[str, Any] = field(default_factory=dict)
-
-    # Detail query configuration (per-event enrichment)
-    detail_query: Dict[str, Any] = field(default_factory=dict)
 
 
 class ConfigDrivenAPIAdapter(APIAdapter):
@@ -345,54 +343,6 @@ class ConfigDrivenAPIAdapter(APIAdapter):
             fetch_ended_at=datetime.now(timezone.utc),
         )
 
-
-    def fetch_detail(self, event_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Fetch detail data for a single event using the detail query config.
-
-        Args:
-            event_id: Source event ID to query
-
-        Returns:
-            Raw response dict from the detail query, or None on failure.
-        """
-        detail_config = self.source_config.detail_query
-        if not detail_config or not detail_config.get("enabled"):
-            return None
-
-        import requests
-
-        template = detail_config.get("template", "")
-        variables = self._substitute_variables(
-            detail_config.get("variables", {}),
-            {"source_event_id": event_id},
-        )
-
-        endpoint = self.source_config.endpoint
-        try:
-            resp = requests.post(
-                endpoint,
-                json={"query": template, "variables": variables},
-                timeout=self.source_config.timeout_seconds,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-
-            # Navigate to response using response_path
-            response_path = detail_config.get("response_path", "data")
-            result = data
-            for part in response_path.split("."):
-                if isinstance(result, dict):
-                    result = result.get(part)
-                else:
-                    return None
-            return result if isinstance(result, dict) else None
-
-        except Exception as e:
-            logger.warning(f"Detail query failed for event {event_id}: {e}")
-            return None
-
-
 class BaseAPIPipeline(BasePipeline):
     """
     Generic API pipeline for ALL sources.
@@ -449,6 +399,15 @@ class BaseAPIPipeline(BasePipeline):
                         "rate_limit_per_second", 2.0
                     ),
                     timeout_s=source_config.html_enrichment.get("timeout_s", 15.0),
+                    source_name=source_config.source_name,
+                    generated_config_path=source_config.html_enrichment.get(
+                        "generated_config_path"
+                    ),
+                    generated_config_dir=source_config.html_enrichment.get(
+                        "generated_config_dir"
+                    ),
+                    wait_for=source_config.html_enrichment.get("wait_for"),
+                    actions=source_config.html_enrichment.get("actions", []),
                 )
                 self.html_enrichment_scraper = HtmlEnrichmentScraper(enrichment_cfg)
             except ImportError:
@@ -523,16 +482,6 @@ class BaseAPIPipeline(BasePipeline):
 
         # Process all events through pipeline stages
         normalized_events = self._process_events_batch(all_raw_events)
-
-        # Add informational normalization note for traceability
-        total_raw_fetched = len(all_raw_events)
-        for event in normalized_events:
-            event.normalization_errors.append(
-                NormalizationError(
-                    message=f"Info: Batch contained {total_raw_fetched} raw events from API ingestion",
-                    category=NormalizationCategory.API_INGESTION,
-                )
-            )
 
         # Deduplication
         if self.config.deduplicate and normalized_events:
@@ -628,6 +577,14 @@ class BaseAPIPipeline(BasePipeline):
         max_pages = self.source_config.max_pages
         fetch_capacity = page_size * max_pages
 
+        # Respect explicit caller constraints but allow one relaxation pass if
+        # they are stricter than source defaults and the window saturates.
+        requested_page_size = int(kwargs.pop("page_size", page_size))
+        requested_max_pages = int(kwargs.pop("max_pages", max_pages))
+        can_relax_pagination = (
+            requested_page_size < page_size or requested_max_pages < max_pages
+        )
+
         # Window sizing (in hours for sub-day granularity)
         initial_window_hours = 7 * 24  # 7 days
         min_window_hours = 6  # 6 hours — allows 4 slices per day
@@ -654,57 +611,86 @@ class BaseAPIPipeline(BasePipeline):
                 # Sub-day window within same calendar day — use next day as end
                 date_to_str = (cursor + timedelta(days=1)).strftime("%Y-%m-%d")
 
-            fetch_result = self.adapter.fetch(
-                area_id=area_id,
-                date_from=date_from_str,
-                date_to=date_to_str,
-                **kwargs,
-            )
+            window_page_size = requested_page_size
+            window_max_pages = requested_max_pages
+            relaxed_pagination = False
 
-            if fetch_result.success and fetch_result.raw_data:
-                fetched = len(fetch_result.raw_data)
-                total_available = fetch_result.metadata.get("total_available", fetched)
-                saturated = total_available > fetched
+            while True:
+                fetch_result = self.adapter.fetch(
+                    area_id=area_id,
+                    date_from=date_from_str,
+                    date_to=date_to_str,
+                    page_size=window_page_size,
+                    max_pages=window_max_pages,
+                    **kwargs,
+                )
 
-                if saturated and window_hours > min_window_hours:
-                    # Window too big for this density — halve and retry
-                    window_hours = max(window_hours // 2, min_window_hours)
-                    self.logger.info(
-                        f"  {city_name}: [{date_from_str}..{date_to_str}] "
-                        f"{fetched}/{total_available} events "
-                        f"(SATURATED — shrinking to {window_hours}h)"
-                    )
-                    continue
+                if fetch_result.success and fetch_result.raw_data:
+                    fetched = len(fetch_result.raw_data)
+                    total_available = fetch_result.metadata.get("total_available", fetched)
+                    saturated = total_available > fetched
 
-                # Accept the data (either not saturated or at minimum window)
-                all_events.extend(fetch_result.raw_data)
+                    if saturated and window_hours > min_window_hours:
+                        # Window too big for this density — halve and retry
+                        window_hours = max(window_hours // 2, min_window_hours)
+                        self.logger.info(
+                            f"  {city_name}: [{date_from_str}..{date_to_str}] "
+                            f"{fetched}/{total_available} events "
+                            f"(SATURATED — shrinking to {window_hours}h)"
+                        )
+                        break
 
-                if saturated:
+                    # At min window, try relaxing strict pagination once to recover
+                    # more rows before accepting partial data.
+                    if (
+                        saturated
+                        and window_hours <= min_window_hours
+                        and can_relax_pagination
+                        and not relaxed_pagination
+                    ):
+                        relaxed_pagination = True
+                        window_page_size = page_size
+                        window_max_pages = max_pages
+                        self.logger.info(
+                            f"  {city_name}: [{date_from_str}..{date_to_str}] "
+                            f"{fetched}/{total_available} events "
+                            f"(SATURATED at min window — retrying with relaxed pagination "
+                            f"page_size={window_page_size}, max_pages={window_max_pages})"
+                        )
+                        continue
+
+                    # Accept the data (either not saturated, or still saturated
+                    # after all retries).
+                    all_events.extend(fetch_result.raw_data)
+
+                    if saturated:
+                        self.logger.warning(
+                            f"  {city_name}: [{date_from_str}..{date_to_str}] "
+                            f"{fetched}/{total_available} events "
+                            f"(SATURATED at min window — {total_available - fetched} "
+                            f"events may be missing)"
+                        )
+                    else:
+                        self.logger.info(
+                            f"  {city_name}: [{date_from_str}..{date_to_str}] "
+                            f"{fetched}/{total_available} events"
+                        )
+
+                    # Advance cursor past this window
+                    cursor = window_end
+
+                    # Gradually restore window size toward initial
+                    if window_hours < initial_window_hours:
+                        window_hours = min(window_hours * 2, initial_window_hours)
+                    break
+                else:
+                    # Fetch failed or empty — advance to avoid infinite loop
                     self.logger.warning(
                         f"  {city_name}: [{date_from_str}..{date_to_str}] "
-                        f"{fetched}/{total_available} events "
-                        f"(SATURATED at min window — {total_available - fetched} "
-                        f"events may be missing)"
+                        f"no results or fetch failed, advancing"
                     )
-                else:
-                    self.logger.info(
-                        f"  {city_name}: [{date_from_str}..{date_to_str}] "
-                        f"{fetched}/{total_available} events"
-                    )
-
-                # Advance cursor past this window
-                cursor = window_end
-
-                # Gradually restore window size toward initial
-                if window_hours < initial_window_hours:
-                    window_hours = min(window_hours * 2, initial_window_hours)
-            else:
-                # Fetch failed or empty — advance to avoid infinite loop
-                self.logger.warning(
-                    f"  {city_name}: [{date_from_str}..{date_to_str}] "
-                    f"no results or fetch failed, advancing"
-                )
-                cursor = window_end
+                    cursor = window_end
+                    break
 
         self.logger.info(
             f"  {city_name}: sliding window complete — "
@@ -790,6 +776,22 @@ class BaseAPIPipeline(BasePipeline):
             ).upper(),
             timezone=loc_defaults.get("timezone"),
         )
+        # Coordinates are optional and should come from the same source query.
+        lat_raw = parsed_event.get("venue_latitude") or parsed_event.get("latitude")
+        lng_raw = parsed_event.get("venue_longitude") or parsed_event.get("longitude")
+        if lat_raw is not None and lng_raw is not None:
+            try:
+                location.coordinates = Coordinates(
+                    latitude=float(lat_raw),
+                    longitude=float(lng_raw),
+                )
+            except (ValueError, TypeError):
+                logger.debug(
+                    "Invalid coordinates in source payload for event %s: lat=%s lng=%s",
+                    source_event_id,
+                    lat_raw,
+                    lng_raw,
+                )
 
         # Parse price — supports both string (ra.co) and pre-parsed numeric fields (Ticketmaster)
         cost_min = parsed_event.get("cost_min")
@@ -939,10 +941,21 @@ class BaseAPIPipeline(BasePipeline):
             if flyer_front:
                 image_url = flyer_front
 
+        age_restriction = parsed_event.get("age_restriction")
+        if age_restriction is None:
+            minimum_age = parsed_event.get("minimum_age")
+            if minimum_age is not None:
+                age_restriction = str(minimum_age)
+
+        ticket_info = TicketInfo(
+            url=parsed_event.get("ticket_url"),
+            is_sold_out=bool(parsed_event.get("is_sold_out", False)),
+        )
+
         # Build custom_fields (RA-specific metadata)
         custom_fields = {}
-        if parsed_event.get("is_ticketed"):
-            custom_fields["is_ticketed"] = True
+        if parsed_event.get("is_ticketed") is not None:
+            custom_fields["is_ticketed"] = bool(parsed_event.get("is_ticketed"))
         pick_blurb = parsed_event.get("pick_blurb")
         if pick_blurb:
             custom_fields["pick_blurb"] = pick_blurb
@@ -969,6 +982,8 @@ class BaseAPIPipeline(BasePipeline):
             tags=tags,
             engagement=engagement,
             capacity=capacity,
+            age_restriction=age_restriction,
+            ticket_info=ticket_info,
             custom_fields=custom_fields,
         )
 
@@ -1123,60 +1138,6 @@ class BaseAPIPipeline(BasePipeline):
                 event.normalization_errors.append(
                     NormalizationError(
                         message=f"HTML enrichment error: {e}",
-                        category=NormalizationCategory.ENRICHMENT_FAILURE,
-                    )
-                )
-
-        # Detail query enrichment (coordinates, minimumAge)
-        detail_config = self.source_config.detail_query
-        if detail_config and detail_config.get("enabled") and event.source.source_event_id:
-            try:
-                # Rate limit detail calls
-                import time
-
-                rate = detail_config.get("rate_limit_per_second", 2.0)
-                if rate > 0:
-                    time.sleep(1.0 / rate)
-
-                detail_data = self.adapter.fetch_detail(event.source.source_event_id)
-                if detail_data:
-                    field_mappings = detail_config.get("field_mappings", {})
-
-                    # Extract fields using dot-path navigation
-                    def _extract(data, path):
-                        for part in path.split("."):
-                            if isinstance(data, dict):
-                                data = data.get(part)
-                            else:
-                                return None
-                        return data
-
-                    # minimum_age -> age_restriction
-                    min_age = _extract(detail_data, field_mappings.get("minimum_age", ""))
-                    if min_age is not None and not event.age_restriction:
-                        event.age_restriction = str(min_age)
-
-                    # venue coordinates
-                    lat = _extract(detail_data, field_mappings.get("venue_latitude", ""))
-                    lng = _extract(detail_data, field_mappings.get("venue_longitude", ""))
-                    if lat is not None and lng is not None and not event.location.coordinates:
-                        try:
-                            event.location.coordinates = Coordinates(
-                                latitude=float(lat), longitude=float(lng)
-                            )
-                        except (ValueError, TypeError) as e:
-                            logger.warning(f"Invalid coordinates for event {event.source.source_event_id}: {e}")
-                else:
-                    logger.debug(
-                        f"Detail query returned no data for event {event.source.source_event_id}"
-                    )
-            except Exception as e:
-                logger.warning(
-                    f"Detail enrichment failed for event {event.source.source_event_id}: {e}"
-                )
-                event.normalization_errors.append(
-                    NormalizationError(
-                        message=f"Detail query enrichment error: {e}",
                         category=NormalizationCategory.ENRICHMENT_FAILURE,
                     )
                 )

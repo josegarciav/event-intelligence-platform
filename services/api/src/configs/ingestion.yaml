@@ -176,7 +176,7 @@ sources:
     enrichment:
       geocoding: true
       compressed_html:
-        enabled: false
+        enabled: true
         engine_type: hybrid
         rate_limit_per_second: 2.0
         timeout_s: 15.0

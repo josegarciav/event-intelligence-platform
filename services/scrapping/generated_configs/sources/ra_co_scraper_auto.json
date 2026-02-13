@@ -1,0 +1,73 @@
+{
+  "source_id": "ra_co_scraper_auto",
+  "labels": {
+    "domain": "ra.co",
+    "base_url": "https://ra.co/"
+  },
+  "engine": {
+    "type": "http",
+    "timeout_s": 15,
+    "verify_ssl": true,
+    "retry_policy": {
+      "max_retries": 3,
+      "backoff": "exp",
+      "retry_on_status": [
+        429,
+        500,
+        502,
+        503,
+        504
+      ]
+    },
+    "rate_limit_policy": {
+      "min_delay_s": 0.2,
+      "jitter_s": 0.2
+    }
+  },
+  "entrypoints": [
+    {
+      "url": "https://ra.co/events/es/barcelona",
+      "paging": {
+        "mode": "page",
+        "pages": 1,
+        "start": 1,
+        "step": 1
+      }
+    }
+  ],
+  "discovery": {
+    "wait_for": null,
+    "link_extract": {
+      "method": "regex",
+      "pattern": "https?://(?:www\\.)?ra\\.co/[^\\s\\\"\\'<>]+",
+      "identifier": null
+    },
+    "dedupe": {
+      "content_fields": [
+        "title",
+        "text"
+      ]
+    }
+  },
+  "actions": [],
+  "parse": {},
+  "validation": {
+    "url_field": "url",
+    "title_field": "title",
+    "text_field": "text",
+    "min_text_len": 200,
+    "require_title": false,
+    "require_text": false
+  },
+  "quality": {
+    "min_text_len": 250,
+    "min_title_len": 3,
+    "max_boilerplate_ratio": 0.85
+  },
+  "storage": {
+    "items_format": "jsonl",
+    "save_raw_pages": true
+  },
+  "enabled": true,
+  "config_version": "1.0"
+}

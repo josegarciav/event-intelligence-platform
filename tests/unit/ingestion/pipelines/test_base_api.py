@@ -20,6 +20,7 @@ from src.ingestion.adapters import FetchResult, SourceType
 from src.schemas.event import (
     EventType,
     LocationInfo,
+    NormalizationCategory,
 )
 
 # =============================================================================
@@ -566,6 +567,119 @@ class TestBaseAPIPipelineEnrichEvent:
 
         assert result.location.timezone == "Europe/Madrid"
 
+    def test_enrich_records_error_when_compressed_html_unavailable(
+        self, sample_source_config, create_event
+    ):
+        """Should not synthesize compressed_html when scraper returns None."""
+        pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
+        pipeline.source_config = sample_source_config
+        pipeline.html_enrichment_scraper = MagicMock()
+        pipeline.html_enrichment_scraper.fetch_compressed_html.return_value = None
+
+        event = create_event(
+            title="Fallback Title",
+            description="Fallback description text",
+        )
+        # Ensure source URL exists to trigger enrichment path.
+        event.source.source_url = "https://example.com/event/1"
+
+        result = pipeline.enrich_event(event)
+
+        assert result.source.compressed_html is None
+        assert any(
+            "HTML enrichment returned no content" in e.message
+            for e in result.normalization_errors
+        )
+
+
+class TestBaseAPIPipelineNormalizeToSchema:
+    """Tests for normalize_to_schema mapping behavior."""
+
+    def test_maps_age_restriction_from_minimum_age(
+        self, sample_source_config, sample_pipeline_config
+    ):
+        """Should map minimum_age from main query into age_restriction."""
+        pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
+        pipeline.source_config = sample_source_config
+        pipeline.config = sample_pipeline_config
+        pipeline.feature_extractor = None
+
+        parsed = {
+            "source_event_id": "ev-1",
+            "title": "Age Restricted Event",
+            "start_time": "2026-06-15T20:00:00Z",
+            "minimum_age": 21,
+            "city": "Barcelona",
+            "country_code": "ES",
+            "source_url": "https://example.com/event/1",
+        }
+        event = pipeline.normalize_to_schema(
+            parsed_event=parsed,
+            primary_cat="play_and_fun",
+            taxonomy_dims=[],
+        )
+
+        assert event.age_restriction == "21"
+
+    def test_maps_coordinates_from_main_query_fields(
+        self, sample_source_config, sample_pipeline_config
+    ):
+        """Should map venue_latitude/venue_longitude from main query."""
+        pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
+        pipeline.source_config = sample_source_config
+        pipeline.config = sample_pipeline_config
+        pipeline.feature_extractor = None
+
+        parsed = {
+            "source_event_id": "ev-2",
+            "title": "Geo Event",
+            "start_time": "2026-06-15T20:00:00Z",
+            "venue_latitude": "41.3851",
+            "venue_longitude": "2.1734",
+            "city": "Barcelona",
+            "country_code": "ES",
+            "source_url": "https://example.com/event/2",
+        }
+        event = pipeline.normalize_to_schema(
+            parsed_event=parsed,
+            primary_cat="play_and_fun",
+            taxonomy_dims=[],
+        )
+
+        assert event.location.coordinates is not None
+        assert event.location.coordinates.latitude == 41.3851
+        assert event.location.coordinates.longitude == 2.1734
+
+
+class TestBaseAPIPipelineExecuteNormalizationNoise:
+    """Tests to prevent non-event-specific normalization noise."""
+
+    def test_execute_does_not_add_batch_info_normalization_error(
+        self, sample_source_config, sample_pipeline_config, create_event
+    ):
+        """Batch-level ingestion info should not be persisted per event."""
+        sample_source_config.defaults = {"areas": {"Barcelona": 20}}
+
+        pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
+        pipeline.source_config = sample_source_config
+        pipeline.config = sample_pipeline_config
+        pipeline.adapter = MagicMock()
+        pipeline.logger = MagicMock()
+        pipeline.execution_id = None
+        pipeline.execution_start_time = None
+
+        pipeline._fetch_with_date_splitting = MagicMock(return_value=[{"id": "x"}])
+        event = create_event(title="No Noise")
+        pipeline._process_events_batch = MagicMock(return_value=[event])
+
+        result = pipeline.execute()
+
+        assert result.events
+        assert not any(
+            err.category == NormalizationCategory.API_INGESTION
+            for err in result.events[0].normalization_errors
+        )
+
 
 class TestCreateAPIPipelineFromConfig:
     """Tests for create_api_pipeline_from_config factory function."""
@@ -813,6 +927,39 @@ class TestFetchWithDateSplitting:
         # Verify the windows advance forward
         for i in range(1, len(call_dates)):
             assert call_dates[i][0] >= call_dates[i - 1][0]
+
+    def test_relaxes_low_pagination_constraints_at_min_window(self):
+        """Should retry min window with source defaults when caller is too restrictive."""
+        pipeline = _make_pipeline_for_date_splitting()
+
+        seen_page_sizes = []
+        seen_max_pages = []
+
+        def adaptive_fetch(**kwargs):
+            ps = kwargs.get("page_size")
+            mp = kwargs.get("max_pages")
+            seen_page_sizes.append(ps)
+            seen_max_pages.append(mp)
+
+            # If relaxed to defaults, pretend saturation is solved.
+            if ps == pipeline.source_config.default_page_size and mp == pipeline.source_config.max_pages:
+                return _make_fetch_result(20, total_available=20)
+            return _make_fetch_result(5, total_available=53)
+
+        pipeline.adapter.fetch.side_effect = adaptive_fetch
+
+        events = pipeline._fetch_with_date_splitting(
+            area_id=20,
+            city_name="Barcelona",
+            date_from="2025-06-01",
+            date_to="2025-06-02",
+            page_size=5,
+            max_pages=1,
+        )
+
+        assert len(events) > 0
+        assert pipeline.source_config.default_page_size in seen_page_sizes
+        assert pipeline.source_config.max_pages in seen_max_pages
 
     def test_empty_fetch_advances_cursor(self):
         """Empty/failed fetch should advance cursor to avoid infinite loop."""

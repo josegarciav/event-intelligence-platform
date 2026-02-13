@@ -327,11 +327,23 @@ class BasePipeline(ABC):
 
                 # Step 5: Validate
                 is_valid, validation_messages = self.validate_event(event)
-                event.normalization_errors.extend(validation_messages)
+                normalized_messages = []
+                for msg in validation_messages:
+                    if isinstance(msg, str):
+                        if msg.strip():
+                            normalized_messages.append(
+                                {
+                                    "message": msg.strip(),
+                                    "category": NormalizationCategory.DATA_VALIDATION,
+                                }
+                            )
+                    else:
+                        normalized_messages.append(msg)
+                event.normalization_errors.extend(normalized_messages)
 
                 if not is_valid:
                     self.logger.warning(
-                        f"Validation warnings for event {idx}: {validation_messages}"
+                        f"Validation warnings for event {idx}: {normalized_messages}"
                     )
 
                 # Step 6: Enrich

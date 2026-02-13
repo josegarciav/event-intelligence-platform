@@ -36,6 +36,9 @@ def sample_config():
                 "enabled": True,
                 "pipeline_type": "scraper",
                 "base_url": "https://example.com",
+                "scraper": {
+                    "config_output_path": "/tmp/test_scraper_factory_config.json",
+                },
             },
             "test_legacy": {
                 "enabled": True,
