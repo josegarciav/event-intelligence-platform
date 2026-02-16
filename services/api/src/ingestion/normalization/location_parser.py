@@ -277,6 +277,9 @@ class LocationParser:
                 location.postal_code = parsed.postal_code
             if parsed.state_or_region and not location.state_or_region:
                 location.state_or_region = parsed.state_or_region
+            # Update street_address to cleaned version (postal code, city, country stripped)
+            if parsed.street_address:
+                location.street_address = parsed.street_address
 
         # --- Step 2: geocoding fallback ---
         if location.coordinates is None and self.geocoding_enabled:

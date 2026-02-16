@@ -1044,9 +1044,19 @@ class BaseAPIPipeline(BasePipeline):
         import re
         from datetime import timedelta
 
-        match = re.search(
-            r"[Ll]ast\s+updated[:\s]+(\d+)\s+(minute|hour|day|week|month)s?\s+ago",
+        # Handle "just now" / "a moment ago"
+        just_now = re.search(
+            r"[Ll]ast\s+updated[\s:]*(just\s+now|a\s+moment\s+ago)",
             text,
+            re.DOTALL,
+        )
+        if just_now:
+            return datetime.now(UTC)
+
+        match = re.search(
+            r"[Ll]ast\s+updated[\s:]*(\d+)\s+(minute|hour|day|week|month)s?\s+ago",
+            text,
+            re.DOTALL,
         )
         if match:
             amount = int(match.group(1))
@@ -1062,10 +1072,30 @@ class BaseAPIPipeline(BasePipeline):
             if delta:
                 return datetime.now(UTC) - delta
 
+        # Handle "1 minute ago" (without leading digit in original pattern)
+        single_match = re.search(
+            r"[Ll]ast\s+updated[\s:]*(?:a|1)\s+(minute|hour|day|week|month)\s+ago",
+            text,
+            re.DOTALL,
+        )
+        if single_match:
+            unit = single_match.group(1)
+            delta_map = {
+                "minute": timedelta(minutes=1),
+                "hour": timedelta(hours=1),
+                "day": timedelta(days=1),
+                "week": timedelta(weeks=1),
+                "month": timedelta(days=30),
+            }
+            delta = delta_map.get(unit)
+            if delta:
+                return datetime.now(UTC) - delta
+
         # Try absolute date: "Last updated: Jan 30, 2026" or "2026-01-30"
         abs_match = re.search(
-            r"[Ll]ast\s+updated[:\s]+([A-Z][a-z]{2}\s+\d{1,2},?\s+\d{4})",
+            r"[Ll]ast\s+updated[\s:]*([A-Z][a-z]{2}\s+\d{1,2},?\s+\d{4})",
             text,
+            re.DOTALL,
         )
         if abs_match:
             try:
