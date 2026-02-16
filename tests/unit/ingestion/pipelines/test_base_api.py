@@ -19,7 +19,6 @@ from src.ingestion.pipelines.apis.base_api import (
 from src.schemas.event import (
     EventType,
     LocationInfo,
-    NormalizationCategory,
 )
 
 # =============================================================================
@@ -663,9 +662,8 @@ class TestBaseAPIPipelineExecuteNormalizationNoise:
         result = pipeline.execute()
 
         assert result.events
-        assert not any(
-            err.category == NormalizationCategory.API_INGESTION for err in result.events[0].normalization_errors
-        )
+        # Verify no spurious normalization errors added by pipeline infrastructure
+        assert not any("api_ingestion" in err.message.lower() for err in result.events[0].normalization_errors)
 
 
 class TestCreateAPIPipelineFromConfig:

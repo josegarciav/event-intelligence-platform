@@ -313,7 +313,7 @@ class TestCalculateQualityScore:
             location=LocationInfo(
                 city="Barcelona",
                 venue_name="Test Venue",
-                coordinates=Coordinates(latitude=41.38, longitude=2.17),
+                coordinates=Coordinates(latitude=41.3851, longitude=2.1734),
             ),
             end_datetime=datetime.utcnow() + timedelta(days=1, hours=3),
             image_url="https://example.com/image.jpg",
@@ -622,7 +622,7 @@ class TestToDataFrame:
                 city="Barcelona",
                 venue_name="Test Venue",
                 street_address="123 Main St",
-                coordinates=Coordinates(latitude=41.38, longitude=2.17),
+                coordinates=Coordinates(latitude=41.3851, longitude=2.1734),
             ),
         )
 
@@ -631,8 +631,8 @@ class TestToDataFrame:
 
         assert df["city"].iloc[0] == "Barcelona"
         assert df["venue_name"].iloc[0] == "Test Venue"
-        assert df["latitude"].iloc[0] == 41.38
-        assert df["longitude"].iloc[0] == 2.17
+        assert df["latitude"].iloc[0] == 41.3851
+        assert df["longitude"].iloc[0] == 2.1734
 
     def test_dataframe_flattens_price(self, sample_pipeline_config, mock_adapter, create_event):
         """Should flatten price fields."""

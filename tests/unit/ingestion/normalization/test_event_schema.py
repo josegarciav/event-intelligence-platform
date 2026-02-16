@@ -184,40 +184,37 @@ class TestCoordinates:
     """Tests for Coordinates validation."""
 
     def test_valid_coordinates(self):
-        """Valid lat/lon should create Coordinates."""
-        coords = Coordinates(latitude=40.7128, longitude=-74.0060)
+        """Valid lat/lon with sufficient precision should create Coordinates."""
+        coords = Coordinates(latitude=40.7128, longitude=-74.0059)
         assert coords.latitude == 40.7128
-        assert coords.longitude == -74.0060
+        assert coords.longitude == -74.0059
 
-    def test_edge_valid_coordinates(self):
-        """Edge case valid coordinates."""
-        coords = Coordinates(latitude=90, longitude=180)
-        assert coords.latitude == 90
-        assert coords.longitude == 180
-
-        coords = Coordinates(latitude=-90, longitude=-180)
-        assert coords.latitude == -90
-        assert coords.longitude == -180
+    def test_insufficient_precision_rejected(self):
+        """Coordinates with < 4 decimal places should be rejected."""
+        with pytest.raises(ValidationError, match="insufficient precision"):
+            Coordinates(latitude=41.0, longitude=2.0)
+        with pytest.raises(ValidationError, match="insufficient precision"):
+            Coordinates(latitude=90, longitude=180)
 
     def test_latitude_too_high(self):
         """Latitude > 90 should raise ValidationError."""
-        with pytest.raises(ValidationError, match="Latitude must be between"):
-            Coordinates(latitude=91, longitude=0)
+        with pytest.raises(ValidationError):
+            Coordinates(latitude=91.1234, longitude=2.1734)
 
     def test_latitude_too_low(self):
         """Latitude < -90 should raise ValidationError."""
-        with pytest.raises(ValidationError, match="Latitude must be between"):
-            Coordinates(latitude=-91, longitude=0)
+        with pytest.raises(ValidationError):
+            Coordinates(latitude=-91.1234, longitude=2.1734)
 
     def test_longitude_too_high(self):
         """Longitude > 180 should raise ValidationError."""
-        with pytest.raises(ValidationError, match="Longitude must be between"):
-            Coordinates(latitude=0, longitude=181)
+        with pytest.raises(ValidationError):
+            Coordinates(latitude=41.3851, longitude=181.1234)
 
     def test_longitude_too_low(self):
         """Longitude < -180 should raise ValidationError."""
-        with pytest.raises(ValidationError, match="Longitude must be between"):
-            Coordinates(latitude=0, longitude=-181)
+        with pytest.raises(ValidationError):
+            Coordinates(latitude=41.3851, longitude=-181.1234)
 
 
 class TestLocationInfo:

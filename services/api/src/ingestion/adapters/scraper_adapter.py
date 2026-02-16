@@ -262,9 +262,13 @@ class HtmlEnrichmentScraper:
     def _load_source_render_hints(self) -> None:
         """
         Load optional browser rendering hints (wait_for/actions) from generated config.
+
+        When no generated config is found, runs SourceDetector inline to pick
+        the right engine for this source.
         """
         path = self._resolve_generated_config_path()
         if path is None:
+            self._detect_source_inline()
             return
 
         try:
@@ -307,6 +311,31 @@ class HtmlEnrichmentScraper:
                 path,
             )
             self.config.engine_type = generated_engine_type
+
+    def _detect_source_inline(self) -> None:
+        """Run SourceDetector when no generated config exists to pick the right engine."""
+        # Need at least a preflight URL or source name to derive a seed URL
+        seed_url = next(iter(self._preflight_urls), None)
+        if not seed_url:
+            return
+
+        try:
+            from src.ingestion.source_detector import SourceDetector
+
+            detection = SourceDetector(min_text_len=self.config.min_text_len).probe(seed_url)
+            if detection.needs_javascript and self.config.engine_type == "http":
+                self.logger.info(
+                    "SourceDetector recommends '%s' engine for %s (was http)",
+                    detection.recommended_engine,
+                    seed_url,
+                )
+                self.config.engine_type = detection.recommended_engine
+            if detection.wait_for_selector and self._wait_for is None:
+                self._wait_for = detection.wait_for_selector
+            if detection.requires_actions and not self._actions:
+                self._actions = detection.requires_actions
+        except Exception as exc:
+            self.logger.debug("Inline source detection failed: %s", exc)
 
     def _get_url_host(self, url: str) -> str:
         """Extract lowercase host name from URL."""
@@ -439,6 +468,29 @@ class HtmlEnrichmentScraper:
 
             # Extract structured text from HTML
             doc = html_to_structured(result.text, url=url)
+
+            # Post-extraction fallback: if text is too short and browser
+            # rendering is available, retry with rendered content.
+            if (
+                doc.text
+                and len(doc.text) < self.config.min_text_len
+                and hasattr(engine, "get_rendered")
+                and not needs_render
+            ):
+                self.logger.debug(
+                    "Short text extraction (%d chars) for %s, retrying with browser rendering",
+                    len(doc.text),
+                    url,
+                )
+                self._run_preflight(engine, url)
+                rendered = engine.get_rendered(
+                    url,
+                    actions=self._actions or None,
+                    wait_for=self._wait_for,
+                )
+                if rendered.text and len(rendered.text) > len(result.text):
+                    doc = html_to_structured(rendered.text, url=url)
+
             if not doc.ok or not doc.text:
                 self.logger.debug(f"No text extracted from {url}")
                 return None
@@ -454,6 +506,32 @@ class HtmlEnrichmentScraper:
                 # Hard failures (captcha/access denied/etc.) still return None.
                 hard_errors = [i for i in quality.errors() if i.code != "short_text"]
                 if hard_errors:
+                    # Last resort: try browser rendering if we haven't already
+                    if not needs_render and hasattr(engine, "get_rendered"):
+                        self.logger.debug(
+                            "Quality hard-fail for %s (%s), retrying with browser",
+                            url,
+                            issues,
+                        )
+                        self._run_preflight(engine, url)
+                        rendered = engine.get_rendered(
+                            url,
+                            actions=self._actions or None,
+                            wait_for=self._wait_for,
+                        )
+                        if rendered.text:
+                            doc = html_to_structured(rendered.text, url=url)
+                            if doc.ok and doc.text:
+                                retry_quality = evaluate_quality(
+                                    {"url": url, "title": doc.title or "", "text": doc.text},
+                                    rules={"min_text_len": self.config.min_text_len},
+                                )
+                                retry_hard = [i for i in retry_quality.errors() if i.code != "short_text"]
+                                if not retry_hard:
+                                    text = doc.text
+                                    if len(text) > self.config.max_text_length:
+                                        text = text[: self.config.max_text_length]
+                                    return text
                     self.logger.debug(f"Quality check failed for {url}: {issues}")
                     return None
                 self.logger.debug(f"Quality short-text fallback accepted for {url}: {issues}")

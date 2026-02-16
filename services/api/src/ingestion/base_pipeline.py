@@ -22,7 +22,7 @@ from enum import Enum
 from typing import Any
 
 from src.ingestion.adapters import BaseSourceAdapter, SourceType
-from src.schemas.event import EventSchema, NormalizationCategory
+from src.schemas.event import EventSchema, NormalizationSeverity
 
 
 class PipelineStatus(str, Enum):
@@ -315,12 +315,7 @@ class BasePipeline(ABC):
                 for msg in validation_messages:
                     if isinstance(msg, str):
                         if msg.strip():
-                            normalized_messages.append(
-                                {
-                                    "message": msg.strip(),
-                                    "category": NormalizationCategory.DATA_VALIDATION,
-                                }
-                            )
+                            normalized_messages.append({"message": msg.strip()})
                     else:
                         normalized_messages.append(msg)
                 event.normalization_errors.extend(normalized_messages)
@@ -366,8 +361,8 @@ class BasePipeline(ABC):
         enrichment_bonus += 0.05 if event.description else 0.0
         score += min(enrichment_bonus, 0.3)
 
-        # Penalize validation errors (up to -10%), excluding INFO category
-        real_errors = [e for e in event.normalization_errors if e.category != NormalizationCategory.INFO]
+        # Penalize validation errors (up to -10%), excluding INFO severity
+        real_errors = [e for e in event.normalization_errors if e.severity != NormalizationSeverity.INFO]
         error_penalty = min(len(real_errors) * 0.02, 0.1)
         score -= error_penalty
 

@@ -39,8 +39,8 @@ from src.schemas.event import (
     EventSchema,
     EventType,
     LocationInfo,
-    NormalizationCategory,
     NormalizationError,
+    NormalizationSeverity,
     OrganizerInfo,
     PriceInfo,
     PrimaryCategory,
@@ -110,6 +110,9 @@ class APISourceConfig:
 
     # HTML enrichment (compressed_html scraping)
     html_enrichment: dict[str, Any] = field(default_factory=dict)
+
+    # Location enrichment (geocoding)
+    geocoding_enabled: bool = False
 
 
 class ConfigDrivenAPIAdapter(APIAdapter):
@@ -395,6 +398,9 @@ class BaseAPIPipeline(BasePipeline):
                 self.html_enrichment_scraper = HtmlEnrichmentScraper(enrichment_cfg)
             except ImportError:
                 logger.warning("Scrapping service not available; HTML enrichment disabled")
+
+        # Location parser (lazy-initialized in enrich_event)
+        self._location_parser = None
 
         # Create adapter with config-driven query builder
         adapter = self._create_adapter()
@@ -785,11 +791,24 @@ class BaseAPIPipeline(BasePipeline):
         # Build source info
         source_name = self.source_config.source_name
         source_url = parsed_event.get("source_url") or ""
+
+        # Use source_updated_at from field mappings if available
+        raw_source_updated = parsed_event.get("source_updated_at")
+        source_updated_at = None
+        if raw_source_updated:
+            if isinstance(raw_source_updated, datetime):
+                source_updated_at = raw_source_updated
+            else:
+                try:
+                    source_updated_at = datetime.fromisoformat(str(raw_source_updated))
+                except (ValueError, TypeError):
+                    pass
+
         source = SourceInfo(
             source_name=source_name,
             source_event_id=source_event_id,
             source_url=source_url,
-            source_updated_at=datetime.now(UTC),
+            source_updated_at=source_updated_at,
         )
 
         # Generate platform-wide deterministic UUID for event_id
@@ -981,21 +1000,14 @@ class BaseAPIPipeline(BasePipeline):
 
         # Required fields
         required_fields = validation_config.get("required_fields", ["title", "source_event_id"])
+        missing_required = False
         for field_name in required_fields:
             if field_name == "title" and (not event.title or event.title == "Untitled Event"):
-                errors.append(
-                    NormalizationError(
-                        message="Title is required",
-                        category=NormalizationCategory.MISSING_REQUIRED,
-                    )
-                )
+                errors.append(NormalizationError(message="Title is required"))
+                missing_required = True
             elif field_name == "source_event_id" and not event.source.source_event_id:
-                errors.append(
-                    NormalizationError(
-                        message="Source event ID is required",
-                        category=NormalizationCategory.MISSING_REQUIRED,
-                    )
-                )
+                errors.append(NormalizationError(message="Source event ID is required"))
+                missing_required = True
 
         # Future events only
         if validation_config.get("future_events_only", True):
@@ -1003,30 +1015,66 @@ class BaseAPIPipeline(BasePipeline):
                 errors.append(
                     NormalizationError(
                         message="Warning: Event start time is in the past",
-                        category=NormalizationCategory.DATA_VALIDATION,
+                        severity=NormalizationSeverity.WARNING,
                     )
                 )
 
         # Location validation
         if not event.location.city:
-            errors.append(
-                NormalizationError(
-                    message="City is required",
-                    category=NormalizationCategory.MISSING_REQUIRED,
-                )
-            )
+            errors.append(NormalizationError(message="City is required"))
+            missing_required = True
 
         # Price validation
         if event.price.minimum_price and event.price.minimum_price < 0:
-            errors.append(
-                NormalizationError(
-                    message="Minimum price cannot be negative",
-                    category=NormalizationCategory.DATA_VALIDATION,
-                )
-            )
+            errors.append(NormalizationError(message="Minimum price cannot be negative"))
 
-        is_valid = not any(e.category == NormalizationCategory.MISSING_REQUIRED for e in errors)
+        is_valid = not missing_required
         return is_valid, errors
+
+    @staticmethod
+    def _extract_source_updated_at(text: str) -> datetime | None:
+        """
+        Try to extract a 'Last updated' timestamp from page text.
+
+        Handles patterns like:
+        - "Last updated: 17 days ago"
+        - "Last updated: 2 hours ago"
+        - "Last updated: Jan 30, 2026"
+        """
+        import re
+        from datetime import timedelta
+
+        match = re.search(
+            r"[Ll]ast\s+updated[:\s]+(\d+)\s+(minute|hour|day|week|month)s?\s+ago",
+            text,
+        )
+        if match:
+            amount = int(match.group(1))
+            unit = match.group(2)
+            delta_map = {
+                "minute": timedelta(minutes=amount),
+                "hour": timedelta(hours=amount),
+                "day": timedelta(days=amount),
+                "week": timedelta(weeks=amount),
+                "month": timedelta(days=amount * 30),
+            }
+            delta = delta_map.get(unit)
+            if delta:
+                return datetime.now(UTC) - delta
+
+        # Try absolute date: "Last updated: Jan 30, 2026" or "2026-01-30"
+        abs_match = re.search(
+            r"[Ll]ast\s+updated[:\s]+([A-Z][a-z]{2}\s+\d{1,2},?\s+\d{4})",
+            text,
+        )
+        if abs_match:
+            try:
+                parsed = datetime.strptime(abs_match.group(1).replace(",", ""), "%b %d %Y")
+                return parsed.replace(tzinfo=UTC)
+            except ValueError:
+                pass
+
+        return None
 
     def enrich_event(self, event: EventSchema) -> EventSchema:
         """Enrich event with additional computed data."""
@@ -1038,6 +1086,12 @@ class BaseAPIPipeline(BasePipeline):
         ):
             try:
                 compressed = self.html_enrichment_scraper.fetch_compressed_html(event.source.source_url)
+                # Retry once on failure — transient blocks/timeouts are common
+                if not compressed:
+                    import time as _time
+
+                    _time.sleep(1.0)
+                    compressed = self.html_enrichment_scraper.fetch_compressed_html(event.source.source_url)
                 if compressed:
                     event.source.compressed_html = compressed
                 else:
@@ -1045,7 +1099,7 @@ class BaseAPIPipeline(BasePipeline):
                     event.normalization_errors.append(
                         NormalizationError(
                             message=f"HTML enrichment returned no content for {event.source.source_url}",
-                            category=NormalizationCategory.ENRICHMENT_FAILURE,
+                            severity=NormalizationSeverity.WARNING,
                         )
                     )
             except Exception as e:
@@ -1053,9 +1107,24 @@ class BaseAPIPipeline(BasePipeline):
                 event.normalization_errors.append(
                     NormalizationError(
                         message=f"HTML enrichment error: {e}",
-                        category=NormalizationCategory.ENRICHMENT_FAILURE,
+                        severity=NormalizationSeverity.WARNING,
                     )
                 )
+
+        # Location enrichment: parse address + geocode (if enabled)
+        if getattr(self, "_location_parser", None) is None:
+            from src.ingestion.normalization.location_parser import LocationParser
+
+            self._location_parser = LocationParser(
+                geocoding_enabled=self.source_config.geocoding_enabled,
+            )
+        self._location_parser.enrich_location(event.location)
+
+        # Try to extract source_updated_at from compressed HTML when not set
+        if event.source.compressed_html and not event.source.source_updated_at:
+            extracted_ts = self._extract_source_updated_at(event.source.compressed_html)
+            if extracted_ts:
+                event.source.source_updated_at = extracted_ts
 
         # Calculate duration
         if event.end_datetime and event.start_datetime:
@@ -1133,6 +1202,7 @@ def create_api_pipeline_from_config(
             "feature_extraction", source_config_dict.get("feature_extraction", {})
         ),
         html_enrichment=source_config_dict.get("enrichment", {}).get("compressed_html", {}),
+        geocoding_enabled=source_config_dict.get("enrichment", {}).get("geocoding", False),
     )
 
     # Create pipeline config if not provided

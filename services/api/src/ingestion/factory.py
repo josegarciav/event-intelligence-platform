@@ -230,23 +230,53 @@ class PipelineFactory:
         except ImportError:
             # Fallback template keeps onboarding unblocked even when scrapping is
             # not installed in the current runtime environment.
+            # Run source detection to pick the right engine automatically.
+            from src.ingestion.source_detector import SourceDetector
+
+            detection = SourceDetector().probe(seed_urls[0])
+            logger.info(
+                "Source detection for '%s': engine=%s, framework=%s, js=%s",
+                source_name,
+                detection.recommended_engine,
+                detection.detected_framework,
+                detection.needs_javascript,
+            )
+
+            engine_cfg: dict[str, Any] = {
+                "type": detection.recommended_engine,
+                "timeout_s": scraper_cfg.get("timeout_s", 15),
+                "verify_ssl": True,
+            }
+
+            discovery_cfg: dict[str, Any] = {
+                "link_extract": {
+                    "method": "regex",
+                    "pattern": ".*",
+                    "identifier": "",
+                },
+            }
+            if detection.wait_for_selector:
+                discovery_cfg["wait_for"] = detection.wait_for_selector
+
             generated_config = {
                 "config_version": "1.0",
                 "source_id": source_name,
                 "enabled": bool(source_config.get("enabled", True)),
-                "engine": {"type": "http", "timeout_s": 15, "verify_ssl": True},
-                "entrypoints": [{"url": seed_urls[0]}],
-                "discovery": {
-                    "link_extract": {
-                        "method": "regex",
-                        "pattern": ".*",
-                        "identifier": "",
-                    }
-                },
+                "engine": engine_cfg,
+                "entrypoints": [{"url": url} for url in seed_urls],
+                "discovery": discovery_cfg,
+                "actions": detection.requires_actions or [],
                 "storage": {"items_format": "jsonl"},
+                "_detection": {
+                    "framework": detection.detected_framework,
+                    "needs_javascript": detection.needs_javascript,
+                    "has_anti_bot": detection.has_anti_bot,
+                    "robots_policy": detection.robots_policy,
+                    "notes": detection.detection_notes,
+                },
             }
             logger.warning(
-                "scrapping package not importable; wrote fallback generated config for '%s'",
+                "scrapping package not importable; wrote detection-enhanced fallback config for '%s'",
                 source_name,
             )
 

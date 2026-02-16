@@ -373,16 +373,22 @@ class Coordinates(BaseModel):
 
     @field_validator("latitude")
     def validate_latitude(cls, v):
-        """Validate latitude is within range."""
+        """Validate latitude is within range and has sufficient precision."""
         if not -90 <= v <= 90:
             raise ValueError("Latitude must be between -90 and 90")
+        decimal_str = str(v).split(".")[-1] if "." in str(v) else ""
+        if len(decimal_str) < 4:
+            raise ValueError(f"Latitude {v} has insufficient precision (min 4 decimals, ~11m accuracy)")
         return v
 
     @field_validator("longitude")
     def validate_longitude(cls, v):
-        """Validate longitude is within range."""
+        """Validate longitude is within range and has sufficient precision."""
         if not -180 <= v <= 180:
             raise ValueError("Longitude must be between -180 and 180")
+        decimal_str = str(v).split(".")[-1] if "." in str(v) else ""
+        if len(decimal_str) < 4:
+            raise ValueError(f"Longitude {v} has insufficient precision (min 4 decimals, ~11m accuracy)")
         return v
 
 
@@ -514,9 +520,9 @@ class SourceInfo(BaseModel):
         default=None,
         description="Parsed HTML or JSON data from source for debugging/validation",
     )
-    source_updated_at: datetime = Field(
-        default_factory=_utc_now,
-        description="Timestamp of last update at the source platform",
+    source_updated_at: datetime | None = Field(
+        default=None,
+        description="Timestamp of last update at the source platform (None = unknown)",
     )
     ingestion_timestamp: datetime = Field(default_factory=_utc_now, description="When we ingested this event")
 
@@ -571,27 +577,19 @@ class EngagementMetrics(BaseModel):
     updated_at: datetime | None = None
 
 
-class NormalizationCategory(str, Enum):
-    """Categories for normalization error/info messages. Designed for LLM classification."""
+class NormalizationSeverity(str, Enum):
+    """Severity level for normalization messages."""
 
-    FIELD_MAPPING = "field_mapping"
-    DATA_VALIDATION = "data_validation"
-    TYPE_COERCION = "type_coercion"
-    MISSING_REQUIRED = "missing_required"
-    FORMAT_MISMATCH = "format_mismatch"
-    TAXONOMY_MAPPING = "taxonomy_mapping"
-    ENRICHMENT_FAILURE = "enrichment_failure"
-    SOURCE_QUALITY = "source_quality"
-    API_INGESTION = "api_ingestion"
-    DEDUPLICATION = "deduplication"
     INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
 
 
 class NormalizationError(BaseModel):
     """Structured normalization error/info message."""
 
     message: str
-    category: NormalizationCategory = NormalizationCategory.DATA_VALIDATION
+    severity: NormalizationSeverity = NormalizationSeverity.ERROR
 
 
 # ============================================================================
