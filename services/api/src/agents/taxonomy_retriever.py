@@ -8,7 +8,7 @@ for LLM-based feature extraction.
 import json
 import logging
 from functools import lru_cache
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.configs.config import Config
 
@@ -18,9 +18,9 @@ TAXONOMY_PATH = Config.get_taxonomy_path()
 
 
 @lru_cache(maxsize=1)
-def _load_taxonomy() -> Dict[str, Any]:
+def _load_taxonomy() -> dict[str, Any]:
     """Load and cache the full taxonomy."""
-    with open(TAXONOMY_PATH, "r", encoding="utf-8") as f:
+    with open(TAXONOMY_PATH, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -42,7 +42,7 @@ class TaxonomyRetriever:
         self._category_index = self._build_category_index()
         self._subcategory_index = self._build_subcategory_index()
 
-    def _build_category_index(self) -> Dict[str, Dict[str, Any]]:
+    def _build_category_index(self) -> dict[str, dict[str, Any]]:
         """Build index mapping category_id -> category data."""
         index = {}
         for cat in self._taxonomy.get("categories", []):
@@ -51,7 +51,7 @@ class TaxonomyRetriever:
                 index[cat_id] = cat
         return index
 
-    def _build_subcategory_index(self) -> Dict[str, Dict[str, Any]]:
+    def _build_subcategory_index(self) -> dict[str, dict[str, Any]]:
         """Build index mapping subcategory_id -> subcategory data with parent info."""
         index = {}
         for cat in self._taxonomy.get("categories", []):
@@ -67,11 +67,11 @@ class TaxonomyRetriever:
                     }
         return index
 
-    def get_full_taxonomy(self) -> Dict[str, Any]:
+    def get_full_taxonomy(self) -> dict[str, Any]:
         """Get the full taxonomy."""
         return self._taxonomy
 
-    def get_category_by_id(self, category_id: str) -> Optional[Dict[str, Any]]:
+    def get_category_by_id(self, category_id: str) -> dict[str, Any] | None:
         """
         Get a category by its ID.
 
@@ -83,7 +83,7 @@ class TaxonomyRetriever:
         """
         return self._category_index.get(category_id)
 
-    def get_subcategory_by_id(self, subcategory_id: str) -> Optional[Dict[str, Any]]:
+    def get_subcategory_by_id(self, subcategory_id: str) -> dict[str, Any] | None:
         """
         Get a subcategory by its ID.
 
@@ -95,9 +95,7 @@ class TaxonomyRetriever:
         """
         return self._subcategory_index.get(subcategory_id)
 
-    def get_activities_for_subcategory(
-        self, subcategory_id: str
-    ) -> List[Dict[str, Any]]:
+    def get_activities_for_subcategory(self, subcategory_id: str) -> list[dict[str, Any]]:
         """
         Get all activities for a subcategory.
 
@@ -206,7 +204,7 @@ class TaxonomyRetriever:
 
         return "\n".join(lines)
 
-    def get_attribute_options(self) -> Dict[str, List[str]]:
+    def get_attribute_options(self) -> dict[str, list[str]]:
         """
         Get all possible options for each taxonomy attribute.
 
@@ -261,8 +259,8 @@ class TaxonomyRetriever:
         self,
         subcategory_id: str,
         event_title: str,
-        event_description: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+        event_description: str | None = None,
+    ) -> dict[str, Any] | None:
         """
         Find the best matching activity for an event using keyword matching.
 
@@ -306,7 +304,7 @@ class TaxonomyRetriever:
 
 
 # Singleton instance
-_retriever: Optional[TaxonomyRetriever] = None
+_retriever: TaxonomyRetriever | None = None
 
 
 def get_taxonomy_retriever() -> TaxonomyRetriever:

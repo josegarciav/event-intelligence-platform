@@ -2,7 +2,7 @@ name: "Logistics Enrichment"
 description: "Infers environmental and practical constraints."
 
 system_prompt: |
-  You are an Urban Logistics Expert. You infer practical details from event descriptions 
+  You are an Urban Logistics Expert. You infer practical details from event descriptions
   to help users plan their day.
 
 user_prompt: |

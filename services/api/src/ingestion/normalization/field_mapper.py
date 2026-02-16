@@ -11,7 +11,7 @@ Supports:
 
 import logging
 import re
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +29,8 @@ class FieldMapper:
 
     def __init__(
         self,
-        field_mappings: Dict[str, str],
-        transformations: Optional[Dict[str, Dict[str, Any]]] = None,
+        field_mappings: dict[str, str],
+        transformations: dict[str, dict[str, Any]] | None = None,
     ):
         """
         Initialize the field mapper.
@@ -44,7 +44,7 @@ class FieldMapper:
         self.field_mappings = field_mappings
         self.transformations = transformations or {}
 
-    def map_event(self, raw_event: Dict[str, Any]) -> Dict[str, Any]:
+    def map_event(self, raw_event: dict[str, Any]) -> dict[str, Any]:
         """
         Extract fields from raw event data using configured mappings.
 
@@ -61,9 +61,7 @@ class FieldMapper:
                 value = self._extract_field(raw_event, source_path)
                 result[target_field] = value
             except Exception as e:
-                logger.debug(
-                    f"Failed to extract {target_field} from {source_path}: {e}"
-                )
+                logger.debug(f"Failed to extract {target_field} from {source_path}: {e}")
                 result[target_field] = None
 
         # Apply transformations
@@ -110,11 +108,7 @@ class FieldMapper:
                 return []
 
             if remaining_path:
-                return [
-                    self._extract_field(item, remaining_path)
-                    for item in items
-                    if item is not None
-                ]
+                return [self._extract_field(item, remaining_path) for item in items if item is not None]
             return items
 
         # Handle array index: items[0].name or items[0]
@@ -162,7 +156,7 @@ class FieldMapper:
             return data.get(key)
         return None
 
-    def apply_transformations(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def apply_transformations(self, data: dict[str, Any]) -> dict[str, Any]:
         """
         Apply configured transformations to extracted data.
 
@@ -263,13 +257,11 @@ class FieldMapper:
                         result[field_name] = cleaned
 
             except Exception as e:
-                logger.warning(
-                    f"Failed to apply transformation {transform_type} to {field_name}: {e}"
-                )
+                logger.warning(f"Failed to apply transformation {transform_type} to {field_name}: {e}")
 
         return result
 
-    def _apply_template(self, template: str, data: Dict[str, Any]) -> str:
+    def _apply_template(self, template: str, data: dict[str, Any]) -> str:
         """
         Apply string template with {{field}} placeholders.
 
@@ -294,7 +286,7 @@ class FieldMapper:
         return result
 
 
-def create_field_mapper_from_config(config: Dict[str, Any]) -> FieldMapper:
+def create_field_mapper_from_config(config: dict[str, Any]) -> FieldMapper:
     """
     Create a FieldMapper from YAML config section.
 

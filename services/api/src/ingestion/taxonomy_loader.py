@@ -53,9 +53,7 @@ def load_taxonomy() -> dict:
 # ---------------------------------------------------------------------------
 
 
-def insert_primary_category(
-    cur: psycopg2.extensions.cursor, category: dict, meta: dict
-) -> None:
+def insert_primary_category(cur: psycopg2.extensions.cursor, category: dict, meta: dict) -> None:
     """Insert top-level experience category."""
     cur.execute(
         """
@@ -74,9 +72,7 @@ def insert_primary_category(
     )
 
 
-def insert_subcategory(
-    cur: psycopg2.extensions.cursor, sub: dict, category_id: str
-) -> None:
+def insert_subcategory(cur: psycopg2.extensions.cursor, sub: dict, category_id: str) -> None:
     """Insert subcategory metadata."""
     cur.execute(
         """
@@ -142,9 +138,7 @@ def insert_activity_metadata(
     )
 
 
-def insert_subcategory_value(
-    cur: psycopg2.extensions.cursor, subcategory_id: str, value: str
-) -> None:
+def insert_subcategory_value(cur: psycopg2.extensions.cursor, subcategory_id: str, value: str) -> None:
     """Insert subcategory psychological value."""
     cur.execute(
         """
@@ -162,9 +156,7 @@ def insert_subcategory_value(
     )
 
 
-def insert_activity_emotion(
-    cur: psycopg2.extensions.cursor, activity_id: str, emotion: str
-) -> None:
+def insert_activity_emotion(cur: psycopg2.extensions.cursor, activity_id: str, emotion: str) -> None:
     """Insert emotional output associated with an activity."""
     cur.execute(
         """
@@ -197,11 +189,9 @@ def run_etl():
     cur = conn.cursor()
 
     for category in data["categories"]:
-
         insert_primary_category(cur, category, data)
 
         for sub in category["subcategories"]:
-
             insert_subcategory(
                 cur,
                 sub,
@@ -213,7 +203,6 @@ def run_etl():
             # ---------------------------
 
             for value in sub.get("values", []):
-
                 insert_subcategory_value(
                     cur,
                     sub["id"],
@@ -225,7 +214,6 @@ def run_etl():
             # ---------------------------
 
             for activity in sub["activities"]:
-
                 insert_activity_metadata(
                     cur,
                     activity,
@@ -236,7 +224,6 @@ def run_etl():
                 # Emotional outputs
 
                 for emotion in activity.get("emotional_output", []):
-
                     insert_activity_emotion(
                         cur,
                         activity["activity_id"],

@@ -229,7 +229,7 @@ CREATE TABLE IF NOT EXISTS events (
 
     data_quality_score FLOAT,
 
-    
+
 
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -429,7 +429,7 @@ CREATE TABLE IF NOT EXISTS event_taxonomy_mappings (
     activity_id UUID,
     activity_name TEXT,
 
-    energy_level TEXT, 
+    energy_level TEXT,
     social_intensity TEXT,
     cognitive_load TEXT,
     physical_involvement TEXT,
@@ -600,4 +600,3 @@ CREATE TABLE IF NOT EXISTS normalization_errors (
         REFERENCES events (event_id)
         ON DELETE SET NULL
 );
-

@@ -343,9 +343,7 @@ class TestFactoryFunction:
                 "title": "event.title",
                 "venue": "event.venue.name",
             },
-            "transformations": {
-                "title_lower": {"type": "lowercase", "source": "title"}
-            },
+            "transformations": {"title_lower": {"type": "lowercase", "source": "title"}},
         }
         mapper = create_field_mapper_from_config(config)
 

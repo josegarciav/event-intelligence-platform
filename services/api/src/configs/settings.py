@@ -55,9 +55,7 @@ class Settings(BaseSettings):
     # BASE_DIR points to services/api
     BASE_DIR: Path = Path(__file__).resolve().parents[2]
 
-    TAXONOMY_DATA_PATH: Path = (
-        BASE_DIR / "src" / "assets" / "human_experience_taxonomy_master.json"
-    )
+    TAXONOMY_DATA_PATH: Path = BASE_DIR / "src" / "assets" / "human_experience_taxonomy_master.json"
     INGESTION_CONFIG_PATH: Path = BASE_DIR / "src" / "configs" / "ingestion.yaml"
 
     # -------------------------------------------------------------------------

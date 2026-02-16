@@ -72,9 +72,7 @@ class RunReportBuilder:
             "run_id": self.run_id,
             "started_at_s": self.started_at_s,
             "finished_at_s": self.finished_at_s,
-            "elapsed_s": (
-                (self.finished_at_s - self.started_at_s) if self.finished_at_s else None
-            ),
+            "elapsed_s": ((self.finished_at_s - self.started_at_s) if self.finished_at_s else None),
             "meta": dict(self.meta),
             "summary": agg,
             "sources": [

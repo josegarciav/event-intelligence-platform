@@ -7,12 +7,11 @@ Tests for BaseSourceAdapter, SourceType, FetchResult, and AdapterConfig.
 from datetime import datetime, timedelta
 
 import pytest
-
 from src.ingestion.adapters.base_adapter import (
-    BaseSourceAdapter,
-    SourceType,
-    FetchResult,
     AdapterConfig,
+    BaseSourceAdapter,
+    FetchResult,
+    SourceType,
 )
 
 # =============================================================================

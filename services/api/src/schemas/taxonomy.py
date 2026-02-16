@@ -11,7 +11,7 @@ Provides functions to:
 
 import json
 from functools import lru_cache
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 from src.configs.config import Config
 
@@ -26,11 +26,11 @@ def _normalize_primary_key(label: str) -> str:
 @lru_cache
 def load_taxonomy() -> dict:
     """Load and cache the Human Experience Taxonomy."""
-    with open(TAXONOMY_PATH, "r", encoding="utf-8") as f:
+    with open(TAXONOMY_PATH, encoding="utf-8") as f:
         return json.load(f)
 
 
-def build_taxonomy_index() -> Dict[str, Set[str]]:
+def build_taxonomy_index() -> dict[str, set[str]]:
     """
     Build a mapping of primary_category to set of subcategory_ids.
 
@@ -38,7 +38,7 @@ def build_taxonomy_index() -> Dict[str, Set[str]]:
         Dict mapping primary category key to set of subcategory IDs.
     """
     taxonomy = load_taxonomy()
-    index: Dict[str, Set[str]] = {}
+    index: dict[str, set[str]] = {}
 
     for cat in taxonomy["categories"]:
         primary = _normalize_primary_key(cat["category"])
@@ -52,7 +52,7 @@ def build_taxonomy_index() -> Dict[str, Set[str]]:
 # =============================================================================
 
 # Mapping from numeric IDs ("1" through "10") to PrimaryCategory enum values
-_PRIMARY_CATEGORY_ID_MAP: Dict[str, str] = {
+_PRIMARY_CATEGORY_ID_MAP: dict[str, str] = {
     "1": "play_and_fun",
     "2": "exploration_and_adventure",
     "3": "creation_and_expression",
@@ -66,12 +66,10 @@ _PRIMARY_CATEGORY_ID_MAP: Dict[str, str] = {
 }
 
 # Reverse mapping from enum value to numeric ID
-_PRIMARY_CATEGORY_VALUE_TO_ID: Dict[str, str] = {
-    v: k for k, v in _PRIMARY_CATEGORY_ID_MAP.items()
-}
+_PRIMARY_CATEGORY_VALUE_TO_ID: dict[str, str] = {v: k for k, v in _PRIMARY_CATEGORY_ID_MAP.items()}
 
 
-def get_primary_category_id_map() -> Dict[str, str]:
+def get_primary_category_id_map() -> dict[str, str]:
     """
     Get mapping from numeric ID to primary category value.
 
@@ -81,7 +79,7 @@ def get_primary_category_id_map() -> Dict[str, str]:
     return _PRIMARY_CATEGORY_ID_MAP.copy()
 
 
-def get_primary_category_value_to_id_map() -> Dict[str, str]:
+def get_primary_category_value_to_id_map() -> dict[str, str]:
     """
     Get mapping from primary category value to numeric ID.
 
@@ -91,7 +89,7 @@ def get_primary_category_value_to_id_map() -> Dict[str, str]:
     return _PRIMARY_CATEGORY_VALUE_TO_ID.copy()
 
 
-def get_primary_category_mappings() -> Tuple[Dict[str, str], Dict[str, str]]:
+def get_primary_category_mappings() -> tuple[dict[str, str], dict[str, str]]:
     """
     Build bidirectional ID <-> value mappings for primary categories.
 
@@ -110,7 +108,7 @@ def get_primary_category_mappings() -> Tuple[Dict[str, str], Dict[str, str]]:
     return _PRIMARY_CATEGORY_ID_MAP.copy(), _PRIMARY_CATEGORY_VALUE_TO_ID.copy()
 
 
-def build_primary_to_subcategory_index() -> Dict[str, Set[str]]:
+def build_primary_to_subcategory_index() -> dict[str, set[str]]:
     """
     Map primary_id -> set of valid subcategory_ids.
 
@@ -126,7 +124,7 @@ def build_primary_to_subcategory_index() -> Dict[str, Set[str]]:
         False
     """
     taxonomy_index = build_taxonomy_index()
-    result: Dict[str, Set[str]] = {}
+    result: dict[str, set[str]] = {}
 
     for primary_id, primary_value in _PRIMARY_CATEGORY_ID_MAP.items():
         # The taxonomy index uses normalized keys like "play_and_pure_fun"
@@ -170,7 +168,7 @@ def validate_subcategory_for_primary(subcategory_id: str, primary_id: str) -> bo
 
 
 @lru_cache
-def get_all_subcategory_options() -> List[Dict[str, Any]]:
+def get_all_subcategory_options() -> list[dict[str, Any]]:
     """
     Return a flat list of all subcategory options from the taxonomy.
 
@@ -180,7 +178,7 @@ def get_all_subcategory_options() -> List[Dict[str, Any]]:
       - "primary_category": taxonomy primary key (e.g. "play_and_pure_fun")
     """
     taxonomy = load_taxonomy()
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     for cat in taxonomy["categories"]:
         primary = _normalize_primary_key(cat["category"])
         for sub in cat.get("subcategories", []):
@@ -194,7 +192,7 @@ def get_all_subcategory_options() -> List[Dict[str, Any]]:
     return out
 
 
-def get_all_subcategory_ids() -> Set[str]:
+def get_all_subcategory_ids() -> set[str]:
     """Return the set of all valid subcategory ids."""
     return {opt["id"] for opt in get_all_subcategory_options()}
 
@@ -205,7 +203,7 @@ def get_all_subcategory_ids() -> Set[str]:
 
 
 @lru_cache
-def _build_activity_index() -> Dict[str, Dict[str, Any]]:
+def _build_activity_index() -> dict[str, dict[str, Any]]:
     """
     Build an index mapping activity_id -> full activity dict with context.
 
@@ -219,7 +217,7 @@ def _build_activity_index() -> Dict[str, Dict[str, Any]]:
         - _subcategory_values: subcategory values list
     """
     taxonomy = load_taxonomy()
-    index: Dict[str, Dict[str, Any]] = {}
+    index: dict[str, dict[str, Any]] = {}
 
     for cat in taxonomy["categories"]:
         primary_key = _normalize_primary_key(cat["category"])
@@ -246,7 +244,7 @@ def _build_activity_index() -> Dict[str, Dict[str, Any]]:
 
 
 @lru_cache
-def _build_subcategory_index() -> Dict[str, Dict[str, Any]]:
+def _build_subcategory_index() -> dict[str, dict[str, Any]]:
     """
     Build an index mapping subcategory_id -> subcategory dict with context.
 
@@ -257,7 +255,7 @@ def _build_subcategory_index() -> Dict[str, Dict[str, Any]]:
         - _primary_category_name: original category name
     """
     taxonomy = load_taxonomy()
-    index: Dict[str, Dict[str, Any]] = {}
+    index: dict[str, dict[str, Any]] = {}
 
     for cat in taxonomy["categories"]:
         primary_key = _normalize_primary_key(cat["category"])
@@ -274,7 +272,7 @@ def _build_subcategory_index() -> Dict[str, Dict[str, Any]]:
     return index
 
 
-def get_activity_by_id(activity_id: str) -> Optional[Dict[str, Any]]:
+def get_activity_by_id(activity_id: str) -> dict[str, Any] | None:
     """
     Get full activity details by UUID.
 
@@ -296,7 +294,7 @@ def get_activity_by_id(activity_id: str) -> Optional[Dict[str, Any]]:
     return index.get(activity_id)
 
 
-def get_subcategory_by_id(subcategory_id: str) -> Optional[Dict[str, Any]]:
+def get_subcategory_by_id(subcategory_id: str) -> dict[str, Any] | None:
     """
     Get full subcategory details by ID.
 
@@ -313,7 +311,7 @@ def get_subcategory_by_id(subcategory_id: str) -> Optional[Dict[str, Any]]:
     return index.get(subcategory_id)
 
 
-def get_activities_for_subcategory(subcategory_id: str) -> List[Dict[str, Any]]:
+def get_activities_for_subcategory(subcategory_id: str) -> list[dict[str, Any]]:
     """
     Get all activities for a subcategory.
 
@@ -339,7 +337,7 @@ def find_best_activity_match(
     event_context: str,
     subcategory_id: str,
     threshold: float = 0.3,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """
     Find best matching activity for event text within a subcategory.
 
@@ -392,7 +390,7 @@ def find_best_activity_match(
     return None
 
 
-def get_primary_category_for_subcategory(subcategory_id: str) -> Optional[str]:
+def get_primary_category_for_subcategory(subcategory_id: str) -> str | None:
     """
     Get the primary category key for a subcategory.
 
@@ -411,10 +409,10 @@ def get_primary_category_for_subcategory(subcategory_id: str) -> Optional[str]:
 def get_full_taxonomy_dimension(
     primary_category: str,
     subcategory_id: str,
-    activity_id: Optional[str] = None,
+    activity_id: str | None = None,
     confidence: float = 0.5,
-    values: Optional[List[str]] = None,
-) -> Dict[str, Any]:
+    values: list[str] | None = None,
+) -> dict[str, Any]:
     """
     Build complete TaxonomyDimension dict with all fields from schema example.
 
@@ -444,7 +442,7 @@ def get_full_taxonomy_dimension(
         ... )
         >>> print(dim["activity_name"])  # "Party games"
     """
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "primary_category": primary_category,
         "subcategory": subcategory_id,
         "confidence": confidence,
@@ -480,7 +478,7 @@ def get_full_taxonomy_dimension(
     return result
 
 
-def list_all_activities() -> List[Dict[str, Any]]:
+def list_all_activities() -> list[dict[str, Any]]:
     """
     Get a list of all activities across all subcategories.
 
@@ -494,7 +492,7 @@ def list_all_activities() -> List[Dict[str, Any]]:
 def search_activities_by_name(
     query: str,
     limit: int = 50,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Search activities by name.
 

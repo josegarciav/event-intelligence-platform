@@ -7,7 +7,7 @@ Supports OpenAI and Anthropic providers with structured output.
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Type, TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
@@ -30,7 +30,7 @@ class BaseLLMClient(ABC):
     def invoke_structured(
         self,
         prompt: str,
-        output_schema: Type[T],
+        output_schema: type[T],
         **kwargs,
     ) -> T:
         """Invoke the LLM and return structured output matching the schema."""
@@ -52,7 +52,7 @@ class LangChainLLMClient(BaseLLMClient):
         self,
         provider: str = "openai",
         model_name: str = "gpt-4o-mini",
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         temperature: float = 0.1,
         max_tokens: int = 2000,
     ):
@@ -73,21 +73,13 @@ class LangChainLLMClient(BaseLLMClient):
 
         # Get API key
         settings = get_settings()
-        self.api_key: Optional[str] = None
+        self.api_key: str | None = None
         if api_key:
             self.api_key = api_key
         elif provider == "openai":
-            self.api_key = (
-                settings.OPENAI_API_KEY.get_secret_value()
-                if settings.OPENAI_API_KEY
-                else None
-            )
+            self.api_key = settings.OPENAI_API_KEY.get_secret_value() if settings.OPENAI_API_KEY else None
         elif provider == "anthropic":
-            self.api_key = (
-                settings.ANTHROPIC_API_KEY.get_secret_value()
-                if settings.ANTHROPIC_API_KEY
-                else None
-            )
+            self.api_key = settings.ANTHROPIC_API_KEY.get_secret_value() if settings.ANTHROPIC_API_KEY else None
 
         self._llm = None
         self._initialized = False
@@ -158,7 +150,7 @@ class LangChainLLMClient(BaseLLMClient):
     def invoke_structured(
         self,
         prompt: str,
-        output_schema: Type[T],
+        output_schema: type[T],
         **kwargs,
     ) -> T:
         """
@@ -189,7 +181,7 @@ class LangChainLLMClient(BaseLLMClient):
         self,
         system_prompt: str,
         user_prompt: str,
-        output_schema: Optional[Type[T]] = None,
+        output_schema: type[T] | None = None,
         **kwargs,
     ) -> Any:
         """
@@ -237,7 +229,7 @@ class FallbackLLMClient(BaseLLMClient):
     def invoke_structured(
         self,
         prompt: str,
-        output_schema: Type[T],
+        output_schema: type[T],
         **kwargs,
     ) -> T:
         """
@@ -251,8 +243,8 @@ class FallbackLLMClient(BaseLLMClient):
 
 def create_llm_client(
     provider: str = "openai",
-    model_name: Optional[str] = None,
-    api_key: Optional[str] = None,
+    model_name: str | None = None,
+    api_key: str | None = None,
     temperature: float = 0.1,
     fallback_to_rules: bool = True,
 ) -> BaseLLMClient:

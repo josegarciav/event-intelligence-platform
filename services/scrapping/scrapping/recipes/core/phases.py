@@ -83,9 +83,7 @@ class PhaseRunner:
 
             except Exception as e:
                 elapsed = (time.time() - t0) * 1000
-                res = PhaseResult(
-                    name=phase.name, ok=False, elapsed_ms=elapsed, error=str(e)
-                )
+                res = PhaseResult(name=phase.name, ok=False, elapsed_ms=elapsed, error=str(e))
                 self.results.append(res)
                 emit_event(
                     self.log,

@@ -5,13 +5,13 @@ Adapter for fetching and cleaning individual
 event page HTML using the scrapping service engines.
 """
 
-import logging
 import json
+import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable, Dict, Optional
 from urllib.parse import urlparse
 
 from .base_adapter import AdapterConfig, BaseSourceAdapter, FetchResult, SourceType
@@ -49,7 +49,7 @@ class ScraperAdapter(BaseSourceAdapter):
     def __init__(
         self,
         config: ScraperAdapterConfig,
-        html_parser: Optional[Callable[[str, str], Dict]] = None,
+        html_parser: Callable[[str, str], dict] | None = None,
     ):
         """
         Initialize the scraper adapter.
@@ -109,7 +109,7 @@ class ScraperAdapter(BaseSourceAdapter):
         Returns:
             FetchResult with raw data
         """
-        fetch_started = datetime.now(timezone.utc)
+        fetch_started = datetime.now(UTC)
         all_data = []
         errors = []
         metadata = {
@@ -180,7 +180,7 @@ class ScraperAdapter(BaseSourceAdapter):
             errors=errors,
             metadata=metadata,
             fetch_started_at=fetch_started,
-            fetch_ended_at=datetime.now(timezone.utc),
+            fetch_ended_at=datetime.now(UTC),
         )
 
     def close(self) -> None:
@@ -205,10 +205,10 @@ class HtmlEnrichmentConfig:
     timeout_s: float = 15.0
     min_text_len: int = 200
     max_text_length: int = 50_000
-    source_name: Optional[str] = None
-    generated_config_path: Optional[str] = None
-    generated_config_dir: Optional[str] = None
-    wait_for: Optional[str] = None
+    source_name: str | None = None
+    generated_config_path: str | None = None
+    generated_config_dir: str | None = None
+    wait_for: str | None = None
     actions: list[dict] = field(default_factory=list)
     preflight_urls: list[str] = field(default_factory=list)
 
@@ -233,7 +233,7 @@ class HtmlEnrichmentScraper:
         self._preflight_done_hosts: set[str] = set()
         self._load_source_render_hints()
 
-    def _resolve_generated_config_path(self) -> Optional[Path]:
+    def _resolve_generated_config_path(self) -> Path | None:
         """Resolve the generated scrapping config path for this source."""
         if self.config.generated_config_path:
             path = Path(self.config.generated_config_path).expanduser().resolve()
@@ -248,12 +248,7 @@ class HtmlEnrichmentScraper:
         else:
             # repo/services/api/src/ingestion/adapters/scraper_adapter.py
             # -> repo/services/scrapping/generated_configs/sources
-            base_dir = (
-                Path(__file__).resolve().parents[4]
-                / "scrapping"
-                / "generated_configs"
-                / "sources"
-            )
+            base_dir = Path(__file__).resolve().parents[4] / "scrapping" / "generated_configs" / "sources"
 
         candidates = [
             base_dir / f"{source_name}.json",
@@ -394,7 +389,7 @@ class HtmlEnrichmentScraper:
             time.sleep(min_interval - elapsed)
         self._last_request_time = time.monotonic()
 
-    def fetch_compressed_html(self, url: str) -> Optional[str]:
+    def fetch_compressed_html(self, url: str) -> str | None:
         """
         Fetch a URL, extract clean text, and return it if quality passes.
 
@@ -433,9 +428,7 @@ class HtmlEnrichmentScraper:
                 result = engine.get(url)
 
             if not result.text:
-                self.logger.debug(
-                    f"Fetch failed for {url}: status={result.status_code}"
-                )
+                self.logger.debug(f"Fetch failed for {url}: status={result.status_code}")
                 return None
             if not result.ok and result.block_signals:
                 self.logger.debug(
@@ -463,9 +456,7 @@ class HtmlEnrichmentScraper:
                 if hard_errors:
                     self.logger.debug(f"Quality check failed for {url}: {issues}")
                     return None
-                self.logger.debug(
-                    f"Quality short-text fallback accepted for {url}: {issues}"
-                )
+                self.logger.debug(f"Quality short-text fallback accepted for {url}: {issues}")
 
             # Truncate if needed
             text = doc.text

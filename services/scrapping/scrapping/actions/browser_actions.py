@@ -55,9 +55,7 @@ class BrowserActionRunner:
         self.options = options or ActionRunnerOptions()
         self.human = HumanLike(self.options.human)
 
-    async def arun(
-        self, page: Any, actions: Sequence[dict[str, Any]]
-    ) -> list[ActionResult]:
+    async def arun(self, page: Any, actions: Sequence[dict[str, Any]]) -> list[ActionResult]:
         """Execute a list of action dicts on an Async Playwright `page`."""
         results = []
         for idx, act in enumerate(actions):
@@ -72,9 +70,7 @@ class BrowserActionRunner:
             try:
                 if atype == "wait_for":
                     if selector:
-                        await page.wait_for_selector(
-                            selector, timeout=int(timeout_s * 1000)
-                        )
+                        await page.wait_for_selector(selector, timeout=int(timeout_s * 1000))
 
                 elif atype == "click":
                     if selector:
@@ -331,7 +327,7 @@ class BrowserActionRunner:
 
         if (
             "range_s" in params
-            and isinstance(params["range_s"], (list, tuple))
+            and isinstance(params["range_s"], list | tuple)
             and len(params["range_s"]) == 2
         ):
             lo, hi = float(params["range_s"][0]), float(params["range_s"][1])
@@ -350,7 +346,7 @@ class BrowserActionRunner:
         """
         bounds = None
         b = params.get("bounds")
-        if isinstance(b, (list, tuple)) and len(b) == 2:
+        if isinstance(b, list | tuple) and len(b) == 2:
             bounds = (int(b[0]), int(b[1]))
         self.human.mouse_drift(page, bounds=bounds)
 

@@ -17,8 +17,8 @@ The backbone of this system is MCP.
 
 # 2. Internal Motto
 
-> Data is our moat.  
-> Design like we are right.  
+> Data is our moat.
+> Design like we are right.
 > Test like we are wrong.
 
 Implications:
@@ -485,7 +485,7 @@ Future capabilities:
 - Trend detection
 - Cultural forecasting
 - Demand prediction
-- Experience gap detection
+- Experience gap, latent demand detection
 
 ---
 
@@ -500,6 +500,8 @@ MCP is the nervous system.
 Agents are the cognition layer.
 
 The dataset becomes the moat.
+
+Keep track of latent demand (once the product is built). Jose
 
 
 

@@ -109,7 +109,7 @@ Fetch Raw Data ──► Parse ──► Classify to Taxonomy
    ```python
    from ingestion.sources.ra_co import RaCoEventPipeline
    from ingestion.base_pipeline import PipelineConfig
-   
+
    config = PipelineConfig(
        source_name="ra_co",
        base_url="https://ra.co/graphql",
@@ -325,13 +325,13 @@ With this architecture, you can:
 
 You now have a **complete, professional-grade event ingestion pipeline** that:
 
-✅ Standardizes ingestion from multiple sources  
-✅ Integrates your Human Experience Taxonomy into every event  
-✅ Ensures data quality through intelligent scoring  
-✅ Scales easily with new sources  
-✅ Provides full observability and monitoring  
-✅ Handles errors gracefully  
-✅ Is thoroughly documented  
+✅ Standardizes ingestion from multiple sources
+✅ Integrates your Human Experience Taxonomy into every event
+✅ Ensures data quality through intelligent scoring
+✅ Scales easily with new sources
+✅ Provides full observability and monitoring
+✅ Handles errors gracefully
+✅ Is thoroughly documented
 
 **The architecture is solid. The patterns are clear. The implementation is clean.**
 

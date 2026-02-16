@@ -5,7 +5,7 @@ These models define the structured output schemas for extracting
 specific fields from events using the Instructor library.
 """
 
-from typing import List, Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -104,7 +104,7 @@ class TaxonomyAttributesExtraction(BaseModel):
         default="medium",
         description="Repeat frequency: high=weekly, medium=monthly, low=unique",
     )
-    emotional_output: List[str] = Field(
+    emotional_output: list[str] = Field(
         default_factory=lambda: ["enjoyment"],
         description="Expected emotional outcomes",
     )
@@ -118,9 +118,7 @@ class TaxonomyAttributesExtraction(BaseModel):
 class TagsExtraction(BaseModel):
     """Extract tags for an event."""
 
-    tags: List[str] = Field(
-        default_factory=list, description="5-10 relevant search tags"
-    )
+    tags: list[str] = Field(default_factory=list, description="5-10 relevant search tags")
 
 
 # =============================================================================
@@ -136,7 +134,7 @@ class MissingFieldsExtraction(BaseModel):
     fields in a single LLM call based on the config's fill_missing list.
     """
 
-    event_type: Optional[
+    event_type: (
         Literal[
             "concert",
             "festival",
@@ -154,32 +152,25 @@ class MissingFieldsExtraction(BaseModel):
             "art_show",
             "other",
         ]
-    ] = Field(default=None, description="Type of event")
-    tags: List[str] = Field(default_factory=list, description="Search/filter tags")
-    energy_level: Optional[Literal["low", "medium", "high"]] = Field(
-        default=None, description="Energy level of the event"
-    )
-    social_intensity: Optional[Literal["solo", "small_group", "large_group"]] = Field(
+        | None
+    ) = Field(default=None, description="Type of event")
+    tags: list[str] = Field(default_factory=list, description="Search/filter tags")
+    energy_level: Literal["low", "medium", "high"] | None = Field(default=None, description="Energy level of the event")
+    social_intensity: Literal["solo", "small_group", "large_group"] | None = Field(
         default=None, description="Social scale of the event"
     )
-    cognitive_load: Optional[Literal["low", "medium", "high"]] = Field(
-        default=None, description="Mental effort required"
-    )
-    physical_involvement: Optional[Literal["none", "light", "moderate"]] = Field(
+    cognitive_load: Literal["low", "medium", "high"] | None = Field(default=None, description="Mental effort required")
+    physical_involvement: Literal["none", "light", "moderate"] | None = Field(
         default=None, description="Physical activity level"
     )
-    environment: Optional[Literal["indoor", "outdoor", "digital", "mixed"]] = Field(
+    environment: Literal["indoor", "outdoor", "digital", "mixed"] | None = Field(
         default=None, description="Primary environment"
     )
-    emotional_output: List[str] = Field(
-        default_factory=list, description="Expected emotional outcomes"
-    )
-    risk_level: Optional[Literal["none", "very_low", "low", "medium"]] = Field(
-        default=None, description="Risk level"
-    )
-    age_accessibility: Optional[Literal["all", "teens+", "adults"]] = Field(
+    emotional_output: list[str] = Field(default_factory=list, description="Expected emotional outcomes")
+    risk_level: Literal["none", "very_low", "low", "medium"] | None = Field(default=None, description="Risk level")
+    age_accessibility: Literal["all", "teens+", "adults"] | None = Field(
         default=None, description="Age appropriateness"
     )
-    repeatability: Optional[Literal["high", "medium", "low"]] = Field(
+    repeatability: Literal["high", "medium", "low"] | None = Field(
         default=None, description="How often people repeat this"
     )

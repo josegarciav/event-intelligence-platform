@@ -19,10 +19,10 @@ CREATE INDEX idx_ticket_event
 ON ticket_info(event_id);
 
 -- Geospatial & Location
-CREATE INDEX idx_locations_geo 
+CREATE INDEX idx_locations_geo
 ON locations(latitude, longitude);
 
-CREATE INDEX IF NOT EXISTS idx_locations_city 
+CREATE INDEX IF NOT EXISTS idx_locations_city
 ON locations(city);
 
 -- ============================================================
@@ -51,7 +51,7 @@ ON engagement_snapshots(event_id);
 -- CREATE INDEX idx_events_title_search ON events USING gin(to_tsvector('english', title));
 
 -- Fast lookup for events by a specific artist
-CREATE INDEX idx_event_artists_artist_id 
+CREATE INDEX idx_event_artists_artist_id
 ON event_artists(artist_id);
 
 -- -- Fast lookup for events by a specific tag

@@ -3,9 +3,9 @@
 
 ## Event Intelligence Platform
 
-A scalable data platform for ingesting, normalizing, and analyzing event data from multiple heterogeneous sources.  
-The system transforms raw event signals into a canonical, city-aware dataset designed for analytics, experimentation, and machine-learning-driven discovery.  
-Built with extensibility in mind, the platform supports rapid onboarding of new sources, cities, and downstream use cases.  
+A scalable data platform for ingesting, normalizing, and analyzing event data from multiple heterogeneous sources.
+The system transforms raw event signals into a canonical, city-aware dataset designed for analytics, experimentation, and machine-learning-driven discovery.
+Built with extensibility in mind, the platform supports rapid onboarding of new sources, cities, and downstream use cases.
 At its core, events are treated as data products, not just listings.
 
 
@@ -126,10 +126,10 @@ event-intelligence-platform/
 
 ## Roadmap (Initial Phases)
 
-1. **Foundations** — Define canonical event schema, city resolution, and category taxonomy.  
-2. **Ingestion** — Build reliable pipelines for initial sources with scheduling and monitoring.  
-3. **Normalization** — Standardize dates, locations, prices, and categories; track data quality.  
-4. **Analytics** — Expose core metrics and instrument user interaction signals.  
+1. **Foundations** — Define canonical event schema, city resolution, and category taxonomy.
+2. **Ingestion** — Build reliable pipelines for initial sources with scheduling and monitoring.
+3. **Normalization** — Standardize dates, locations, prices, and categories; track data quality.
+4. **Analytics** — Expose core metrics and instrument user interaction signals.
 5. **Experimentation** — Prepare A/B testing framework and baseline recommendation logic.
 
 ### Brainstorming
@@ -177,9 +177,16 @@ uv sync
 uv lock
 ```
 
+
+Running pre-commit:
+
+```bash
+uv run pre-commit run --all-files
+```
+
 ## Contribution Guidelines
 
-This repository **strictly enforces the Conventional Commits specification**.  
+This repository **strictly enforces the Conventional Commits specification**.
 All contributions must follow this format to ensure consistent changelogs, versioning, and collaboration.
 
 Examples:
@@ -211,34 +218,34 @@ This project is structured with clear separation of concerns and Python-first de
 
 ### Layers
 
-**Backend / Ingestion & Normalization**  
-- FastAPI + SQLAlchemy + Pydantic  
-- Handles data ingestion from multiple sources, normalization, enrichment, and storage.  
+**Backend / Ingestion & Normalization**
+- FastAPI + SQLAlchemy + Pydantic
+- Handles data ingestion from multiple sources, normalization, enrichment, and storage.
 
-**Analytics / ML Layer**  
-- FastAPI endpoints, Celery or Prefect pipelines, Jupyter dashboards  
-- Exposes analytics, recommendation, and experimentation services.  
+**Analytics / ML Layer**
+- FastAPI endpoints, Celery or Prefect pipelines, Jupyter dashboards
+- Exposes analytics, recommendation, and experimentation services.
 
-**Application Layer**  
-- Web app → Django, Flask + Jinja, or FastAPI + HTMX  
-- Mobile app → REST/GraphQL endpoints consumed by native SDKs or Flutter/Dart  
-- Frontend is fully decoupled, consuming the same API-first backend.  
+**Application Layer**
+- Web app → Django, Flask + Jinja, or FastAPI + HTMX
+- Mobile app → REST/GraphQL endpoints consumed by native SDKs or Flutter/Dart
+- Frontend is fully decoupled, consuming the same API-first backend.
 
 ### Design Patterns
 
-**Adapter Pattern**  
-- Used at the **pipeline-source level** to standardize diverse event sources (Meetup, Facebook, Ticketing APIs) into a **canonical event schema**.  
+**Adapter Pattern**
+- Used at the **pipeline-source level** to standardize diverse event sources (Meetup, Facebook, Ticketing APIs) into a **canonical event schema**.
 - Each source implements a common interface, allowing the ingestion layer to treat all sources uniformly.
 
-**Other To-Be-Used Patterns**  
-- **Factory Pattern** → dynamically create ingestion pipelines or ML model objects depending on event type or client requirements.  
-- **Observer / Pub-Sub** → track event updates and trigger downstream analytics or experimentation pipelines asynchronously.  
-- **Strategy Pattern** → enable dynamic pricing or recommendation strategies in the analytics layer without changing the core logic.  
+**Other To-Be-Used Patterns**
+- **Factory Pattern** → dynamically create ingestion pipelines or ML model objects depending on event type or client requirements.
+- **Observer / Pub-Sub** → track event updates and trigger downstream analytics or experimentation pipelines asynchronously.
+- **Strategy Pattern** → enable dynamic pricing or recommendation strategies in the analytics layer without changing the core logic.
 - **Singleton Pattern** → for global configuration, logging, or experiment registry within the system.
 
 ### Best Practices
 
-- **FastAPI** for API-first design ensures all clients (web, mobile, CLI) can consume the backend consistently.  
-- **Pydantic models** enforce schema consistency across layers.  
-- **Docker** containerization ensures reproducible environments for backend and CI/CD.  
+- **FastAPI** for API-first design ensures all clients (web, mobile, CLI) can consume the backend consistently.
+- **Pydantic models** enforce schema consistency across layers.
+- **Docker** containerization ensures reproducible environments for backend and CI/CD.
 - **Adapters at source-level** keep the system flexible to add/remove event sources without impacting the pipeline logic.

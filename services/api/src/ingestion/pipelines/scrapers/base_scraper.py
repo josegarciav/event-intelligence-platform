@@ -16,9 +16,10 @@ import logging
 import re
 import time
 from abc import abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin, urlparse
 
 if TYPE_CHECKING:
@@ -43,9 +44,9 @@ class PageFetchResult:
     ok: bool
     url: str
     final_url: str
-    status_code: Optional[int]
-    html: Optional[str]
-    error: Optional[str] = None
+    status_code: int | None
+    html: str | None
+    error: str | None = None
     elapsed_s: float = 0.0
 
 
@@ -89,8 +90,7 @@ def get_config_path(source_name: str) -> Path:
     config_path = SCRAPER_CONFIGS_DIR / f"{source_name}.json"
     if not config_path.exists():
         raise FileNotFoundError(
-            f"Scraper config not found: {config_path}. "
-            f"Available configs: {list_available_configs()}"
+            f"Scraper config not found: {config_path}. " f"Available configs: {list_available_configs()}"
         )
     return config_path
 
@@ -102,7 +102,7 @@ def list_available_configs() -> list[str]:
     return [f.stem for f in SCRAPER_CONFIGS_DIR.glob("*.json")]
 
 
-def load_config_raw(source_name: str) -> Dict[str, Any]:
+def load_config_raw(source_name: str) -> dict[str, Any]:
     """
     Load raw config dict from JSON file.
 
@@ -113,16 +113,16 @@ def load_config_raw(source_name: str) -> Dict[str, Any]:
         Raw config dictionary
     """
     config_path = get_config_path(source_name)
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         return json.load(f)
 
 
 def load_scraper_config(
     source_name: str,
     *,
-    city: Optional[str] = None,
-    country_code: Optional[str] = None,
-    max_pages: Optional[int] = None,
+    city: str | None = None,
+    country_code: str | None = None,
+    max_pages: int | None = None,
     headless: bool = True,
     **overrides: Any,
 ) -> ScraperConfig:
@@ -231,8 +231,8 @@ class EventScraper:
             config: ScraperConfig instance
         """
         self.config = config
-        self._browser: Optional[Browser] = None
-        self._playwright: Optional[Playwright] = None
+        self._browser: Browser | None = None
+        self._playwright: Playwright | None = None
 
     def _ensure_browser(self) -> None:
         """Ensure browser is started."""
@@ -243,8 +243,7 @@ class EventScraper:
             from playwright.sync_api import sync_playwright
         except ImportError:
             raise ImportError(
-                "playwright is required for scraping. "
-                "Install it with: pip install playwright && playwright install"
+                "playwright is required for scraping. " "Install it with: pip install playwright && playwright install"
             )
 
         self._playwright = sync_playwright().start()
@@ -292,12 +291,14 @@ class EventScraper:
             page.set_default_timeout(self.config.timeout_s * 1000)
 
             # Add stealth scripts to avoid detection
-            page.add_init_script("""
+            page.add_init_script(
+                """
                 Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
                 Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
                 Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en', 'es'] });
                 Object.defineProperty(navigator, 'platform', { get: () => 'MacIntel' });
-            """)
+            """
+            )
 
             response = page.goto(url, wait_until="networkidle")
             page.wait_for_timeout(3000)
@@ -323,8 +324,7 @@ class EventScraper:
             is_blocked = "captcha" in html.lower() or status_code == 403
 
             return PageFetchResult(
-                ok=not is_blocked
-                and (status_code is None or (200 <= status_code < 400)),
+                ok=not is_blocked and (status_code is None or (200 <= status_code < 400)),
                 url=url,
                 final_url=final_url,
                 status_code=status_code,
@@ -349,10 +349,10 @@ class EventScraper:
     def fetch_listing_pages(
         self,
         *,
-        city: Optional[str] = None,
-        country_code: Optional[str] = None,
-        max_pages: Optional[int] = None,
-    ) -> List[PageFetchResult]:
+        city: str | None = None,
+        country_code: str | None = None,
+        max_pages: int | None = None,
+    ) -> list[PageFetchResult]:
         """
         Fetch listing pages.
 
@@ -381,9 +381,7 @@ class EventScraper:
             results.append(result)
 
             if result.ok:
-                logger.info(
-                    f"Successfully fetched: {url} ({len(result.html or '')} chars)"
-                )
+                logger.info(f"Successfully fetched: {url} ({len(result.html or '')} chars)")
             else:
                 logger.warning(f"Failed to fetch: {url} - {result.error}")
 
@@ -391,7 +389,7 @@ class EventScraper:
 
         return results
 
-    def extract_event_urls(self, html: str, base_url: str) -> List[str]:
+    def extract_event_urls(self, html: str, base_url: str) -> list[str]:
         """
         Extract event URLs from listing page HTML.
 
@@ -429,10 +427,10 @@ class EventScraper:
 
     def fetch_event_pages(
         self,
-        urls: List[str],
+        urls: list[str],
         *,
-        max_events: Optional[int] = None,
-    ) -> List[PageFetchResult]:
+        max_events: int | None = None,
+    ) -> list[PageFetchResult]:
         """
         Fetch event detail pages.
 
@@ -461,12 +459,10 @@ class EventScraper:
 
             time.sleep(self.config.min_delay_s)
 
-        logger.info(
-            f"Fetched {len(results)} event pages, {sum(1 for r in results if r.ok)} successful"
-        )
+        logger.info(f"Fetched {len(results)} event pages, {sum(1 for r in results if r.ok)} successful")
         return results
 
-    def __enter__(self) -> "EventScraper":
+    def __enter__(self) -> EventScraper:
         """Enter context manager and return scraper instance."""
         return self
 
@@ -508,7 +504,7 @@ class BaseScraperPipeline(BasePipeline):
         self,
         config: PipelineConfig,
         scraper_config: ScraperConfig,
-        html_parser: Optional[Callable[[str, str], Dict]] = None,
+        html_parser: Callable[[str, str], dict] | None = None,
     ):
         """
         Initialize the scraper pipeline.
@@ -540,7 +536,7 @@ class BaseScraperPipeline(BasePipeline):
         super().__init__(config, adapter)
         self.scraper_config = scraper_config
 
-    def _default_html_parser(self, html: str, url: str) -> Dict[str, Any]:
+    def _default_html_parser(self, html: str, url: str) -> dict[str, Any]:
         """
         Delegate to parse_event_html for HTML parsing.
 
@@ -549,7 +545,7 @@ class BaseScraperPipeline(BasePipeline):
         return self.parse_event_html(html, url)
 
     @abstractmethod
-    def parse_event_html(self, html: str, url: str) -> Dict[str, Any]:
+    def parse_event_html(self, html: str, url: str) -> dict[str, Any]:
         """
         Parse event detail page HTML into intermediate format.
 
@@ -562,7 +558,7 @@ class BaseScraperPipeline(BasePipeline):
         """
         pass
 
-    def parse_raw_event(self, raw_event: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_raw_event(self, raw_event: dict[str, Any]) -> dict[str, Any]:
         """
         Parse raw event - already parsed by html_parser in adapter.
 

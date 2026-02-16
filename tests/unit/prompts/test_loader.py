@@ -5,10 +5,9 @@ Tests for PromptLoader class.
 """
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch, mock_open
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
-
 from src.agents.loader import PromptLoader
 
 # =============================================================================
@@ -53,9 +52,7 @@ def mock_taxonomy_retriever():
     retriever = MagicMock()
     retriever.get_subcategory_context_for_prompt.return_value = "Subcategory context"
     retriever.get_all_categories_summary.return_value = "All categories summary"
-    retriever.get_attribute_options_string.return_value = (
-        "- energy_level: low | medium | high"
-    )
+    retriever.get_attribute_options_string.return_value = "- energy_level: low | medium | high"
     return retriever
 
 
@@ -223,9 +220,7 @@ class TestPromptLoaderGetAllGroupPrompts:
         with patch.object(loader, "get_prompt") as mock_get:
             mock_get.return_value = {"system": "sys", "user": "usr"}
 
-            result = loader.get_all_group_prompts(
-                variables={"title": "Test", "description": "Desc"}
-            )
+            result = loader.get_all_group_prompts(variables={"title": "Test", "description": "Desc"})
 
         assert "core" in result
         assert "pulse" in result
@@ -236,9 +231,7 @@ class TestPromptLoaderGetAllGroupPrompts:
         with patch.object(loader, "get_prompt") as mock_get:
             mock_get.return_value = {"system": "sys", "user": "usr"}
 
-            loader.get_all_group_prompts(
-                variables={"title": "Test", "description": "Desc"}
-            )
+            loader.get_all_group_prompts(variables={"title": "Test", "description": "Desc"})
 
         assert mock_get.call_count == 3
 
@@ -247,9 +240,7 @@ class TestPromptLoaderGetAllGroupPrompts:
         with patch.object(loader, "get_prompt") as mock_get:
             mock_get.return_value = {"system": "sys", "user": "usr"}
 
-            loader.get_all_group_prompts(
-                variables={"title": "Test", "description": "Desc"}
-            )
+            loader.get_all_group_prompts(variables={"title": "Test", "description": "Desc"})
 
         # Check calls - get_prompt is called with positional args
         calls = mock_get.call_args_list

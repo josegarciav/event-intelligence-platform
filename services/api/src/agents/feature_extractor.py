@@ -12,7 +12,7 @@ to ensure accurate classification and attribute selection.
 
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from src.agents.extraction_models import (
     MissingFieldsExtraction,
@@ -20,13 +20,13 @@ from src.agents.extraction_models import (
     SubcategoryExtraction,
 )
 from src.agents.taxonomy_retriever import get_taxonomy_retriever
+from src.configs.settings import get_settings
 from src.schemas.features import (
     EventTypeOutput,
     FullTaxonomyEnrichmentOutput,
     MusicGenresOutput,
     TagsOutput,
 )
-from src.configs.settings import get_settings
 
 if TYPE_CHECKING:
     from src.schemas.event import TaxonomyDimension
@@ -67,8 +67,8 @@ class FeatureExtractor:
     def __init__(
         self,
         provider: str = "openai",
-        model_name: Optional[str] = None,
-        api_key: Optional[str] = None,
+        model_name: str | None = None,
+        api_key: str | None = None,
         temperature: float = 0.1,
         max_tokens: int = 2000,
     ):
@@ -89,10 +89,8 @@ class FeatureExtractor:
 
         # Get API key
         settings = get_settings()
-        self._api_key: Optional[str] = api_key or (
-            settings.OPENAI_API_KEY.get_secret_value()
-            if settings.OPENAI_API_KEY
-            else None
+        self._api_key: str | None = api_key or (
+            settings.OPENAI_API_KEY.get_secret_value() if settings.OPENAI_API_KEY else None
         )
 
         # Initialize Instructor client (lazy)
@@ -140,9 +138,7 @@ class FeatureExtractor:
     # PRIMARY CATEGORY CLASSIFICATION
     # =========================================================================
 
-    def extract_primary_category(
-        self, event_context: Dict[str, Any]
-    ) -> PrimaryCategoryExtraction:
+    def extract_primary_category(self, event_context: dict[str, Any]) -> PrimaryCategoryExtraction:
         """
         Classify event into one of 10 primary categories.
 
@@ -190,16 +186,14 @@ class FeatureExtractor:
                 confidence=0.3,
             )
 
-    def _infer_primary_category_rules(self, event_context: Dict[str, Any]) -> str:
+    def _infer_primary_category_rules(self, event_context: dict[str, Any]) -> str:
         """Rule-based primary category inference."""
         title = (event_context.get("title") or "").lower()
         description = (event_context.get("description") or "").lower()
         text = f"{title} {description}"
 
         # Category mapping based on keywords
-        if any(
-            w in text for w in ["concert", "music", "dj", "live", "techno", "house"]
-        ):
+        if any(w in text for w in ["concert", "music", "dj", "live", "techno", "house"]):
             return "1"  # PLAY & PURE FUN
         elif any(w in text for w in ["workshop", "class", "learn", "masterclass"]):
             return "2"  # LEARN & DISCOVER
@@ -226,9 +220,7 @@ class FeatureExtractor:
     # SUBCATEGORY CLASSIFICATION
     # =========================================================================
 
-    def extract_subcategory(
-        self, event_context: Dict[str, Any], category_id: str
-    ) -> SubcategoryExtraction:
+    def extract_subcategory(self, event_context: dict[str, Any], category_id: str) -> SubcategoryExtraction:
         """
         Classify into subcategory within a category using RAG context.
 
@@ -249,9 +241,7 @@ class FeatureExtractor:
 
         client = self._get_client()
         context = self._format_event_context(event_context)
-        subcategory_context = self._taxonomy.get_category_context_for_prompt(
-            category_id
-        )
+        subcategory_context = self._taxonomy.get_category_context_for_prompt(category_id)
 
         try:
             return client.chat.completions.create(
@@ -281,9 +271,7 @@ class FeatureExtractor:
     # FILL MISSING FIELDS
     # =========================================================================
 
-    def fill_missing_fields(
-        self, event_context: Dict[str, Any], fields: List[str]
-    ) -> Dict[str, Any]:
+    def fill_missing_fields(self, event_context: dict[str, Any], fields: list[str]) -> dict[str, Any]:
         """
         Extract multiple missing fields in one call.
 
@@ -316,19 +304,13 @@ class FeatureExtractor:
 
             # Return only the requested fields with non-None values
             extracted = result.model_dump()
-            return {
-                k: v
-                for k, v in extracted.items()
-                if k in fields and v is not None and v != []
-            }
+            return {k: v for k, v in extracted.items() if k in fields and v is not None and v != []}
 
         except Exception as e:
             logger.warning(f"Fill missing fields failed: {e}, using rules")
             return self._fill_missing_fields_rules(event_context, fields)
 
-    def _build_missing_fields_prompt(
-        self, event_context: Dict[str, Any], fields: List[str]
-    ) -> str:
+    def _build_missing_fields_prompt(self, event_context: dict[str, Any], fields: list[str]) -> str:
         """Build prompt for extracting missing fields."""
         event_str = self._format_event_context(event_context)
 
@@ -346,9 +328,7 @@ class FeatureExtractor:
             "repeatability": "Repeat frequency (high, medium, low)",
         }
 
-        fields_to_extract = "\n".join(
-            f"- {f}: {field_descriptions.get(f, f)}" for f in fields
-        )
+        fields_to_extract = "\n".join(f"- {f}: {field_descriptions.get(f, f)}" for f in fields)
 
         return f"""Analyze this event and extract the following fields:
 
@@ -359,11 +339,9 @@ Event:
 
 Extract the requested fields based on the event information."""
 
-    def _fill_missing_fields_rules(
-        self, event_context: Dict[str, Any], fields: List[str]
-    ) -> Dict[str, Any]:
+    def _fill_missing_fields_rules(self, event_context: dict[str, Any], fields: list[str]) -> dict[str, Any]:
         """Rule-based fallback for missing field extraction."""
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
         title = (event_context.get("title") or "").lower()
         description = (event_context.get("description") or "").lower()
         text = f"{title} {description}"
@@ -412,7 +390,7 @@ Extract the requested fields based on the event information."""
     # HIERARCHY PROPAGATION
     # =========================================================================
 
-    def propagate_hierarchy(self, subcategory_id: str) -> Dict[str, Any]:
+    def propagate_hierarchy(self, subcategory_id: str) -> dict[str, Any]:
         """
         Get full hierarchy from subcategory ID.
 
@@ -461,7 +439,7 @@ Extract the requested fields based on the event information."""
     def enrich_taxonomy_dimension(
         self,
         dimension: "TaxonomyDimension",
-        event_context: Dict[str, Any],
+        event_context: dict[str, Any],
     ) -> "TaxonomyDimension":
         """
         Enrich a TaxonomyDimension with activity-level fields.
@@ -491,9 +469,7 @@ Extract the requested fields based on the event information."""
             "confidence": dimension.confidence,
             "activity_id": dimension.activity_id,
             "activity_name": dimension.activity_name,
-            "emotional_output": (
-                dimension.emotional_output.copy() if dimension.emotional_output else []
-            ),
+            "emotional_output": (dimension.emotional_output.copy() if dimension.emotional_output else []),
         }
 
         # Get subcategory details if not already populated
@@ -511,9 +487,7 @@ Extract the requested fields based on the event information."""
 
         # Use LLM or fallback for attribute enrichment
         if self.is_llm_available:
-            attributes = self._enrich_with_llm(
-                event_context, dimension.subcategory, category_id
-            )
+            attributes = self._enrich_with_llm(event_context, dimension.subcategory, category_id)
         else:
             attributes = self._enrich_with_rules(event_context)
 
@@ -534,10 +508,10 @@ Extract the requested fields based on the event information."""
 
     def _enrich_with_llm(
         self,
-        event_context: Dict[str, Any],
-        subcategory_id: Optional[str],
-        category_id: Optional[str],
-    ) -> Dict[str, Any]:
+        event_context: dict[str, Any],
+        subcategory_id: str | None,
+        category_id: str | None,
+    ) -> dict[str, Any]:
         """
         Use LLM to enrich taxonomy attributes.
 
@@ -553,13 +527,9 @@ Extract the requested fields based on the event information."""
 
             # Get taxonomy context filtered by category
             if subcategory_id:
-                taxonomy_context = self._taxonomy.get_subcategory_context_for_prompt(
-                    subcategory_id
-                )
+                taxonomy_context = self._taxonomy.get_subcategory_context_for_prompt(subcategory_id)
             elif category_id:
-                taxonomy_context = self._taxonomy.get_category_context_for_prompt(
-                    category_id
-                )
+                taxonomy_context = self._taxonomy.get_category_context_for_prompt(category_id)
             else:
                 taxonomy_context = self._taxonomy.get_attribute_options_string()
 
@@ -654,19 +624,16 @@ Also suggest relevant emotional outputs (e.g., "joy", "excitement", "connection"
     # RULE-BASED FALLBACK ENRICHMENT
     # =========================================================================
 
-    def _enrich_with_rules(self, event_context: Dict[str, Any]) -> Dict[str, Any]:
+    def _enrich_with_rules(self, event_context: dict[str, Any]) -> dict[str, Any]:
         """Apply rule-based fallback for attribute selection when LLM is unavailable."""
         title = (event_context.get("title") or "").lower()
         description = (event_context.get("description") or "").lower()
         text = f"{title} {description}"
 
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
 
         # Energy level
-        if any(
-            w in text
-            for w in ["festival", "rave", "party", "club", "techno", "house", "night"]
-        ):
+        if any(w in text for w in ["festival", "rave", "party", "club", "techno", "house", "night"]):
             result["energy_level"] = "high"
         elif any(w in text for w in ["workshop", "talk", "exhibition", "gallery"]):
             result["energy_level"] = "medium"
@@ -733,7 +700,7 @@ Also suggest relevant emotional outputs (e.g., "joy", "excitement", "connection"
 
         return result
 
-    def _infer_emotional_output(self, text: str) -> List[str]:
+    def _infer_emotional_output(self, text: str) -> list[str]:
         """Infer emotional outputs from event text."""
         emotions = []
 
@@ -758,7 +725,7 @@ Also suggest relevant emotional outputs (e.g., "joy", "excitement", "connection"
     # SPECIFIC FEATURE EXTRACTION METHODS
     # =========================================================================
 
-    def extract_event_type(self, event_context: Dict[str, Any]) -> Optional[str]:
+    def extract_event_type(self, event_context: dict[str, Any]) -> str | None:
         """
         Extract event type from event context.
 
@@ -797,7 +764,7 @@ Select the single most appropriate event type.""",
         # Fallback
         return self._infer_event_type_rules(event_context)
 
-    def _infer_event_type_rules(self, event_context: Dict[str, Any]) -> str:
+    def _infer_event_type_rules(self, event_context: dict[str, Any]) -> str:
         """Rule-based event type inference."""
         title = (event_context.get("title") or "").lower()
 
@@ -816,7 +783,7 @@ Select the single most appropriate event type.""",
         else:
             return "nightlife"
 
-    def extract_music_genres(self, event_context: Dict[str, Any]) -> List[str]:
+    def extract_music_genres(self, event_context: dict[str, Any]) -> list[str]:
         """
         Extract music genres from event context.
 
@@ -854,7 +821,7 @@ Return a list of relevant music genres (e.g., electronic, techno, house, ambient
         # Fallback
         return self._infer_genres_rules(event_context)
 
-    def _infer_genres_rules(self, event_context: Dict[str, Any]) -> List[str]:
+    def _infer_genres_rules(self, event_context: dict[str, Any]) -> list[str]:
         """Rule-based genre inference."""
         text = f"{event_context.get('title', '')} {event_context.get('description', '')}".lower()
         genres = []
@@ -877,7 +844,7 @@ Return a list of relevant music genres (e.g., electronic, techno, house, ambient
 
         return genres if genres else ["electronic"]  # Default for ra.co events
 
-    def extract_tags(self, event_context: Dict[str, Any]) -> List[str]:
+    def extract_tags(self, event_context: dict[str, Any]) -> list[str]:
         """
         Generate tags for an event.
 
@@ -915,7 +882,7 @@ Return 5-10 relevant tags for search and filtering.""",
         # Fallback
         return self._infer_tags_rules(event_context)
 
-    def _infer_tags_rules(self, event_context: Dict[str, Any]) -> List[str]:
+    def _infer_tags_rules(self, event_context: dict[str, Any]) -> list[str]:
         """Rule-based tag generation."""
         tags = []
         title = (event_context.get("title") or "").lower()
@@ -940,7 +907,7 @@ Return 5-10 relevant tags for search and filtering.""",
     # HELPER METHODS
     # =========================================================================
 
-    def _format_event_context(self, event_context: Dict[str, Any]) -> str:
+    def _format_event_context(self, event_context: dict[str, Any]) -> str:
         """Format event context as string for prompts."""
         lines = []
 
@@ -972,7 +939,7 @@ Return 5-10 relevant tags for search and filtering.""",
 
         return "\n".join(lines)
 
-    def _infer_cost_level(self, event_context: Dict[str, Any]) -> str:
+    def _infer_cost_level(self, event_context: dict[str, Any]) -> str:
         """Infer cost level from price data."""
         price = None
 
@@ -998,7 +965,7 @@ Return 5-10 relevant tags for search and filtering.""",
         else:
             return "high"
 
-    def _infer_time_scale(self, event_context: Dict[str, Any]) -> str:
+    def _infer_time_scale(self, event_context: dict[str, Any]) -> str:
         """Infer time scale from duration."""
         duration = event_context.get("duration_minutes")
 
@@ -1025,7 +992,7 @@ Return 5-10 relevant tags for search and filtering.""",
 
 
 def create_feature_extractor_from_config(
-    config: Dict[str, Any],
+    config: dict[str, Any],
 ) -> FeatureExtractor:
     """
     Create a FeatureExtractor from config.

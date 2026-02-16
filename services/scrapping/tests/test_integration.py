@@ -7,9 +7,7 @@ from scrapping import cli
 
 
 @pytest.mark.integration
-@pytest.mark.skipif(
-    os.environ.get("RUN_INTEGRATION") != "1", reason="RUN_INTEGRATION=1 not set"
-)
+@pytest.mark.skipif(os.environ.get("RUN_INTEGRATION") != "1", reason="RUN_INTEGRATION=1 not set")
 def test_run_example_com(tmp_path):
     results_dir = tmp_path / "results"
     config_path = "tests/fixtures/config_minimal_http.json"

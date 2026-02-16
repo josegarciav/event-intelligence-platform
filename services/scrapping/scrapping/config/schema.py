@@ -84,9 +84,7 @@ class ScheduleConfig(BaseModel):
     frequency: str | None = Field(
         default=None, description="Human-friendly frequency like '15m', '2h', 'daily'."
     )
-    timezone: str | None = Field(
-        default=None, description="IANA timezone, e.g., Europe/Madrid"
-    )
+    timezone: str | None = Field(default=None, description="IANA timezone, e.g., Europe/Madrid")
     priority: int = Field(default=5, ge=1, le=10)
     polling_strategy: PollingStrategy = Field(default=PollingStrategy.fixed)
 
@@ -110,9 +108,7 @@ class PagingConfig(BaseModel):
 class EntryPoint(BaseModel):
     """Define an entry point URL with optional paging and parameters."""
 
-    url: str = Field(
-        ..., description="Entrypoint URL template. May include {page} etc."
-    )
+    url: str = Field(..., description="Entrypoint URL template. May include {page} etc.")
     paging: PagingConfig | None = None
     params: dict[str, Any] = Field(default_factory=dict)
     headers: dict[str, Any] = Field(default_factory=dict)
@@ -133,9 +129,7 @@ class RetryPolicy(BaseModel):
 
     max_retries: int = Field(default=3, ge=0, le=20)
     backoff: str = Field(default="exp", description="exp | fixed | none")
-    retry_on_status: list[int] = Field(
-        default_factory=lambda: [429, 500, 502, 503, 504]
-    )
+    retry_on_status: list[int] = Field(default_factory=lambda: [429, 500, 502, 503, 504])
 
 
 class CaptchaConfig(BaseModel):
@@ -269,14 +263,9 @@ class SourceConfig(BaseModel):
             pass
 
         # Link extractor requirements
-        if (
-            self.discovery
-            and self.discovery.link_extract.method == LinkExtractMethod.regex
-        ):
+        if self.discovery and self.discovery.link_extract.method == LinkExtractMethod.regex:
             if not self.discovery.link_extract.pattern:
-                raise ValueError(
-                    "discovery.link_extract.pattern is required when method=regex"
-                )
+                raise ValueError("discovery.link_extract.pattern is required when method=regex")
 
         if self.discovery and self.discovery.link_extract.method in (
             LinkExtractMethod.css,
@@ -284,9 +273,7 @@ class SourceConfig(BaseModel):
             LinkExtractMethod.js,
         ):
             if not self.discovery.link_extract.selector:
-                raise ValueError(
-                    "discovery.link_extract.selector is required when method!=regex"
-                )
+                raise ValueError("discovery.link_extract.selector is required when method!=regex")
 
         return self
 

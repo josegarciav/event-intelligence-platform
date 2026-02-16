@@ -6,7 +6,6 @@ LLM-based methods are tested with mocked clients.
 """
 
 import pytest
-
 from src.agents.feature_extractor import (
     FeatureExtractor,
     create_feature_extractor_from_config,
@@ -421,9 +420,7 @@ class TestInferEmotionalOutput:
 
     def test_infer_multiple_emotions(self, extractor):
         """Should infer multiple emotions."""
-        result = extractor._infer_emotional_output(
-            "party festival community dance together"
-        )
+        result = extractor._infer_emotional_output("party festival community dance together")
         assert "joy" in result
         assert "excitement" in result
         assert "connection" in result

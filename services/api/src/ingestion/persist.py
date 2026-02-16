@@ -7,7 +7,6 @@ PostgreSQL schema, managing foreign key relationships and transactions.
 """
 
 import logging
-from typing import List
 
 from psycopg2.extras import execute_values
 
@@ -50,7 +49,7 @@ class EventDataWriter:
         except Exception as e:
             logger.error(f"Failed to load metadata cache: {e}")
 
-    def persist_batch(self, events: List[EventSchema]) -> int:
+    def persist_batch(self, events: list[EventSchema]) -> int:
         """
         Persist a list of events to the database.
 
@@ -87,9 +86,7 @@ class EventDataWriter:
             organizer_id = self._persist_organizer(cur, event)
 
             # 4. Event (central spine)
-            event_id = self._persist_event(
-                cur, event, location_id, source_id, organizer_id
-            )
+            event_id = self._persist_event(cur, event, location_id, source_id, organizer_id)
 
             # 5. Price snapshot
             self._persist_price_snapshot(cur, event, event_id)
@@ -226,9 +223,7 @@ class EventDataWriter:
     # 4. Event (central spine)
     # ------------------------------------------------------------------
 
-    def _persist_event(
-        self, cur, event: EventSchema, location_id, source_id, organizer_id
-    ):
+    def _persist_event(self, cur, event: EventSchema, location_id, source_id, organizer_id):
         # Convert PrimaryCategory enum value to taxonomy ID
         primary_cat_id = self._value_to_id.get(event.primary_category)
 
@@ -318,9 +313,7 @@ class EventDataWriter:
 
     def _persist_taxonomy_mappings(self, cur, event: EventSchema, event_id):
         # 1. Cleanup existing mappings (cascades to event_emotional_outputs)
-        cur.execute(
-            "DELETE FROM event_taxonomy_mappings WHERE event_id = %s", (event_id,)
-        )
+        cur.execute("DELETE FROM event_taxonomy_mappings WHERE event_id = %s", (event_id,))
 
         if not event.taxonomy_dimensions:
             return
@@ -340,8 +333,7 @@ class EventDataWriter:
             act_id = dim.activity_id
             if act_id and str(act_id) not in self._valid_activities:
                 logger.warning(
-                    f"Event '{event.title}': activity_id '{act_id}' "
-                    "not found in metadata. Setting to NULL."
+                    f"Event '{event.title}': activity_id '{act_id}' " "not found in metadata. Setting to NULL."
                 )
                 act_id = None
 
@@ -498,10 +490,7 @@ class EventDataWriter:
             return
 
         # 2. Bulk insert
-        asset_data = [
-            (event_id, a.type, a.url, a.title, a.description, a.width, a.height)
-            for a in event.media_assets
-        ]
+        asset_data = [(event_id, a.type, a.url, a.title, a.description, a.width, a.height) for a in event.media_assets]
         execute_values(
             cur,
             """
@@ -567,10 +556,7 @@ class EventDataWriter:
                 unique_artists.append(a)
                 seen_names.add(a.name)
 
-        artist_data = [
-            (a.name, a.soundcloud_url, a.spotify_url, a.instagram_url, a.genre)
-            for a in unique_artists
-        ]
+        artist_data = [(a.name, a.soundcloud_url, a.spotify_url, a.instagram_url, a.genre) for a in unique_artists]
 
         execute_values(
             cur,
@@ -608,10 +594,7 @@ class EventDataWriter:
             return
 
         # 2. Bulk insert
-        error_data = [
-            (event_id, err.category, err.message)
-            for err in event.normalization_errors
-        ]
+        error_data = [(event_id, err.category, err.message) for err in event.normalization_errors]
         execute_values(
             cur,
             "INSERT INTO normalization_errors (event_id, category, error_message) VALUES %s;",

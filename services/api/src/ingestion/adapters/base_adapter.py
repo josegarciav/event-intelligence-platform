@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class SourceType(str, Enum):
@@ -30,12 +30,12 @@ class FetchResult:
 
     success: bool
     source_type: SourceType
-    raw_data: List[Dict[str, Any]] = field(default_factory=list)
+    raw_data: list[dict[str, Any]] = field(default_factory=list)
     total_fetched: int = 0
-    errors: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    fetch_started_at: Optional[datetime] = None
-    fetch_ended_at: Optional[datetime] = None
+    errors: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    fetch_started_at: datetime | None = None
+    fetch_ended_at: datetime | None = None
 
     @property
     def duration_seconds(self) -> float:
@@ -58,7 +58,7 @@ class AdapterConfig:
     request_timeout: int = 30
     max_retries: int = 3
     rate_limit_per_second: float = 1.0
-    custom_config: Dict[str, Any] = field(default_factory=dict)
+    custom_config: dict[str, Any] = field(default_factory=dict)
 
 
 class BaseSourceAdapter(ABC):

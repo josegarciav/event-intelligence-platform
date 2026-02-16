@@ -4,15 +4,14 @@ Unit tests for the taxonomy_retriever module.
 Tests for TaxonomyRetriever class and related functions.
 """
 
-from unittest.mock import patch, mock_open
 import json
+from unittest.mock import mock_open, patch
 
 import pytest
-
 from src.ingestion.normalization.taxonomy_retriever import (
     TaxonomyRetriever,
-    get_taxonomy_retriever,
     _load_taxonomy,
+    get_taxonomy_retriever,
 )
 
 # =============================================================================

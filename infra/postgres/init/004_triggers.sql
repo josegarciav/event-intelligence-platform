@@ -40,4 +40,3 @@ CREATE TRIGGER trg_engagement_snapshots_updated_at
 BEFORE UPDATE ON engagement_snapshots
 FOR EACH ROW
 EXECUTE FUNCTION set_updated_at();
-

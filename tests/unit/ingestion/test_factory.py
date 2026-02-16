@@ -74,7 +74,7 @@ class TestPipelineFactoryInit:
 
     def test_init_uses_default_path(self):
         """Should use default path when not specified."""
-        from src.ingestion.factory import PipelineFactory, DEFAULT_CONFIG_PATH
+        from src.ingestion.factory import DEFAULT_CONFIG_PATH, PipelineFactory
 
         factory = PipelineFactory()
         assert factory.config_path == DEFAULT_CONFIG_PATH
@@ -348,8 +348,8 @@ class TestGetFactory:
 
     def test_get_factory_creates_instance(self):
         """Should create factory instance."""
-        from src.ingestion.factory import get_factory
         import src.ingestion.factory as factory_module
+        from src.ingestion.factory import get_factory
 
         # Reset module state
         factory_module._factory = None
@@ -360,8 +360,8 @@ class TestGetFactory:
 
     def test_get_factory_returns_singleton(self):
         """Should return same instance on multiple calls."""
-        from src.ingestion.factory import get_factory
         import src.ingestion.factory as factory_module
+        from src.ingestion.factory import get_factory
 
         # Reset module state
         factory_module._factory = None
@@ -373,8 +373,8 @@ class TestGetFactory:
 
     def test_get_factory_with_path_creates_new(self, config_file):
         """Should create new factory when path provided."""
-        from src.ingestion.factory import get_factory
         import src.ingestion.factory as factory_module
+        from src.ingestion.factory import get_factory
 
         # Reset module state
         factory_module._factory = None
@@ -530,9 +530,7 @@ class TestRESTAPIPipelineConfig:
 
         assert config is not None
         assert config["connection"]["protocol"] == "rest"
-        assert config["connection"]["endpoint"] == (
-            "https://app.ticketmaster.com/discovery/v2/events.json"
-        )
+        assert config["connection"]["endpoint"] == ("https://app.ticketmaster.com/discovery/v2/events.json")
 
     def test_ticketmaster_pipeline_creation(self):
         """Should create pipeline from Ticketmaster config (even if disabled)."""

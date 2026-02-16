@@ -13,8 +13,8 @@ The pipeline uses:
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from src.agents.feature_extractor import (
     FeatureExtractor,
@@ -45,8 +45,8 @@ from src.schemas.event import (
     PriceInfo,
     PrimaryCategory,
     SourceInfo,
-    TicketInfo,
     TaxonomyDimension,
+    TicketInfo,
 )
 
 logger = logging.getLogger(__name__)
@@ -78,11 +78,11 @@ class APISourceConfig:
     rate_limit_per_second: float = 1.0
 
     # Query configuration
-    query_template: Optional[str] = None
-    query_variables: Dict[str, Any] = field(default_factory=dict)
-    query_params: Dict[str, Any] = field(default_factory=dict)
+    query_template: str | None = None
+    query_variables: dict[str, Any] = field(default_factory=dict)
+    query_params: dict[str, Any] = field(default_factory=dict)
     response_path: str = "data"
-    total_results_path: Optional[str] = None
+    total_results_path: str | None = None
 
     # Pagination
     pagination_type: str = "page_number"  # "page_number" | "cursor" | "offset"
@@ -90,26 +90,26 @@ class APISourceConfig:
     default_page_size: int = 50
 
     # Field mapping
-    field_mappings: Dict[str, str] = field(default_factory=dict)
-    transformations: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    field_mappings: dict[str, str] = field(default_factory=dict)
+    transformations: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     # Taxonomy configuration
-    taxonomy_config: Dict[str, Any] = field(default_factory=dict)
+    taxonomy_config: dict[str, Any] = field(default_factory=dict)
 
     # Event type rules
-    event_type_rules: List[Dict[str, Any]] = field(default_factory=list)
+    event_type_rules: list[dict[str, Any]] = field(default_factory=list)
 
     # Defaults
-    defaults: Dict[str, Any] = field(default_factory=dict)
+    defaults: dict[str, Any] = field(default_factory=dict)
 
     # Validation
-    validation: Dict[str, Any] = field(default_factory=dict)
+    validation: dict[str, Any] = field(default_factory=dict)
 
     # Feature extraction
-    feature_extraction: Dict[str, Any] = field(default_factory=dict)
+    feature_extraction: dict[str, Any] = field(default_factory=dict)
 
     # HTML enrichment (compressed_html scraping)
-    html_enrichment: Dict[str, Any] = field(default_factory=dict)
+    html_enrichment: dict[str, Any] = field(default_factory=dict)
 
 
 class ConfigDrivenAPIAdapter(APIAdapter):
@@ -141,7 +141,7 @@ class ConfigDrivenAPIAdapter(APIAdapter):
             response_parser=self._parse_response,
         )
 
-    def _build_query(self, **kwargs) -> Dict[str, Any]:
+    def _build_query(self, **kwargs) -> dict[str, Any]:
         """
         Build query from config template.
 
@@ -152,12 +152,10 @@ class ConfigDrivenAPIAdapter(APIAdapter):
 
         # Set date defaults if not provided
         if "date_from" not in params:
-            params["date_from"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            params["date_from"] = datetime.now(UTC).strftime("%Y-%m-%d")
         if "date_to" not in params:
             days_ahead = params.get("days_ahead", 30)
-            params["date_to"] = (
-                datetime.now(timezone.utc) + timedelta(days=days_ahead)
-            ).strftime("%Y-%m-%d")
+            params["date_to"] = (datetime.now(UTC) + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
 
         if self.source_config.protocol == "graphql":
             # Build GraphQL query
@@ -183,7 +181,7 @@ class ConfigDrivenAPIAdapter(APIAdapter):
     def _substitute_variables(
         self,
         template: Any,
-        params: Dict[str, Any],
+        params: dict[str, Any],
     ) -> Any:
         """
         Recursively substitute {{variable}} placeholders in template.
@@ -220,16 +218,14 @@ class ConfigDrivenAPIAdapter(APIAdapter):
             return result
 
         elif isinstance(template, dict):
-            return {
-                k: self._substitute_variables(v, params) for k, v in template.items()
-            }
+            return {k: self._substitute_variables(v, params) for k, v in template.items()}
 
         elif isinstance(template, list):
             return [self._substitute_variables(item, params) for item in template]
 
         return template
 
-    def _parse_response(self, response: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _parse_response(self, response: dict[str, Any]) -> list[dict[str, Any]]:
         """
         Parse API response using configured response_path.
 
@@ -271,7 +267,7 @@ class ConfigDrivenAPIAdapter(APIAdapter):
             else:
                 return len(data)
 
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             return int(value)
         return len(data)
 
@@ -288,7 +284,7 @@ class ConfigDrivenAPIAdapter(APIAdapter):
         errors = []
         total_results = 0
 
-        fetch_started = datetime.now(timezone.utc)
+        fetch_started = datetime.now(UTC)
 
         while page <= max_pages:
             logger.info(f"Fetching page {page}/{max_pages}...")
@@ -312,9 +308,7 @@ class ConfigDrivenAPIAdapter(APIAdapter):
 
             # Check if we've fetched all available events
             if len(result.raw_data) < page_size:
-                logger.info(
-                    f"Received {len(result.raw_data)} events (less than page_size), stopping pagination"
-                )
+                logger.info(f"Received {len(result.raw_data)} events (less than page_size), stopping pagination")
                 break
 
             # Check if we've reached total available
@@ -324,9 +318,7 @@ class ConfigDrivenAPIAdapter(APIAdapter):
 
             page += 1
 
-        logger.info(
-            f"Pagination complete: fetched {len(all_data)} total events across {page} pages"
-        )
+        logger.info(f"Pagination complete: fetched {len(all_data)} total events across {page} pages")
 
         return FetchResult(
             success=len(all_data) > 0,
@@ -340,8 +332,9 @@ class ConfigDrivenAPIAdapter(APIAdapter):
                 "max_pages": max_pages,
             },
             fetch_started_at=fetch_started,
-            fetch_ended_at=datetime.now(timezone.utc),
+            fetch_ended_at=datetime.now(UTC),
         )
+
 
 class BaseAPIPipeline(BasePipeline):
     """
@@ -375,11 +368,9 @@ class BaseAPIPipeline(BasePipeline):
         self.taxonomy_mapper = TaxonomyMapper(source_config.taxonomy_config)
 
         # Create feature extractor if enabled
-        self.feature_extractor: Optional[FeatureExtractor] = None
+        self.feature_extractor: FeatureExtractor | None = None
         if source_config.feature_extraction.get("enabled"):
-            self.feature_extractor = create_feature_extractor_from_config(
-                source_config.feature_extraction
-            )
+            self.feature_extractor = create_feature_extractor_from_config(source_config.feature_extraction)
 
         # Create HTML enrichment scraper if enabled
         self.html_enrichment_scraper = None
@@ -392,28 +383,18 @@ class BaseAPIPipeline(BasePipeline):
 
                 enrichment_cfg = HtmlEnrichmentConfig(
                     enabled=True,
-                    engine_type=source_config.html_enrichment.get(
-                        "engine_type", "hybrid"
-                    ),
-                    rate_limit_per_second=source_config.html_enrichment.get(
-                        "rate_limit_per_second", 2.0
-                    ),
+                    engine_type=source_config.html_enrichment.get("engine_type", "hybrid"),
+                    rate_limit_per_second=source_config.html_enrichment.get("rate_limit_per_second", 2.0),
                     timeout_s=source_config.html_enrichment.get("timeout_s", 15.0),
                     source_name=source_config.source_name,
-                    generated_config_path=source_config.html_enrichment.get(
-                        "generated_config_path"
-                    ),
-                    generated_config_dir=source_config.html_enrichment.get(
-                        "generated_config_dir"
-                    ),
+                    generated_config_path=source_config.html_enrichment.get("generated_config_path"),
+                    generated_config_dir=source_config.html_enrichment.get("generated_config_dir"),
                     wait_for=source_config.html_enrichment.get("wait_for"),
                     actions=source_config.html_enrichment.get("actions", []),
                 )
                 self.html_enrichment_scraper = HtmlEnrichmentScraper(enrichment_cfg)
             except ImportError:
-                logger.warning(
-                    "Scrapping service not available; HTML enrichment disabled"
-                )
+                logger.warning("Scrapping service not available; HTML enrichment disabled")
 
         # Create adapter with config-driven query builder
         adapter = self._create_adapter()
@@ -427,16 +408,8 @@ class BaseAPIPipeline(BasePipeline):
             request_timeout=self.source_config.timeout_seconds,
             max_retries=self.source_config.max_retries,
             rate_limit_per_second=self.source_config.rate_limit_per_second,
-            graphql_endpoint=(
-                self.source_config.endpoint
-                if self.source_config.protocol == "graphql"
-                else None
-            ),
-            base_url=(
-                self.source_config.endpoint
-                if self.source_config.protocol == "rest"
-                else ""
-            ),
+            graphql_endpoint=(self.source_config.endpoint if self.source_config.protocol == "graphql" else None),
+            base_url=(self.source_config.endpoint if self.source_config.protocol == "rest" else ""),
         )
 
         return ConfigDrivenAPIAdapter(api_config, self.source_config)
@@ -457,11 +430,8 @@ class BaseAPIPipeline(BasePipeline):
             return super().execute(**kwargs)
 
         self.execution_id = self._generate_execution_id()
-        self.execution_start_time = datetime.now(timezone.utc)
-        self.logger.info(
-            f"Starting multi-city execution: {self.execution_id} "
-            f"({len(areas)} cities)"
-        )
+        self.execution_start_time = datetime.now(UTC)
+        self.logger.info(f"Starting multi-city execution: {self.execution_id} " f"({len(areas)} cities)")
 
         all_raw_events = []
         fetch_errors = []
@@ -469,9 +439,7 @@ class BaseAPIPipeline(BasePipeline):
         for city_name, area_id in areas.items():
             self.logger.info(f"Fetching events for {city_name} (area_id={area_id})...")
             try:
-                raw_events = self._fetch_with_date_splitting(
-                    area_id=area_id, city_name=city_name, **kwargs
-                )
+                raw_events = self._fetch_with_date_splitting(area_id=area_id, city_name=city_name, **kwargs)
                 self.logger.info(f"  {city_name}: {len(raw_events)} raw events fetched")
                 all_raw_events.extend(raw_events)
             except Exception as e:
@@ -490,14 +458,10 @@ class BaseAPIPipeline(BasePipeline):
                 get_deduplicator,
             )
 
-            deduplicator = get_deduplicator(
-                DeduplicationStrategy(self.config.deduplication_strategy)
-            )
+            deduplicator = get_deduplicator(DeduplicationStrategy(self.config.deduplication_strategy))
             before_count = len(normalized_events)
             normalized_events = deduplicator.deduplicate(normalized_events)
-            self.logger.info(
-                f"Deduplication: {before_count} -> {len(normalized_events)} events"
-            )
+            self.logger.info(f"Deduplication: {before_count} -> {len(normalized_events)} events")
 
         status = PipelineStatus.SUCCESS if normalized_events else PipelineStatus.FAILED
         if normalized_events and len(normalized_events) < len(all_raw_events):
@@ -509,7 +473,7 @@ class BaseAPIPipeline(BasePipeline):
             source_type=self.source_type,
             execution_id=self.execution_id,
             started_at=self.execution_start_time,
-            ended_at=datetime.now(timezone.utc),
+            ended_at=datetime.now(UTC),
             total_events_processed=len(all_raw_events),
             successful_events=len(normalized_events),
             failed_events=len(all_raw_events) - len(normalized_events),
@@ -522,8 +486,7 @@ class BaseAPIPipeline(BasePipeline):
         )
 
         self.logger.info(
-            f"Multi-city pipeline completed: "
-            f"{result.successful_events}/{result.total_events_processed} successful"
+            f"Multi-city pipeline completed: " f"{result.successful_events}/{result.total_events_processed} successful"
         )
         return result
 
@@ -532,7 +495,7 @@ class BaseAPIPipeline(BasePipeline):
         area_id: int,
         city_name: str,
         **kwargs,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Fetch events for a single area using an adaptive sliding date window.
 
@@ -560,15 +523,11 @@ class BaseAPIPipeline(BasePipeline):
         """
         days_ahead = self.source_config.defaults.get("days_ahead", 30)
         range_start = datetime.strptime(
-            kwargs.pop("date_from", None)
-            or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            kwargs.pop("date_from", None) or datetime.now(UTC).strftime("%Y-%m-%d"),
             "%Y-%m-%d",
         )
         range_end = datetime.strptime(
-            kwargs.pop("date_to", None)
-            or (datetime.now(timezone.utc) + timedelta(days=days_ahead)).strftime(
-                "%Y-%m-%d"
-            ),
+            kwargs.pop("date_to", None) or (datetime.now(UTC) + timedelta(days=days_ahead)).strftime("%Y-%m-%d"),
             "%Y-%m-%d",
         )
 
@@ -581,16 +540,14 @@ class BaseAPIPipeline(BasePipeline):
         # they are stricter than source defaults and the window saturates.
         requested_page_size = int(kwargs.pop("page_size", page_size))
         requested_max_pages = int(kwargs.pop("max_pages", max_pages))
-        can_relax_pagination = (
-            requested_page_size < page_size or requested_max_pages < max_pages
-        )
+        can_relax_pagination = requested_page_size < page_size or requested_max_pages < max_pages
 
         # Window sizing (in hours for sub-day granularity)
         initial_window_hours = 7 * 24  # 7 days
         min_window_hours = 6  # 6 hours — allows 4 slices per day
         window_hours = initial_window_hours
 
-        all_events: List[Dict[str, Any]] = []
+        all_events: list[dict[str, Any]] = []
         cursor = range_start
 
         self.logger.info(
@@ -672,8 +629,7 @@ class BaseAPIPipeline(BasePipeline):
                         )
                     else:
                         self.logger.info(
-                            f"  {city_name}: [{date_from_str}..{date_to_str}] "
-                            f"{fetched}/{total_available} events"
+                            f"  {city_name}: [{date_from_str}..{date_to_str}] " f"{fetched}/{total_available} events"
                         )
 
                     # Advance cursor past this window
@@ -686,23 +642,19 @@ class BaseAPIPipeline(BasePipeline):
                 else:
                     # Fetch failed or empty — advance to avoid infinite loop
                     self.logger.warning(
-                        f"  {city_name}: [{date_from_str}..{date_to_str}] "
-                        f"no results or fetch failed, advancing"
+                        f"  {city_name}: [{date_from_str}..{date_to_str}] " f"no results or fetch failed, advancing"
                     )
                     cursor = window_end
                     break
 
-        self.logger.info(
-            f"  {city_name}: sliding window complete — "
-            f"{len(all_events)} total raw events"
-        )
+        self.logger.info(f"  {city_name}: sliding window complete — " f"{len(all_events)} total raw events")
         return all_events
 
     # ========================================================================
     # PIPELINE STAGES
     # ========================================================================
 
-    def parse_raw_event(self, raw_event: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_raw_event(self, raw_event: dict[str, Any]) -> dict[str, Any]:
         """
         Parse raw API event using FieldMapper.
 
@@ -716,8 +668,8 @@ class BaseAPIPipeline(BasePipeline):
 
     def map_to_taxonomy(
         self,
-        parsed_event: Dict[str, Any],
-    ) -> Tuple[str, List[Dict[str, Any]]]:
+        parsed_event: dict[str, Any],
+    ) -> tuple[str, list[dict[str, Any]]]:
         """
         Map event to taxonomy using TaxonomyMapper.
 
@@ -733,9 +685,7 @@ class BaseAPIPipeline(BasePipeline):
         dims_as_dicts = [
             {
                 "primary_category": (
-                    dim.primary_category.value
-                    if hasattr(dim.primary_category, "value")
-                    else dim.primary_category
+                    dim.primary_category.value if hasattr(dim.primary_category, "value") else dim.primary_category
                 ),
                 "subcategory": dim.subcategory,
                 "values": dim.values,
@@ -747,9 +697,9 @@ class BaseAPIPipeline(BasePipeline):
 
     def normalize_to_schema(
         self,
-        parsed_event: Dict[str, Any],
+        parsed_event: dict[str, Any],
         primary_cat: str,
-        taxonomy_dims: List[Dict[str, Any]],
+        taxonomy_dims: list[dict[str, Any]],
     ) -> EventSchema:
         """
         Normalize parsed event to EventSchema.
@@ -757,9 +707,7 @@ class BaseAPIPipeline(BasePipeline):
         Uses configuration for defaults and FeatureExtractor for missing fields.
         """
         source_event_id = str(parsed_event.get("source_event_id", ""))
-        start_dt = self._parse_datetime(
-            parsed_event.get("start_time") or parsed_event.get("date")
-        )
+        start_dt = self._parse_datetime(parsed_event.get("start_time") or parsed_event.get("date"))
         end_dt = self._parse_datetime(parsed_event.get("end_time"))
 
         # Get location defaults
@@ -770,10 +718,7 @@ class BaseAPIPipeline(BasePipeline):
             venue_name=parsed_event.get("venue_name"),
             street_address=parsed_event.get("venue_address"),
             city=parsed_event.get("city") or loc_defaults.get("city", "Unknown"),
-            country_code=(
-                parsed_event.get("country_code")
-                or loc_defaults.get("country_code", "US")
-            ).upper(),
+            country_code=(parsed_event.get("country_code") or loc_defaults.get("country_code", "US")).upper(),
             timezone=loc_defaults.get("timezone"),
         )
         # Coordinates are optional and should come from the same source query.
@@ -800,9 +745,9 @@ class BaseAPIPipeline(BasePipeline):
 
         from decimal import Decimal
 
-        min_price: Optional[Decimal] = None
-        max_price: Optional[Decimal] = None
-        price_raw: Optional[str] = None
+        min_price: Decimal | None = None
+        max_price: Decimal | None = None
+        price_raw: str | None = None
         currency: str = str(loc_defaults.get("currency", "EUR"))
 
         if cost_min is not None or cost_max is not None:
@@ -811,21 +756,15 @@ class BaseAPIPipeline(BasePipeline):
             max_price = Decimal(str(cost_max)) if cost_max is not None else None
             if cost_currency:
                 currency = str(cost_currency)
-            price_raw = (
-                f"{min_price}-{max_price} {currency}" if max_price else str(min_price)
-            )
+            price_raw = f"{min_price}-{max_price} {currency}" if max_price else str(min_price)
             is_free = min_price == 0 and (max_price is None or max_price == 0)
         else:
             # String price (e.g. "10€", "Free")
             price_str = parsed_event.get("cost") or ""
-            parsed_min, parsed_max, parsed_currency = CurrencyParser.parse_price_string(
-                str(price_str)
-            )
+            parsed_min, parsed_max, parsed_currency = CurrencyParser.parse_price_string(str(price_str))
             min_price = Decimal(str(parsed_min)) if parsed_min is not None else None
             max_price = Decimal(str(parsed_max)) if parsed_max is not None else None
-            is_free = (min_price is None and max_price is None) or str(
-                price_str
-            ).lower() in ["free", "0", "gratis"]
+            is_free = (min_price is None and max_price is None) or str(price_str).lower() in ["free", "0", "gratis"]
             if parsed_currency:
                 currency = str(parsed_currency)
             price_raw = str(price_str) if price_str else None
@@ -840,9 +779,7 @@ class BaseAPIPipeline(BasePipeline):
 
         # Build organizer
         organizer = OrganizerInfo(
-            name=parsed_event.get("organizer_name")
-            or parsed_event.get("venue_name")
-            or "Unknown",
+            name=parsed_event.get("organizer_name") or parsed_event.get("venue_name") or "Unknown",
         )
 
         # Build source info
@@ -852,7 +789,7 @@ class BaseAPIPipeline(BasePipeline):
             source_name=source_name,
             source_event_id=source_event_id,
             source_url=source_url,
-            source_updated_at=datetime.now(timezone.utc),
+            source_updated_at=datetime.now(UTC),
         )
 
         # Generate platform-wide deterministic UUID for event_id
@@ -878,9 +815,7 @@ class BaseAPIPipeline(BasePipeline):
             enriched_dims = []
             for dim in taxonomy_objs:
                 try:
-                    enriched = self.feature_extractor.enrich_taxonomy_dimension(
-                        dim, parsed_event
-                    )
+                    enriched = self.feature_extractor.enrich_taxonomy_dimension(dim, parsed_event)
                     enriched_dims.append(enriched)
                 except Exception as e:
                     logger.warning(f"Failed to enrich taxonomy dimension: {e}")
@@ -893,13 +828,9 @@ class BaseAPIPipeline(BasePipeline):
         # Use feature extractor for missing fields
         extracted_fields = {}
         if self.feature_extractor:
-            missing_fields = self.source_config.feature_extraction.get(
-                "fill_missing", []
-            )
+            missing_fields = self.source_config.feature_extraction.get("fill_missing", [])
             if missing_fields:
-                extracted_fields = self.feature_extractor.fill_missing_fields(
-                    parsed_event, missing_fields
-                )
+                extracted_fields = self.feature_extractor.fill_missing_fields(parsed_event, missing_fields)
 
                 # Apply extracted event_type
                 if "event_type" in extracted_fields and not event_type:
@@ -923,7 +854,7 @@ class BaseAPIPipeline(BasePipeline):
             try:
                 engagement = EngagementMetrics(
                     going_count=int(attending) if attending is not None else None,
-                    interested_count=int(interested) if interested is not None else None,
+                    interested_count=(int(interested) if interested is not None else None),
                 )
             except (ValueError, TypeError):
                 pass
@@ -987,9 +918,7 @@ class BaseAPIPipeline(BasePipeline):
             custom_fields=custom_fields,
         )
 
-    def _determine_event_type(
-        self, parsed_event: Dict[str, Any]
-    ) -> Optional[EventType]:
+    def _determine_event_type(self, parsed_event: dict[str, Any]) -> EventType | None:
         """Determine event type from configured rules."""
         title = (parsed_event.get("title") or "").lower()
 
@@ -1017,7 +946,7 @@ class BaseAPIPipeline(BasePipeline):
     def _parse_datetime(self, dt_value: Any) -> datetime:
         """Parse datetime from various formats."""
         if not dt_value:
-            return datetime.now(timezone.utc)
+            return datetime.now(UTC)
 
         if isinstance(dt_value, datetime):
             return dt_value
@@ -1030,36 +959,30 @@ class BaseAPIPipeline(BasePipeline):
                     clean = dt_value.split(".")[0]
                     if clean.endswith("Z"):
                         clean = clean[:-1]
-                    return datetime.fromisoformat(clean).replace(tzinfo=timezone.utc)
-                return datetime.fromisoformat(dt_value).replace(tzinfo=timezone.utc)
+                    return datetime.fromisoformat(clean).replace(tzinfo=UTC)
+                return datetime.fromisoformat(dt_value).replace(tzinfo=UTC)
             except ValueError:
                 pass
 
             # Try common formats
             for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"]:
                 try:
-                    return datetime.strptime(dt_value, fmt).replace(tzinfo=timezone.utc)
+                    return datetime.strptime(dt_value, fmt).replace(tzinfo=UTC)
                 except ValueError:
                     continue
 
         logger.warning(f"Could not parse datetime: {dt_value}")
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
 
-    def validate_event(
-        self, event: EventSchema
-    ) -> Tuple[bool, List[NormalizationError]]:
+    def validate_event(self, event: EventSchema) -> tuple[bool, list[NormalizationError]]:
         """Validate event using configured rules."""
-        errors: List[NormalizationError] = []
+        errors: list[NormalizationError] = []
         validation_config = self.source_config.validation
 
         # Required fields
-        required_fields = validation_config.get(
-            "required_fields", ["title", "source_event_id"]
-        )
+        required_fields = validation_config.get("required_fields", ["title", "source_event_id"])
         for field_name in required_fields:
-            if field_name == "title" and (
-                not event.title or event.title == "Untitled Event"
-            ):
+            if field_name == "title" and (not event.title or event.title == "Untitled Event"):
                 errors.append(
                     NormalizationError(
                         message="Title is required",
@@ -1076,7 +999,7 @@ class BaseAPIPipeline(BasePipeline):
 
         # Future events only
         if validation_config.get("future_events_only", True):
-            if event.start_datetime < datetime.now(timezone.utc):
+            if event.start_datetime < datetime.now(UTC):
                 errors.append(
                     NormalizationError(
                         message="Warning: Event start time is in the past",
@@ -1102,9 +1025,7 @@ class BaseAPIPipeline(BasePipeline):
                 )
             )
 
-        is_valid = not any(
-            e.category == NormalizationCategory.MISSING_REQUIRED for e in errors
-        )
+        is_valid = not any(e.category == NormalizationCategory.MISSING_REQUIRED for e in errors)
         return is_valid, errors
 
     def enrich_event(self, event: EventSchema) -> EventSchema:
@@ -1116,15 +1037,11 @@ class BaseAPIPipeline(BasePipeline):
             and not event.source.compressed_html
         ):
             try:
-                compressed = self.html_enrichment_scraper.fetch_compressed_html(
-                    event.source.source_url
-                )
+                compressed = self.html_enrichment_scraper.fetch_compressed_html(event.source.source_url)
                 if compressed:
                     event.source.compressed_html = compressed
                 else:
-                    logger.warning(
-                        f"HTML enrichment returned None for {event.source.source_url}"
-                    )
+                    logger.warning(f"HTML enrichment returned None for {event.source.source_url}")
                     event.normalization_errors.append(
                         NormalizationError(
                             message=f"HTML enrichment returned no content for {event.source.source_url}",
@@ -1132,9 +1049,7 @@ class BaseAPIPipeline(BasePipeline):
                         )
                     )
             except Exception as e:
-                logger.warning(
-                    f"HTML enrichment failed for {event.source.source_url}: {e}"
-                )
+                logger.warning(f"HTML enrichment failed for {event.source.source_url}: {e}")
                 event.normalization_errors.append(
                     NormalizationError(
                         message=f"HTML enrichment error: {e}",
@@ -1173,8 +1088,8 @@ class BaseAPIPipeline(BasePipeline):
 
 def create_api_pipeline_from_config(
     source_name: str,
-    source_config_dict: Dict[str, Any],
-    pipeline_config: Optional[PipelineConfig] = None,
+    source_config_dict: dict[str, Any],
+    pipeline_config: PipelineConfig | None = None,
 ) -> BaseAPIPipeline:
     """
     Create a BaseAPIPipeline from YAML config dict.
@@ -1195,12 +1110,9 @@ def create_api_pipeline_from_config(
     source_config = APISourceConfig(
         source_name=source_name,
         enabled=source_config_dict.get("enabled", True),
-        endpoint=connection.get("endpoint")
-        or source_config_dict.get("graphql_endpoint", ""),
+        endpoint=connection.get("endpoint") or source_config_dict.get("graphql_endpoint", ""),
         protocol=connection.get("protocol", "graphql"),
-        timeout_seconds=connection.get(
-            "timeout_seconds", source_config_dict.get("request_timeout", 30)
-        ),
+        timeout_seconds=connection.get("timeout_seconds", source_config_dict.get("request_timeout", 30)),
         max_retries=source_config_dict.get("max_retries", 3),
         rate_limit_per_second=source_config_dict.get("rate_limit_per_second", 1.0),
         query_template=query_config.get("template"),
@@ -1210,9 +1122,7 @@ def create_api_pipeline_from_config(
         total_results_path=query_config.get("total_results_path"),
         pagination_type=pagination.get("type", "page_number"),
         max_pages=pagination.get("max_pages", 10),
-        default_page_size=pagination.get(
-            "default_page_size", source_config_dict.get("batch_size", 50)
-        ),
+        default_page_size=pagination.get("default_page_size", source_config_dict.get("batch_size", 50)),
         field_mappings=source_config_dict.get("field_mappings", {}),
         transformations=source_config_dict.get("transformations", {}),
         taxonomy_config=source_config_dict.get("taxonomy_suggestions", {}),
@@ -1222,9 +1132,7 @@ def create_api_pipeline_from_config(
         feature_extraction=source_config_dict.get("enrichment", {}).get(
             "feature_extraction", source_config_dict.get("feature_extraction", {})
         ),
-        html_enrichment=source_config_dict.get("enrichment", {}).get(
-            "compressed_html", {}
-        ),
+        html_enrichment=source_config_dict.get("enrichment", {}).get("compressed_html", {}),
     )
 
     # Create pipeline config if not provided

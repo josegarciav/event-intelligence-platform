@@ -138,9 +138,7 @@ class SklearnTextClassifier:
         blob = (title + "\n" + text).strip()
 
         if not blob:
-            return Classification(
-                label="unknown", score=0.0, meta={"reason": "empty_text"}
-            )
+            return Classification(label="unknown", score=0.0, meta={"reason": "empty_text"})
 
         model = self._model
         try:

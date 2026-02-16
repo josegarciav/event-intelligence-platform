@@ -60,9 +60,7 @@ def parse_schedule(spec: dict[str, Any]) -> Schedule | None:
     return None
 
 
-def next_run_times(
-    schedule: Schedule, start_ts: float, n: int = 5
-) -> list[datetime.datetime]:
+def next_run_times(schedule: Schedule, start_ts: float, n: int = 5) -> list[datetime.datetime]:
     """Calculate next N run times starting from start_ts."""
     out = []
     base_dt = datetime.datetime.fromtimestamp(start_ts, tz=datetime.timezone.utc)

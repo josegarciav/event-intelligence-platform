@@ -9,7 +9,6 @@ Provides multiple deduplication strategies using the Strategy pattern:
 
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import List, Optional
 
 from src.schemas.event import EventSchema
 
@@ -27,7 +26,7 @@ class EventDeduplicator(ABC):
     """Abstract base for deduplication strategies."""
 
     @abstractmethod
-    def deduplicate(self, events: List[EventSchema]) -> List[EventSchema]:
+    def deduplicate(self, events: list[EventSchema]) -> list[EventSchema]:
         """Deduplicate events and return unique set."""
         pass
 
@@ -35,7 +34,7 @@ class EventDeduplicator(ABC):
 class ExactMatchDeduplicator(EventDeduplicator):
     """Match by title + venue + date (exact)."""
 
-    def deduplicate(self, events: List[EventSchema]) -> List[EventSchema]:
+    def deduplicate(self, events: list[EventSchema]) -> list[EventSchema]:
         """
         Deduplicate events using exact matching on title, venue, and date.
 
@@ -73,7 +72,7 @@ class FuzzyMatchDeduplicator(EventDeduplicator):
         """
         self.threshold = threshold
 
-    def deduplicate(self, events: List[EventSchema]) -> List[EventSchema]:
+    def deduplicate(self, events: list[EventSchema]) -> list[EventSchema]:
         """
         Deduplicate events using fuzzy matching.
 
@@ -95,7 +94,7 @@ class MetadataDeduplicator(EventDeduplicator):
     TODO: Implement weighted similarity scoring
     """
 
-    def __init__(self, weights: Optional[dict] = None):
+    def __init__(self, weights: dict | None = None):
         """
         Initialize with field weights.
 
@@ -109,7 +108,7 @@ class MetadataDeduplicator(EventDeduplicator):
             "artists": 0.1,
         }
 
-    def deduplicate(self, events: List[EventSchema]) -> List[EventSchema]:
+    def deduplicate(self, events: list[EventSchema]) -> list[EventSchema]:
         """
         Deduplicate events using weighted metadata matching.
 
@@ -125,7 +124,7 @@ class MetadataDeduplicator(EventDeduplicator):
 class CompositeDeduplicator(EventDeduplicator):
     """Chain multiple deduplication strategies."""
 
-    def __init__(self, strategies: Optional[List[EventDeduplicator]] = None):
+    def __init__(self, strategies: list[EventDeduplicator] | None = None):
         """
         Initialize with list of strategies to chain.
 
@@ -134,7 +133,7 @@ class CompositeDeduplicator(EventDeduplicator):
         """
         self.strategies = strategies or [ExactMatchDeduplicator()]
 
-    def deduplicate(self, events: List[EventSchema]) -> List[EventSchema]:
+    def deduplicate(self, events: list[EventSchema]) -> list[EventSchema]:
         """
         Apply each strategy in sequence.
 

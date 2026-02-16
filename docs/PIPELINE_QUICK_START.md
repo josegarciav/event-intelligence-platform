@@ -47,41 +47,41 @@ from normalization.event_schema import EventSchema
 
 class TicketmasterEventPipeline(BasePipeline):
     """Pipeline for Ticketmaster events."""
-    
+
     def fetch_raw_data(self, **kwargs) -> List[Dict[str, Any]]:
         """Fetch events from Ticketmaster API."""
         # Call Ticketmaster API
         # Handle pagination
         # Return list of raw event dicts
         pass
-    
+
     def parse_raw_event(self, raw_event: Dict[str, Any]) -> Dict[str, Any]:
         """Parse raw Ticketmaster event into intermediate format."""
         # Extract title, date, venue, price, etc.
         # Normalize dates and locations
         # Return cleaned dict
         pass
-    
+
     def map_to_taxonomy(self, parsed_event: Dict[str, Any]) -> Tuple[str, List[Dict[str, Any]]]:
         """Map to Human Experience Taxonomy."""
         # Classify event (concert? sports? theater?)
         # Return (primary_category, taxonomy_dimensions)
         pass
-    
-    def normalize_to_schema(self, parsed_event: Dict[str, Any], 
+
+    def normalize_to_schema(self, parsed_event: Dict[str, Any],
                            primary_cat: str,
                            taxonomy_dims: List[Dict[str, Any]]) -> EventSchema:
         """Normalize to canonical EventSchema."""
         # Create fully validated EventSchema instance
         # Map all fields from parsed_event to schema fields
         pass
-    
+
     def validate_event(self, event: EventSchema) -> Tuple[bool, List[str]]:
         """Validate event with source-specific rules."""
         # Check location, time, price, etc.
         # Return (is_valid, errors_list)
         pass
-    
+
     def enrich_event(self, event: EventSchema) -> EventSchema:
         """Enrich event with additional data."""
         # Geocode venue if coordinates missing
@@ -103,11 +103,11 @@ sources:
     api_key: "${TICKETMASTER_API_KEY}"
     batch_size: 200
     rate_limit_per_second: 2.0
-    
+
     schedule:
       type: "interval"
       interval_hours: 12
-    
+
     custom:
       countries: ["US", "GB"]
       classifiers: ["music", "sports", "arts"]
@@ -395,15 +395,15 @@ Override validation for your source:
 ```python
 def validate_event(self, event: EventSchema) -> Tuple[bool, List[str]]:
     errors = []
-    
+
     # Meetup-specific: require minimum RSVP count
     if event.engagement and event.engagement.going_count < 5:
         errors.append("Event has too few RSVPs to be included")
-    
+
     # Meetup requires group info
     if "group_id" not in event.custom_fields:
         errors.append("Missing group information")
-    
+
     return len(errors) == 0, errors
 ```
 
@@ -417,7 +417,7 @@ def enrich_event(self, event: EventSchema) -> EventSchema:
         if group_id:
             group_data = self._fetch_group_data(group_id)
             event.organizer.follower_count = group_data["member_count"]
-    
+
     return event
 ```
 

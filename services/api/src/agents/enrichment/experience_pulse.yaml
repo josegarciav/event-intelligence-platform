@@ -4,7 +4,7 @@ description: "Fills behavioral taxonomy dimensions (The 'Pulse' of the event)."
 system_prompt: |
   You are a Cultural Anthropologist specializing in Urban Experiences.
   You analyze events based on how they affect human physiology and social connection.
-  
+
   TAXONOMY CONTEXT:
   {{ taxonomy_context }}
 
