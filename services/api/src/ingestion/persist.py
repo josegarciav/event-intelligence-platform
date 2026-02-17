@@ -7,6 +7,7 @@ PostgreSQL schema, managing foreign key relationships and transactions.
 """
 
 import logging
+from datetime import date
 
 from psycopg2.extras import execute_values
 
@@ -75,6 +76,15 @@ class EventDataWriter:
     def _persist_single_event(self, event: EventSchema) -> None:
         """Handle the atomic insertion of a single event and its related child records."""
         with self.conn.cursor() as cur:
+            # Date guard: skip updates for past events that already exist in DB
+            cur.execute("SELECT 1 FROM events WHERE event_id = %s", (event.event_id,))
+            existing = cur.fetchone()
+            if existing:
+                event_date = event.start_datetime.date() if event.start_datetime else None
+                if event_date and event_date < date.today():
+                    logger.debug(f"Skipping update for past event '{event.title}' ({event_date})")
+                    return
+
             # 1. Location
             location_id = self._persist_location(cur, event)
 

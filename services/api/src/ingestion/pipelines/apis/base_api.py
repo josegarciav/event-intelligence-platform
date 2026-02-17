@@ -11,6 +11,7 @@ The pipeline uses:
 """
 
 import logging
+import os
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -205,9 +206,15 @@ class ConfigDrivenAPIAdapter(APIAdapter):
             Template with substituted values
         """
         if isinstance(template, str):
+            # Handle ${ENV_VAR} environment variable resolution
+            stripped = template.strip()
+            if stripped.startswith("${") and stripped.endswith("}"):
+                env_var = stripped[2:-1]
+                resolved = os.environ.get(env_var, stripped)
+                return resolved
+
             # Fast path: if the entire string is exactly one placeholder,
             # return the raw value to preserve its type (int, float, bool, etc.)
-            stripped = template.strip()
             for key, value in params.items():
                 placeholder = f"{{{{{key}}}}}"
                 if stripped == placeholder:
@@ -275,7 +282,7 @@ class ConfigDrivenAPIAdapter(APIAdapter):
             return int(value)
         return len(data)
 
-    def fetch(self, **kwargs) -> FetchResult:
+    async def fetch(self, **kwargs) -> FetchResult:
         """
         Fetch data with pagination support.
 
@@ -297,7 +304,7 @@ class ConfigDrivenAPIAdapter(APIAdapter):
             page_params = {**kwargs, "page": page, "page_size": page_size}
 
             # Fetch single page using parent class
-            result = super().fetch(**page_params)
+            result = await super().fetch(**page_params)
 
             if not result.success or not result.raw_data:
                 if result.errors:
@@ -425,33 +432,50 @@ class BaseAPIPipeline(BasePipeline):
     # MULTI-CITY + DATE-WINDOW EXECUTION
     # ========================================================================
 
-    def execute(self, **kwargs) -> PipelineExecutionResult:
+    async def execute(self, **kwargs) -> PipelineExecutionResult:
         """
         Execute pipeline with multi-city support.
 
         If config has defaults.areas (dict of city_name: area_id),
         iterates over each city. Otherwise falls back to single-area execution.
+        Also supports defaults.cities (list of city names) for REST APIs.
         """
         areas = self.source_config.defaults.get("areas", {})
-        if not areas:
-            return super().execute(**kwargs)
+        cities = self.source_config.defaults.get("cities", [])
+
+        if not areas and not cities:
+            return await super().execute(**kwargs)
 
         self.execution_id = self._generate_execution_id()
         self.execution_start_time = datetime.now(UTC)
-        self.logger.info(f"Starting multi-city execution: {self.execution_id} " f"({len(areas)} cities)")
+        total_cities = len(areas) + len(cities) if not areas else len(areas)
+        self.logger.info(f"Starting multi-city execution: {self.execution_id} " f"({total_cities} cities)")
 
         all_raw_events = []
         fetch_errors = []
 
+        # GraphQL sources with area IDs
         for city_name, area_id in areas.items():
             self.logger.info(f"Fetching events for {city_name} (area_id={area_id})...")
             try:
-                raw_events = self._fetch_with_date_splitting(area_id=area_id, city_name=city_name, **kwargs)
+                raw_events = await self._fetch_with_date_splitting(area_id=area_id, city_name=city_name, **kwargs)
                 self.logger.info(f"  {city_name}: {len(raw_events)} raw events fetched")
                 all_raw_events.extend(raw_events)
             except Exception as e:
                 self.logger.error(f"  {city_name}: fetch failed: {e}")
                 fetch_errors.append({"error": str(e), "city": city_name})
+
+        # REST sources with city names (e.g. Ticketmaster)
+        if cities and not areas:
+            for city_name in cities:
+                self.logger.info(f"Fetching events for {city_name}...")
+                try:
+                    raw_events = await self._fetch_with_date_splitting(city=city_name, city_name=city_name, **kwargs)
+                    self.logger.info(f"  {city_name}: {len(raw_events)} raw events fetched")
+                    all_raw_events.extend(raw_events)
+                except Exception as e:
+                    self.logger.error(f"  {city_name}: fetch failed: {e}")
+                    fetch_errors.append({"error": str(e), "city": city_name})
 
         self.logger.info(f"Total raw events across all cities: {len(all_raw_events)}")
 

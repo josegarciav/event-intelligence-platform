@@ -5,6 +5,7 @@ Adapter for fetching and cleaning individual
 event page HTML using the scrapping service engines.
 """
 
+import asyncio
 import json
 import logging
 import time
@@ -95,7 +96,7 @@ class ScraperAdapter(BaseSourceAdapter):
             self._scraper = EventScraper(scraper_config)
         return self._scraper
 
-    def fetch(self, **kwargs) -> FetchResult:
+    async def fetch(self, **kwargs) -> FetchResult:
         """
         Fetch data via web scraping.
 
@@ -127,7 +128,7 @@ class ScraperAdapter(BaseSourceAdapter):
             scraper = self._get_scraper()
 
             # Fetch listing pages
-            listing_results = scraper.fetch_listing_pages(
+            listing_results = await scraper.fetch_listing_pages(
                 city=city,
                 country_code=country_code,
                 max_pages=max_pages,
@@ -146,7 +147,7 @@ class ScraperAdapter(BaseSourceAdapter):
             logger.info(f"Found {len(event_urls)} unique event URLs")
 
             # Fetch event detail pages
-            event_results = scraper.fetch_event_pages(event_urls, max_events=max_events)
+            event_results = await scraper.fetch_event_pages(event_urls, max_events=max_events)
             metadata["events_fetched"] = len(event_results)
 
             # Parse each event page
@@ -183,10 +184,10 @@ class ScraperAdapter(BaseSourceAdapter):
             fetch_ended_at=datetime.now(UTC),
         )
 
-    def close(self) -> None:
+    async def close(self) -> None:
         """Close scraper and release browser resources."""
         if self._scraper:
-            self._scraper.close()
+            await self._scraper.close()
             self._scraper = None
 
 
@@ -408,17 +409,17 @@ class HtmlEnrichmentScraper:
 
         return self._engine
 
-    def _rate_limit(self) -> None:
+    async def _rate_limit(self) -> None:
         """Enforce rate limiting between requests."""
         if self.config.rate_limit_per_second <= 0:
             return
         min_interval = 1.0 / self.config.rate_limit_per_second
         elapsed = time.monotonic() - self._last_request_time
         if elapsed < min_interval:
-            time.sleep(min_interval - elapsed)
+            await asyncio.sleep(min_interval - elapsed)
         self._last_request_time = time.monotonic()
 
-    def fetch_compressed_html(self, url: str) -> str | None:
+    async def fetch_compressed_html(self, url: str) -> str | None:
         """
         Fetch a URL, extract clean text, and return it if quality passes.
 
@@ -432,7 +433,7 @@ class HtmlEnrichmentScraper:
             from scrapping.processing.html_to_structured import html_to_structured
             from scrapping.processing.quality_filters import evaluate_quality
 
-            self._rate_limit()
+            await self._rate_limit()
             engine = self._get_engine()
             needs_render = self.config.engine_type in {"browser", "hybrid"}
             if needs_render and hasattr(engine, "get_rendered"):
@@ -550,7 +551,7 @@ class HtmlEnrichmentScraper:
             self.logger.warning(f"HTML enrichment failed for {url}: {e}")
             return None
 
-    def close(self) -> None:
+    async def close(self) -> None:
         """Release engine resources."""
         if self._engine is not None:
             try:

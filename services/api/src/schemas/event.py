@@ -583,7 +583,6 @@ class EventSchema(BaseModel):
     artists: list[ArtistInfo] = Field(default_factory=list)
 
     # ---- MEDIA & VISUAL ----
-    image_url: str | None = None
     media_assets: list[MediaAsset] = Field(default_factory=list)
 
     # ---- SOURCE METADATA ----

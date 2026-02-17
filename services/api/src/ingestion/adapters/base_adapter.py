@@ -96,7 +96,7 @@ class BaseSourceAdapter(ABC):
         return self.config.source_id
 
     @abstractmethod
-    def fetch(self, **kwargs) -> FetchResult:
+    async def fetch(self, **kwargs) -> FetchResult:
         """
         Fetch raw data from the source.
 
@@ -120,7 +120,7 @@ class BaseSourceAdapter(ABC):
         """
         pass
 
-    def close(self) -> None:
+    async def close(self) -> None:
         """
         Release any resources held by the adapter.
 
@@ -128,10 +128,10 @@ class BaseSourceAdapter(ABC):
         """
         pass
 
-    def __enter__(self) -> "BaseSourceAdapter":
-        """Enter context manager and return adapter instance."""
+    async def __aenter__(self) -> "BaseSourceAdapter":
+        """Enter async context manager and return adapter instance."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        """Exit context manager and release resources."""
-        self.close()
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Exit async context manager and release resources."""
+        await self.close()

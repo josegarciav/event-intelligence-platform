@@ -101,7 +101,7 @@ class FeatureExtractor:
         self._taxonomy = get_taxonomy_retriever()
 
     def _get_client(self):
-        """Lazy initialization of Instructor client."""
+        """Lazy initialization of async Instructor client."""
         if self._client is not None:
             return self._client
 
@@ -112,10 +112,10 @@ class FeatureExtractor:
 
         try:
             import instructor
-            from openai import OpenAI
+            from openai import AsyncOpenAI
 
-            openai_client = OpenAI(api_key=self._api_key)
-            self._client = instructor.from_openai(openai_client)
+            openai_client = AsyncOpenAI(api_key=self._api_key)
+            self._client = instructor.from_openai(openai_client, mode=instructor.Mode.TOOLS)
             self._llm_available = True
             return self._client
         except ImportError as e:
@@ -138,7 +138,7 @@ class FeatureExtractor:
     # PRIMARY CATEGORY CLASSIFICATION
     # =========================================================================
 
-    def extract_primary_category(self, event_context: dict[str, Any]) -> PrimaryCategoryExtraction:
+    async def extract_primary_category(self, event_context: dict[str, Any]) -> PrimaryCategoryExtraction:
         """
         Classify event into one of 10 primary categories.
 
@@ -162,7 +162,7 @@ class FeatureExtractor:
         categories_context = self._taxonomy.get_all_categories_summary()
 
         try:
-            return client.chat.completions.create(
+            return await client.chat.completions.create(
                 model=self.model_name,
                 response_model=PrimaryCategoryExtraction,
                 messages=[
@@ -220,7 +220,7 @@ class FeatureExtractor:
     # SUBCATEGORY CLASSIFICATION
     # =========================================================================
 
-    def extract_subcategory(self, event_context: dict[str, Any], category_id: str) -> SubcategoryExtraction:
+    async def extract_subcategory(self, event_context: dict[str, Any], category_id: str) -> SubcategoryExtraction:
         """
         Classify into subcategory within a category using RAG context.
 
@@ -244,7 +244,7 @@ class FeatureExtractor:
         subcategory_context = self._taxonomy.get_category_context_for_prompt(category_id)
 
         try:
-            return client.chat.completions.create(
+            return await client.chat.completions.create(
                 model=self.model_name,
                 response_model=SubcategoryExtraction,
                 messages=[
@@ -271,7 +271,7 @@ class FeatureExtractor:
     # FILL MISSING FIELDS
     # =========================================================================
 
-    def fill_missing_fields(self, event_context: dict[str, Any], fields: list[str]) -> dict[str, Any]:
+    async def fill_missing_fields(self, event_context: dict[str, Any], fields: list[str]) -> dict[str, Any]:
         """
         Extract multiple missing fields in one call.
 
@@ -295,7 +295,7 @@ class FeatureExtractor:
         prompt = self._build_missing_fields_prompt(event_context, fields)
 
         try:
-            result = client.chat.completions.create(
+            result = await client.chat.completions.create(
                 model=self.model_name,
                 response_model=MissingFieldsExtraction,
                 messages=[{"role": "user", "content": prompt}],
@@ -426,7 +426,7 @@ Extract the requested fields based on the event information."""
     # MAIN ENRICHMENT METHOD
     # =========================================================================
 
-    def enrich_taxonomy_dimension(
+    async def enrich_taxonomy_dimension(
         self,
         dimension: "TaxonomyDimension",
         event_context: dict[str, Any],
@@ -477,7 +477,7 @@ Extract the requested fields based on the event information."""
 
         # Use LLM or fallback for attribute enrichment
         if self.is_llm_available:
-            attributes = self._enrich_with_llm(event_context, dimension.subcategory, category_id)
+            attributes = await self._enrich_with_llm(event_context, dimension.subcategory, category_id)
         else:
             attributes = self._enrich_with_rules(event_context)
 
@@ -496,7 +496,7 @@ Extract the requested fields based on the event information."""
     # LLM-BASED ENRICHMENT
     # =========================================================================
 
-    def _enrich_with_llm(
+    async def _enrich_with_llm(
         self,
         event_context: dict[str, Any],
         subcategory_id: str | None,
@@ -528,7 +528,7 @@ Extract the requested fields based on the event information."""
             user_prompt = self._build_enrichment_user_prompt(event_str)
 
             # Call LLM with structured output using Instructor
-            result = client.chat.completions.create(
+            result = await client.chat.completions.create(
                 model=self.model_name,
                 response_model=FullTaxonomyEnrichmentOutput,
                 messages=[
@@ -715,7 +715,7 @@ Also suggest relevant emotional outputs (e.g., "joy", "excitement", "connection"
     # SPECIFIC FEATURE EXTRACTION METHODS
     # =========================================================================
 
-    def extract_event_type(self, event_context: dict[str, Any]) -> str | None:
+    async def extract_event_type(self, event_context: dict[str, Any]) -> str | None:
         """
         Extract event type from event context.
 
@@ -729,7 +729,7 @@ Also suggest relevant emotional outputs (e.g., "joy", "excitement", "connection"
             client = self._get_client()
             try:
                 event_str = self._format_event_context(event_context)
-                result = client.chat.completions.create(
+                result = await client.chat.completions.create(
                     model=self.model_name,
                     response_model=EventTypeOutput,
                     messages=[
@@ -773,7 +773,7 @@ Select the single most appropriate event type.""",
         else:
             return "nightlife"
 
-    def extract_music_genres(self, event_context: dict[str, Any]) -> list[str]:
+    async def extract_music_genres(self, event_context: dict[str, Any]) -> list[str]:
         """
         Extract music genres from event context.
 
@@ -787,7 +787,7 @@ Select the single most appropriate event type.""",
             client = self._get_client()
             try:
                 event_str = self._format_event_context(event_context)
-                result = client.chat.completions.create(
+                result = await client.chat.completions.create(
                     model=self.model_name,
                     response_model=MusicGenresOutput,
                     messages=[
@@ -834,7 +834,7 @@ Return a list of relevant music genres (e.g., electronic, techno, house, ambient
 
         return genres if genres else ["electronic"]  # Default for ra.co events
 
-    def extract_tags(self, event_context: dict[str, Any]) -> list[str]:
+    async def extract_tags(self, event_context: dict[str, Any]) -> list[str]:
         """
         Generate tags for an event.
 
@@ -848,7 +848,7 @@ Return a list of relevant music genres (e.g., electronic, techno, house, ambient
             client = self._get_client()
             try:
                 event_str = self._format_event_context(event_context)
-                result = client.chat.completions.create(
+                result = await client.chat.completions.create(
                     model=self.model_name,
                     response_model=TagsOutput,
                     messages=[

@@ -157,7 +157,7 @@ class BasePipeline(ABC):
         pass
 
     @abstractmethod
-    def normalize_to_schema(
+    async def normalize_to_schema(
         self,
         parsed_event: dict[str, Any],
         primary_cat: str,
@@ -190,7 +190,7 @@ class BasePipeline(ABC):
         pass
 
     @abstractmethod
-    def enrich_event(self, event: EventSchema) -> EventSchema:
+    async def enrich_event(self, event: EventSchema) -> EventSchema:
         """
         Enrich event with additional data.
 
@@ -206,7 +206,7 @@ class BasePipeline(ABC):
     # CONCRETE METHODS - Pipeline execution
     # ========================================================================
 
-    def execute(self, **kwargs) -> PipelineExecutionResult:
+    async def execute(self, **kwargs) -> PipelineExecutionResult:
         """
         Execute the full pipeline workflow.
 
@@ -224,7 +224,7 @@ class BasePipeline(ABC):
 
         try:
             # Step 1: Fetch raw data via adapter
-            fetch_result = self.adapter.fetch(**kwargs)
+            fetch_result = await self.adapter.fetch(**kwargs)
 
             if not fetch_result.success:
                 self.logger.error(f"Fetch failed: {fetch_result.errors}")
@@ -242,7 +242,7 @@ class BasePipeline(ABC):
             self.logger.info(f"Fetched {fetch_result.total_fetched} raw events")
 
             # Step 2-6: Process events through pipeline
-            normalized_events = self._process_events_batch(fetch_result.raw_data)
+            normalized_events = await self._process_events_batch(fetch_result.raw_data)
 
             # Step 7: Deduplication
             if self.config.deduplicate and normalized_events:
@@ -294,7 +294,7 @@ class BasePipeline(ABC):
                 errors=[{"error": str(e), "stage": "execution"}],
             )
 
-    def _process_events_batch(self, raw_events: list[dict[str, Any]]) -> list[EventSchema]:
+    async def _process_events_batch(self, raw_events: list[dict[str, Any]]) -> list[EventSchema]:
         """Process a batch of raw events through the pipeline."""
         normalized_events = []
 
@@ -307,7 +307,7 @@ class BasePipeline(ABC):
                 primary_cat, taxonomy_dims = self.map_to_taxonomy(parsed_event)
 
                 # Step 4: Normalize
-                event = self.normalize_to_schema(parsed_event, primary_cat, taxonomy_dims)
+                event = await self.normalize_to_schema(parsed_event, primary_cat, taxonomy_dims)
 
                 # Step 5: Validate
                 is_valid, validation_messages = self.validate_event(event)
@@ -324,7 +324,7 @@ class BasePipeline(ABC):
                     self.logger.warning(f"Validation warnings for event {idx}: {normalized_messages}")
 
                 # Step 6: Enrich
-                event = self.enrich_event(event)
+                event = await self.enrich_event(event)
 
                 # Calculate quality score
                 event.data_quality_score = self._calculate_quality_score(event)
@@ -353,7 +353,7 @@ class BasePipeline(ABC):
 
         # Enrichment fields (30%)
         enrichment_bonus = 0.0
-        enrichment_bonus += 0.05 if event.image_url else 0.0
+        enrichment_bonus += 0.05 if event.media_assets else 0.0
         enrichment_bonus += 0.05 if event.location.coordinates else 0.0
         enrichment_bonus += 0.05 if event.price and not event.price.is_free else 0.0
         enrichment_bonus += 0.05 if event.organizer and event.organizer.name else 0.0
@@ -522,7 +522,6 @@ class BasePipeline(ABC):
                 "source_updated_at": src.source_updated_at if src else None,
                 "source_ingestion_timestamp": src.ingestion_timestamp if src else None,
                 # ==== MEDIA ====
-                "image_url": event.image_url,
                 "media_assets_json": media_json,
                 # ==== ENGAGEMENT (flattened) ====
                 "engagement_going_count": eng.going_count if eng else None,
@@ -572,7 +571,7 @@ class BasePipeline(ABC):
 
         return pd.DataFrame(rows)
 
-    def close(self) -> None:
+    async def close(self) -> None:
         """Release adapter resources."""
         if self.adapter:
-            self.adapter.close()
+            await self.adapter.close()

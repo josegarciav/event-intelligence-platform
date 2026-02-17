@@ -232,7 +232,7 @@ sources:
   # TICKETMASTER - REST API-based ingestion
   # =========================================================================
   ticketmaster:
-    enabled: false
+    enabled: true
     pipeline_type: "api"
 
     # Connection settings

@@ -4,13 +4,14 @@ Base Scraper Pipeline and related utilities.
 This module provides:
 - PageFetchResult: Result of fetching a single page
 - ScraperConfig: Configuration for the scraper
-- EventScraper: Playwright-based browser automation for web scraping
+- EventScraper: Playwright-based browser automation for web scraping (async)
 - BaseScraperPipeline: Abstract base class for scraper-based pipelines
 - Config loading utilities for JSON scraper configs
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -23,7 +24,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin, urlparse
 
 if TYPE_CHECKING:
-    from playwright.sync_api import Browser, Playwright
+    from playwright.async_api import Browser, Playwright
 
 from src.ingestion.adapters import ScraperAdapter, SourceType
 from src.ingestion.adapters.scraper_adapter import ScraperAdapterConfig
@@ -202,25 +203,25 @@ load_event_scraper_config = load_scraper_config
 
 
 # =============================================================================
-# EVENT SCRAPER
+# EVENT SCRAPER (ASYNC)
 # =============================================================================
 
 
 class EventScraper:
     """
-    Event scraper using Playwright for browser automation.
+    Event scraper using async Playwright for browser automation.
 
     Handles:
     - Fetching listing pages with pagination
     - Extracting event URLs from listing pages
-    - Fetching individual event detail pages
+    - Fetching individual event detail pages (parallel batches)
 
     Usage:
         config = ScraperConfig(...)
-        with EventScraper(config) as scraper:
-            listing_results = scraper.fetch_listing_pages()
+        async with EventScraper(config) as scraper:
+            listing_results = await scraper.fetch_listing_pages()
             event_urls = scraper.extract_event_urls(listing_results[0].html, base_url)
-            event_results = scraper.fetch_event_pages(event_urls)
+            event_results = await scraper.fetch_event_pages(event_urls)
     """
 
     def __init__(self, config: ScraperConfig):
@@ -234,47 +235,47 @@ class EventScraper:
         self._browser: Browser | None = None
         self._playwright: Playwright | None = None
 
-    def _ensure_browser(self) -> None:
+    async def _ensure_browser(self) -> None:
         """Ensure browser is started."""
         if self._browser is not None:
             return
 
         try:
-            from playwright.sync_api import sync_playwright
+            from playwright.async_api import async_playwright
         except ImportError:
             raise ImportError(
                 "playwright is required for scraping. " "Install it with: pip install playwright && playwright install"
             )
 
-        self._playwright = sync_playwright().start()
-        self._browser = self._playwright.chromium.launch(headless=self.config.headless)
+        self._playwright = await async_playwright().start()
+        self._browser = await self._playwright.chromium.launch(headless=self.config.headless)
         logger.info("Browser started")
 
-    def close(self) -> None:
+    async def close(self) -> None:
         """Close browser and release resources."""
         if self._browser:
             try:
-                self._browser.close()
+                await self._browser.close()
             except Exception as e:
                 logger.warning(f"Error closing browser: {e}")
             self._browser = None
 
         if self._playwright:
             try:
-                self._playwright.stop()
+                await self._playwright.stop()
             except Exception as e:
                 logger.warning(f"Error stopping playwright: {e}")
             self._playwright = None
 
-    def _fetch_page(self, url: str) -> PageFetchResult:
+    async def _fetch_page(self, url: str) -> PageFetchResult:
         """Fetch a single page with stealth settings."""
-        self._ensure_browser()
+        await self._ensure_browser()
         assert self._browser is not None  # ensured by _ensure_browser()
 
         start_time = time.time()
         try:
             # Create context with realistic browser fingerprint
-            context = self._browser.new_context(
+            context = await self._browser.new_context(
                 user_agent=(
                     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -287,11 +288,11 @@ class EventScraper:
                 permissions=["geolocation"],
             )
 
-            page = context.new_page()
+            page = await context.new_page()
             page.set_default_timeout(self.config.timeout_s * 1000)
 
             # Add stealth scripts to avoid detection
-            page.add_init_script(
+            await page.add_init_script(
                 """
                 Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
                 Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
@@ -300,25 +301,25 @@ class EventScraper:
             """
             )
 
-            response = page.goto(url, wait_until="networkidle")
-            page.wait_for_timeout(3000)
+            response = await page.goto(url, wait_until="networkidle")
+            await page.wait_for_timeout(3000)
 
-            html = page.content()
+            html = await page.content()
             if "captcha" in html.lower() or "datadome" in html.lower():
                 logger.warning(f"Captcha detected on {url}, waiting longer...")
-                page.wait_for_timeout(5000)
-                html = page.content()
+                await page.wait_for_timeout(5000)
+                html = await page.content()
 
             # Scroll to load lazy content
-            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            page.wait_for_timeout(1500)
+            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await page.wait_for_timeout(1500)
 
-            html = page.content()
+            html = await page.content()
             status_code = response.status if response else None
             final_url = page.url
 
-            page.close()
-            context.close()
+            await page.close()
+            await context.close()
 
             elapsed = time.time() - start_time
             is_blocked = "captcha" in html.lower() or status_code == 403
@@ -346,7 +347,7 @@ class EventScraper:
                 elapsed_s=elapsed,
             )
 
-    def fetch_listing_pages(
+    async def fetch_listing_pages(
         self,
         *,
         city: str | None = None,
@@ -377,7 +378,7 @@ class EventScraper:
 
             logger.info(f"Fetching listing page: {url}")
 
-            result = self._fetch_page(url)
+            result = await self._fetch_page(url)
             results.append(result)
 
             if result.ok:
@@ -385,7 +386,7 @@ class EventScraper:
             else:
                 logger.warning(f"Failed to fetch: {url} - {result.error}")
 
-            time.sleep(self.config.min_delay_s)
+            await asyncio.sleep(self.config.min_delay_s)
 
         return results
 
@@ -425,18 +426,20 @@ class EventScraper:
         logger.info(f"Extracted {len(urls)} event URLs")
         return urls
 
-    def fetch_event_pages(
+    async def fetch_event_pages(
         self,
         urls: list[str],
         *,
         max_events: int | None = None,
+        concurrency: int = 5,
     ) -> list[PageFetchResult]:
         """
-        Fetch event detail pages.
+        Fetch event detail pages in parallel batches.
 
         Args:
             urls: List of event URLs
             max_events: Maximum events to fetch
+            concurrency: Number of concurrent fetches per batch
 
         Returns:
             List of PageFetchResult for each event page
@@ -446,29 +449,31 @@ class EventScraper:
 
         results = []
 
-        for url in urls:
-            logger.info(f"Fetching event: {url}")
+        # Process in batches of `concurrency`
+        for i in range(0, len(urls), concurrency):
+            batch = urls[i : i + concurrency]
+            logger.info(f"Fetching event batch {i // concurrency + 1} ({len(batch)} URLs)")
 
-            result = self._fetch_page(url)
-            results.append(result)
+            batch_results = await asyncio.gather(*[self._fetch_page(url) for url in batch])
+            results.extend(batch_results)
 
-            if result.ok:
-                logger.debug(f"Successfully fetched event: {url}")
-            else:
-                logger.warning(f"Failed to fetch event: {url} - {result.error}")
+            ok_count = sum(1 for r in batch_results if r.ok)
+            logger.debug(f"Batch complete: {ok_count}/{len(batch)} successful")
 
-            time.sleep(self.config.min_delay_s)
+            # Delay between batches (not between individual pages)
+            if i + concurrency < len(urls):
+                await asyncio.sleep(self.config.min_delay_s)
 
         logger.info(f"Fetched {len(results)} event pages, {sum(1 for r in results if r.ok)} successful")
         return results
 
-    def __enter__(self) -> EventScraper:
-        """Enter context manager and return scraper instance."""
+    async def __aenter__(self) -> EventScraper:
+        """Enter async context manager and return scraper instance."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        """Exit context manager and close browser."""
-        self.close()
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Exit async context manager and close browser."""
+        await self.close()
 
 
 # =============================================================================

@@ -5,6 +5,7 @@ Coordinates execution, scheduling, persistence, and management of all event inge
 Supports both API and scraper-based sources through the adapter pattern.
 """
 
+import asyncio
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -119,7 +120,7 @@ class PipelineOrchestrator:
     # EXECUTION
     # ========================================================================
 
-    def execute_pipeline(self, source_name: str, **kwargs) -> PipelineExecutionResult:
+    async def execute_pipeline(self, source_name: str, **kwargs) -> PipelineExecutionResult:
         """
         Execute a single pipeline.
 
@@ -137,7 +138,7 @@ class PipelineOrchestrator:
         self.logger.info(f"Executing pipeline: {source_name}")
 
         try:
-            result = pipeline.execute(**kwargs)
+            result = await pipeline.execute(**kwargs)
             self.execution_history.append(result)
             self._store_execution_result(result)
             return result
@@ -146,9 +147,9 @@ class PipelineOrchestrator:
             self.logger.error(f"Pipeline execution failed: {source_name}", exc_info=True)
             raise
 
-    def execute_all_pipelines(self, **kwargs) -> dict[str, PipelineExecutionResult]:
+    async def execute_all_pipelines(self, **kwargs) -> dict[str, PipelineExecutionResult]:
         """
-        Execute all registered pipelines.
+        Execute all registered pipelines sequentially.
 
         Returns:
             Dictionary mapping source_name -> PipelineExecutionResult
@@ -157,14 +158,14 @@ class PipelineOrchestrator:
 
         for source_name in self.pipelines:
             try:
-                result = self.execute_pipeline(source_name, **kwargs)
+                result = await self.execute_pipeline(source_name, **kwargs)
                 results[source_name] = result
             except Exception as e:
                 self.logger.error(f"Failed to execute {source_name}: {e}")
 
         return results
 
-    def execute_by_type(self, source_type: SourceType, **kwargs) -> dict[str, PipelineExecutionResult]:
+    async def execute_by_type(self, source_type: SourceType, **kwargs) -> dict[str, PipelineExecutionResult]:
         """
         Execute all pipelines of a specific type (API or scraper).
 
@@ -180,7 +181,7 @@ class PipelineOrchestrator:
         for name, pipeline in self.pipelines.items():
             if pipeline.source_type == source_type:
                 try:
-                    result = self.execute_pipeline(name, **kwargs)
+                    result = await self.execute_pipeline(name, **kwargs)
                     results[name] = result
                 except Exception as e:
                     self.logger.error(f"Failed to execute {name}: {e}")
@@ -259,7 +260,7 @@ class PipelineOrchestrator:
     # ========================================================================
     # END-TO-END EXECUTION & PERSISTENCE
     # ========================================================================
-    def run_full_ingestion(self, **kwargs) -> dict[str, Any]:
+    async def run_full_ingestion(self, **kwargs) -> dict[str, Any]:
         """
         Execute all registered pipelines, deduplicate, and persist.
 
@@ -270,35 +271,33 @@ class PipelineOrchestrator:
         start_time = datetime.now(UTC)
 
         # 1. Execute all pipelines
-        # This returns Dict[source_name, PipelineExecutionResult]
-        pipeline_results = self.execute_all_pipelines(**kwargs)
+        pipeline_results = await self.execute_all_pipelines(**kwargs)
 
         # 2. Extract and Deduplicate
-        # Uses the logic defined in deduplicate_results (title + venue + date)
         unique_events = self.deduplicate_results(pipeline_results)
         total_raw_events = sum(r.total_events_processed for r in pipeline_results.values())
 
         self.logger.info(
-            f"Deduplication complete: {len(unique_events)} unique events " f"found from {total_raw_events} raw results."
+            f"Deduplication complete: {len(unique_events)} unique events found from {total_raw_events} raw results."
         )
 
-        # 3. Persist to Database
+        # 3. Persist to Database (sync psycopg2, run in thread)
         saved_count = 0
         if unique_events:
             try:
-                # Use the connection utility and the EventDataWriter class
-                conn = get_connection()
-                writer = EventDataWriter(conn)
+
+                def _persist():
+                    conn = get_connection()
+                    writer = EventDataWriter(conn)
+                    count = writer.persist_batch(unique_events)
+                    conn.close()
+                    return count
 
                 self.logger.info(f"Persisting {len(unique_events)} events to Postgres...")
-                saved_count = writer.persist_batch(unique_events)
-
-                # Close connection after work is done
-                conn.close()
+                saved_count = await asyncio.to_thread(_persist)
                 self.logger.info(f"Successfully saved {saved_count} events.")
             except Exception as e:
                 self.logger.error(f"Critical error during persistence: {e}")
-                # We don't raise here so we can return the status of the fetch
         else:
             self.logger.warning("No unique events found to persist.")
 
