@@ -11,7 +11,7 @@ const personas = [
   {
     title: "Culture Seekers",
     description:
-      "Discover hidden gems and underground scenes tailored to your taste.",
+      "Discover our 'Surprise Me' feature for serendipitous finds tailored to your vibe.",
   },
   {
     title: "Expats & Newcomers",
@@ -21,14 +21,14 @@ const personas = [
   {
     title: "Social Planners",
     description:
-      "Plan perfect group outings that work for everyone.",
+      "Plan perfect itineraries that work for everyone.",
   },
 ];
 
 const highlights = [
   "Context-aware recs",
   "Mood matching",
-  "Social planning",
+  "Itinerary builder",
   "Transparent AI",
 ];
 
@@ -51,7 +51,7 @@ export default function ForPeople() {
             <h2 className="text-4xl md:text-5xl font-bold mt-4 mb-6 tracking-tight">
               Discovery,
               <br />
-              not listings.
+              not listings
             </h2>
             <p className="text-[#666] text-lg leading-relaxed max-w-md">
               Stop scrolling through endless event lists. Pulsecity understands

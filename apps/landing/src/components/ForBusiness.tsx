@@ -44,9 +44,9 @@ const audiences = [
   "Event Organizers",
   "Venues & Promoters",
   "City Councils",
-  "Tourism Boards",
+  "Tour Providers",
   "Ticketing Platforms",
-  "Experiential Brands",
+  "Travel Agencies",
 ];
 
 function FallingBlock({
@@ -213,10 +213,10 @@ export default function ForBusiness() {
           <h2 className="text-4xl md:text-5xl font-bold mt-4 tracking-tight">
             Intelligence,
             <br />
-            <span className="gradient-text">not guesswork.</span>
+            <span className="gradient-text">not guesswork</span>
           </h2>
           <p className="text-[#666] text-lg mt-6 max-w-2xl mx-auto">
-            Event organizers, venues, city councils, and brands get
+            Event organizers, venues, tour providers, and travel agencies get
             unprecedented visibility into cultural demand and audience behavior.
           </p>
         </motion.div>

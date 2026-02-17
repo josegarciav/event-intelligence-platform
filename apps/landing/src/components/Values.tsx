@@ -23,8 +23,8 @@ const values = [
     description: "Explain why something is suggested. Always.",
   },
   {
-    title: "Humane monetization",
-    description: "Revenue should never degrade user wellbeing.",
+    title: "Personal growth",
+    description: "Travel enlightens our soul.",
   },
   {
     title: "Open cultural infrastructure",
@@ -50,7 +50,7 @@ export default function Values() {
           <h2 className="text-4xl md:text-5xl font-bold mt-4 tracking-tight">
             Built on
             <br />
-            <span className="gradient-text">principles.</span>
+            <span className="gradient-text">principles</span>
           </h2>
         </motion.div>
 

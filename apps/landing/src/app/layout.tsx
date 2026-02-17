@@ -10,9 +10,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Pulsecity — Help humans spend their free time better",
+  title: "Pulsecity — Help humans spend their free time, better",
   description:
-    "A city-scale intelligence platform that transforms fragmented event data into personalized, free-time recommendations and analytics.",
+    "Fly through your city. Feel its pulse.",
   keywords: [
     "events",
     "intelligence",

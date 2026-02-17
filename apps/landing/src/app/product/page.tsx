@@ -1,66 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import {
-  Zap,
-  Database,
-  Brain,
-  Globe,
-  Compass,
-  MapPin,
-  Users,
-  Shield,
-} from "lucide-react";
+import { Compass, MapPin, Users, Shield } from "lucide-react";
 import PulseLine from "@/components/PulseLine";
-
-const capabilities = [
-  {
-    category: "Ingestion",
-    icon: Globe,
-    items: [
-      "50+ source connectors",
-      "API feed processing",
-      "Resilient data collection",
-    ],
-  },
-  {
-    category: "Processing",
-    icon: Database,
-    items: [
-      "Canonical event schema",
-      "Intelligent deduplication",
-      "Temporal normalization",
-    ],
-  },
-  {
-    category: "Intelligence",
-    icon: Brain,
-    items: [
-      "ML-powered enrichment",
-      "Taxonomy classification",
-      "Price signal extraction",
-    ],
-  },
-  {
-    category: "Serving",
-    icon: Zap,
-    items: [
-      "REST & GraphQL APIs",
-      "Recommendation engine",
-      "Search & filtering",
-    ],
-  },
-];
-
-const techStack = [
-  { layer: "Ingestion", tools: "Python, Playwright, Airflow" },
-  { layer: "Processing", tools: "Pydantic, spaCy, LLM assist" },
-  { layer: "Storage", tools: "Postgres, S3, pgvector" },
-  { layer: "Intelligence", tools: "ML, embeddings, implicit feedback" },
-  { layer: "Serving", tools: "FastAPI, GraphQL, Redis, CDN" },
-  { layer: "Clients", tools: "Next.js, Flutter, React Native" },
-  { layer: "DevOps", tools: "Docker, Terraform, GitHub Actions" },
-];
 
 const peopleFeatures = [
   {
@@ -139,7 +81,7 @@ export default function ProductPage() {
             <h1 className="text-5xl md:text-7xl font-bold mt-6 tracking-tight leading-[1.05]">
               The intelligence
               <br />
-              layer for <span className="gradient-text">events.</span>
+              layer for <span className="gradient-text">events</span>
             </h1>
           </motion.div>
           <motion.p
@@ -169,7 +111,7 @@ export default function ProductPage() {
               For People
             </span>
             <h2 className="text-3xl md:text-5xl font-bold mt-4 tracking-tight">
-              Your city, understood.
+              Your city, understood
             </h2>
             <p className="text-[#666] text-lg mt-6 max-w-2xl leading-relaxed">
               Whether you&apos;re a time-poor professional, a culture seeker, an
@@ -221,12 +163,12 @@ export default function ProductPage() {
               For Business
             </span>
             <h2 className="text-3xl md:text-5xl font-bold mt-4 tracking-tight">
-              Cultural intelligence at scale.
+              Cultural intelligence insights
             </h2>
             <p className="text-[#666] text-lg mt-6 max-w-2xl leading-relaxed">
               Event organizers, venues, city councils, tourism boards, ticketing
               platforms, and brands get unprecedented visibility into cultural
-              demand and audience behavior.
+              demand and audience behavior to tailor their offerings.
             </p>
           </motion.div>
 
@@ -255,9 +197,9 @@ export default function ProductPage() {
         </div>
       </section>
 
-      <PulseLine />
+      {/* <PulseLine /> */}
 
-      {/* Capabilities */}
+      {/* Capabilities
       <section className="py-32 px-6 bg-[#0a0a0a]">
         <div className="max-w-5xl mx-auto">
           <motion.h2
@@ -302,9 +244,9 @@ export default function ProductPage() {
             })}
           </div>
         </div>
-      </section>
+      </section> */}
 
-      {/* Tech Stack */}
+      {/* Tech Stack
       <section className="py-32 px-6">
         <div className="max-w-5xl mx-auto">
           <motion.h2
@@ -335,7 +277,7 @@ export default function ProductPage() {
             ))}
           </div>
         </div>
-      </section>
+      </section> */}
     </main>
   );
 }

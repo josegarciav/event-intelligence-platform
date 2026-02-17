@@ -100,9 +100,9 @@ export default function Hero() {
         >
           Help humans spend
           <br />
-          their free time
+          their free time,
           <br />
-          <span className="gradient-text">better.</span>
+          <span className="gradient-text">better</span>
         </motion.h1>
 
         <motion.p

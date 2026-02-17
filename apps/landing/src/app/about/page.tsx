@@ -3,58 +3,32 @@
 import { motion } from "framer-motion";
 import PulseLine from "@/components/PulseLine";
 
-const valuesList = [
-  {
-    title: "Human time is sacred",
-    text: "We optimize for meaningful experiences, not addiction loops. Every feature is measured against this standard.",
-  },
-  {
-    title: "Discovery over exploitation",
-    text: "Help people explore beyond algorithmic sameness. Novelty and serendipity are features, not bugs.",
-  },
-  {
-    title: "Cities are cultural organisms",
-    text: "We strengthen local scenes and cultural ecosystems, not just monetize them.",
-  },
-  {
-    title: "Radical transparency",
-    text: "Every recommendation comes with a reason. No black boxes.",
-  },
-  {
-    title: "Humane monetization",
-    text: "Revenue should never degrade user wellbeing. If it hurts the user, we don\u2019t do it.",
-  },
-  {
-    title: "Open infrastructure",
-    text: "We\u2019re building a cultural data layer that cities and organizers directly benefit from.",
-  },
-];
-
 const milestones = [
   {
     phase: "v0",
     title: "Ingestion + Schema",
     timeline: "4\u20136 weeks",
-    description: "Core data pipeline and canonical event schema",
+    description: "Core data pipelines unified into normalized event schema",
   },
   {
     phase: "MVP",
-    title: "Discovery App",
+    title: "Backend infrastructure + internal tools",
     timeline: "8\u201312 weeks",
-    description: "First city-scale event intelligence application",
+    description: "Core data enrichment infrastructure, modeling, and internal platform for data management.",
   },
   {
     phase: "v1",
-    title: "Personalization",
+    title: "Web app + APIs",
     timeline: "3\u20136 months",
-    description: "Taste modeling and context-aware recommendations",
+    description: "MCP for discovery app and public APIs. Focus on core user flows and data products.",
   },
 ];
 
 const team = [
-  { role: "Data Engineer", focus: "Ingestion & Infrastructure" },
-  { role: "Data Scientist", focus: "Modeling & Experimentation" },
+  { role: "Data Engineer", focus: "Ingestion Pipelines" },
+  { role: "Data Scientist", focus: "Modeling & Experimentation Platform" },
   { role: "Backend / Platform Engineer", focus: "Platform & APIs" },
+  { role: "Security Engineer", focus: "Security & Compliance" },
 ];
 
 export default function AboutPage() {
@@ -75,7 +49,7 @@ export default function AboutPage() {
               Building the operating
               <br />
               system for{" "}
-              <span className="gradient-text">free time.</span>
+              <span className="gradient-text">free time</span>
             </h1>
           </motion.div>
           <motion.p
@@ -102,12 +76,12 @@ export default function AboutPage() {
               transition={{ duration: 0.6 }}
             >
               <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-6">
-                The problem is clear.
+                The problem is clear
               </h2>
               <div className="space-y-4 text-[#666] leading-relaxed">
                 <p>
                   Every city pulses with cultural energy &mdash; concerts,
-                  exhibitions, pop-ups, festivals, meetups. But discovering
+                  exhibitions, tours, festivals, meetups. But discovering
                   what&apos;s right for you is broken.
                 </p>
                 <p>
@@ -127,17 +101,12 @@ export default function AboutPage() {
               transition={{ duration: 0.6, delay: 0.1 }}
             >
               <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-6">
-                Our approach is different.
+                Our approach is different
               </h2>
               <div className="space-y-4 text-[#666] leading-relaxed">
                 <p>
-                  We treat events as data assets, not listings. We ingest,
-                  normalize, enrich, and model them into an experience graph.
-                </p>
-                <p>
-                  Then we build intelligence on top &mdash; taste modeling,
-                  context awareness, cultural analytics &mdash; so every
-                  recommendation has purpose.
+                  We treat events as data assets, not listings.
+                  We are adding an intelligence layer to discovery.
                 </p>
                 <p>City by city. Scene by scene.</p>
               </div>
@@ -148,7 +117,7 @@ export default function AboutPage() {
 
       <PulseLine />
 
-      {/* Values */}
+      {/* Values
       <section className="py-32 px-6">
         <div className="max-w-5xl mx-auto">
           <motion.h2
@@ -179,7 +148,7 @@ export default function AboutPage() {
             ))}
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* Roadmap */}
       <section className="py-32 px-6 bg-[#0a0a0a]">
@@ -191,7 +160,7 @@ export default function AboutPage() {
             transition={{ duration: 0.6 }}
             className="text-3xl md:text-4xl font-bold tracking-tight mb-16"
           >
-            Where we&apos;re headed.
+            Where we&apos;re headed
           </motion.h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -234,7 +203,7 @@ export default function AboutPage() {
             transition={{ duration: 0.6 }}
             className="text-3xl md:text-4xl font-bold tracking-tight mb-16"
           >
-            The team we&apos;re building.
+            The team we&apos;re building
           </motion.h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

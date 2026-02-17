@@ -47,7 +47,7 @@ export default function CareersPage() {
             <h1 className="text-5xl md:text-7xl font-bold mt-6 tracking-tight leading-[1.05]">
               Build what
               <br />
-              <span className="gradient-text">matters.</span>
+              <span className="gradient-text">matters</span>
             </h1>
           </motion.div>
           <motion.p
@@ -73,7 +73,7 @@ export default function CareersPage() {
             transition={{ duration: 0.6 }}
             className="text-3xl md:text-4xl font-bold tracking-tight mb-8"
           >
-            How we work.
+            How we work
           </motion.h2>
 
           <motion.p
@@ -117,7 +117,7 @@ export default function CareersPage() {
             transition={{ duration: 0.6 }}
             className="text-3xl md:text-4xl font-bold tracking-tight mb-16"
           >
-            Open roles.
+            Open roles
           </motion.h2>
 
           <div className="border-t border-white/[0.06]">
@@ -160,8 +160,7 @@ export default function CareersPage() {
             className="mt-16 text-center"
           >
             <p className="text-[#555] mb-6">
-              Don&apos;t see your role? We&apos;re always looking for
-              exceptional people.
+              Don&apos;t see your role? Reach out!
             </p>
             <Link href="/early-access" className="inline-block px-8 py-4 bg-white text-black font-medium rounded-full hover:bg-white/90 transition-all duration-300 text-sm">
               Send Open Application
