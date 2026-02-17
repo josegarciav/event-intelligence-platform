@@ -7,7 +7,7 @@ specific fields from events using the Instructor library.
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # =============================================================================
 # PRIMARY CATEGORY EXTRACTION
@@ -17,11 +17,19 @@ from pydantic import BaseModel, Field
 class PrimaryCategoryExtraction(BaseModel):
     """Extract primary category from event context."""
 
-    category_id: Literal["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"] = Field(
-        description="Primary category ID (1-10) based on event type"
-    )
+    category_id: str = Field(description="Primary category ID (0-10) based on event type. '0' = Other.")
     reasoning: str = Field(description="Brief explanation for classification")
     confidence: float = Field(ge=0, le=1, description="Confidence score")
+
+    @field_validator("category_id")
+    @classmethod
+    def validate_category_id(cls, v: str) -> str:
+        from src.schemas.taxonomy import get_primary_category_id_map
+
+        valid_ids = get_primary_category_id_map()
+        if v not in valid_ids:
+            return "0"
+        return v
 
 
 # =============================================================================

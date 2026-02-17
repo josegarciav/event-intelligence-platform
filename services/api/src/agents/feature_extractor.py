@@ -12,7 +12,7 @@ to ensure accurate classification and attribute selection.
 
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any
 
 from src.agents.extraction_models import (
     MissingFieldsExtraction,
@@ -33,8 +33,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Type alias for primary category IDs
-CategoryID = Literal["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
+# Type alias for primary category IDs (unconstrained — derived from taxonomy JSON)
+CategoryID = str
 
 
 class FeatureExtractor:
@@ -152,7 +152,7 @@ class FeatureExtractor:
             # Fallback to rule-based
             category_id = self._infer_primary_category_rules(event_context)
             return PrimaryCategoryExtraction(
-                category_id=cast(CategoryID, category_id),
+                category_id=category_id,
                 reasoning="Rule-based classification",
                 confidence=0.5,
             )
@@ -181,7 +181,7 @@ class FeatureExtractor:
             logger.warning(f"Primary category extraction failed: {e}")
             category_id = self._infer_primary_category_rules(event_context)
             return PrimaryCategoryExtraction(
-                category_id=cast(CategoryID, category_id),
+                category_id=category_id,
                 reasoning=f"Fallback due to error: {e}",
                 confidence=0.3,
             )
@@ -214,7 +214,7 @@ class FeatureExtractor:
         elif any(w in text for w in ["festival", "celebration", "carnival"]):
             return "10"  # CELEBRATE & COMMEMORATE
         else:
-            return "1"  # Default to PLAY & PURE FUN
+            return "0"  # Default to OTHER
 
     # =========================================================================
     # SUBCATEGORY CLASSIFICATION
@@ -417,20 +417,10 @@ Extract the requested fields based on the event information."""
         }
 
     def _get_category_value(self, category_id: str) -> str:
-        """Map category ID to category enum value."""
-        category_map = {
-            "1": "play_and_pure_fun",
-            "2": "learn_and_discover",
-            "3": "connect_and_belong",
-            "4": "create_and_express",
-            "5": "move_and_thrive",
-            "6": "taste_and_savor",
-            "7": "explore_and_wander",
-            "8": "rest_and_recharge",
-            "9": "give_and_impact",
-            "10": "celebrate_and_commemorate",
-        }
-        return category_map.get(category_id, "play_and_pure_fun")
+        """Map category ID to category normalized value."""
+        from src.schemas.taxonomy import resolve_primary_category
+
+        return resolve_primary_category(category_id)
 
     # =========================================================================
     # MAIN ENRICHMENT METHOD

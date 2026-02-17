@@ -19,8 +19,8 @@ TAXONOMY_PATH = Config.get_taxonomy_path()
 
 
 def _normalize_primary_key(label: str) -> str:
-    """Normalize category label to index key (lowercase, ' & ' -> '_', ' ' -> '_')."""
-    return label.lower().replace(" & ", "_").replace(" ", "_")
+    """Normalize category label to index key (lowercase, symbols removed, spaces -> '_')."""
+    return label.lower().replace(" & ", "_").replace(",", "").replace("-", "_").replace(" ", "_")
 
 
 @lru_cache
@@ -48,25 +48,26 @@ def build_taxonomy_index() -> dict[str, set[str]]:
 
 
 # =============================================================================
-# PRIMARY CATEGORY ID MAPPING
+# PRIMARY CATEGORY ID MAPPING (dynamically built from taxonomy JSON)
 # =============================================================================
 
-# Mapping from numeric IDs ("1" through "10") to PrimaryCategory enum values
-_PRIMARY_CATEGORY_ID_MAP: dict[str, str] = {
-    "1": "play_and_fun",
-    "2": "exploration_and_adventure",
-    "3": "creation_and_expression",
-    "4": "learning_and_intellectual",
-    "5": "social_connection",
-    "6": "body_and_movement",
-    "7": "challenge_and_achievement",
-    "8": "relaxation_and_escapism",
-    "9": "identity_and_meaning",
-    "10": "contribution_and_impact",
-}
 
-# Reverse mapping from enum value to numeric ID
-_PRIMARY_CATEGORY_VALUE_TO_ID: dict[str, str] = {v: k for k, v in _PRIMARY_CATEGORY_ID_MAP.items()}
+@lru_cache
+def _build_primary_category_id_map() -> dict[str, str]:
+    """Build mapping from numeric category ID to normalized category value from taxonomy JSON."""
+    taxonomy = load_taxonomy()
+    id_map: dict[str, str] = {}
+    for cat in taxonomy["categories"]:
+        cat_id = cat["category_id"]
+        cat_value = _normalize_primary_key(cat["category"])
+        id_map[cat_id] = cat_value
+    return id_map
+
+
+@lru_cache
+def _build_primary_category_value_to_id() -> dict[str, str]:
+    """Build reverse mapping from normalized category value to numeric ID."""
+    return {v: k for k, v in _build_primary_category_id_map().items()}
 
 
 def get_primary_category_id_map() -> dict[str, str]:
@@ -74,9 +75,9 @@ def get_primary_category_id_map() -> dict[str, str]:
     Get mapping from numeric ID to primary category value.
 
     Returns:
-        Dict mapping "1" -> "play_and_fun", "2" -> "exploration_and_adventure", etc.
+        Dict mapping "0" -> "other", "1" -> "play_pure_fun", etc.
     """
-    return _PRIMARY_CATEGORY_ID_MAP.copy()
+    return _build_primary_category_id_map().copy()
 
 
 def get_primary_category_value_to_id_map() -> dict[str, str]:
@@ -84,9 +85,9 @@ def get_primary_category_value_to_id_map() -> dict[str, str]:
     Get mapping from primary category value to numeric ID.
 
     Returns:
-        Dict mapping "play_and_fun" -> "1", "exploration_and_adventure" -> "2", etc.
+        Dict mapping "other" -> "0", "play_pure_fun" -> "1", etc.
     """
-    return _PRIMARY_CATEGORY_VALUE_TO_ID.copy()
+    return _build_primary_category_value_to_id().copy()
 
 
 def get_primary_category_mappings() -> tuple[dict[str, str], dict[str, str]]:
@@ -95,17 +96,60 @@ def get_primary_category_mappings() -> tuple[dict[str, str], dict[str, str]]:
 
     Returns:
         Tuple of (id_to_value, value_to_id) dicts.
-        - id_to_value: "1" -> "play_and_fun"
-        - value_to_id: "play_and_fun" -> "1"
+    """
+    return get_primary_category_id_map(), get_primary_category_value_to_id_map()
+
+
+def resolve_primary_category(value: str) -> str:
+    """
+    Resolve any primary category representation to its normalized value.
+
+    Accepts numeric ID ("1"), normalized value ("play_and_pure_fun"),
+    or raw label ("PLAY & PURE FUN"). Returns the normalized value.
+
+    Falls back to "other" if the value cannot be resolved.
 
     Example:
-        >>> id_to_val, val_to_id = get_primary_category_mappings()
-        >>> id_to_val["1"]
-        'play_and_fun'
-        >>> val_to_id["play_and_fun"]
-        '1'
+        >>> resolve_primary_category("1")
+        'play_pure_fun'
+        >>> resolve_primary_category("0")
+        'other'
+        >>> resolve_primary_category("play_pure_fun")
+        'play_pure_fun'
     """
-    return _PRIMARY_CATEGORY_ID_MAP.copy(), _PRIMARY_CATEGORY_VALUE_TO_ID.copy()
+    id_map = _build_primary_category_id_map()
+    value_to_id = _build_primary_category_value_to_id()
+
+    # Try as numeric ID
+    if value in id_map:
+        return id_map[value]
+
+    # Try as already-normalized value
+    if value in value_to_id:
+        return value
+
+    # Try normalizing as a raw label
+    normalized = _normalize_primary_key(value)
+    if normalized in value_to_id:
+        return normalized
+
+    return "other"
+
+
+def primary_category_to_id(value: str) -> str:
+    """
+    Convert a normalized primary category value to its numeric ID.
+
+    Falls back to "0" (Other) if value not found.
+
+    Example:
+        >>> primary_category_to_id("play_pure_fun")
+        '1'
+        >>> primary_category_to_id("other")
+        '0'
+    """
+    value_to_id = _build_primary_category_value_to_id()
+    return value_to_id.get(value, "0")
 
 
 def build_primary_to_subcategory_index() -> dict[str, set[str]]:
@@ -124,16 +168,11 @@ def build_primary_to_subcategory_index() -> dict[str, set[str]]:
         False
     """
     taxonomy_index = build_taxonomy_index()
+    id_map = _build_primary_category_id_map()
     result: dict[str, set[str]] = {}
 
-    for primary_id, primary_value in _PRIMARY_CATEGORY_ID_MAP.items():
-        # The taxonomy index uses normalized keys like "play_and_pure_fun"
-        # We need to check both possible formats
+    for primary_id, primary_value in id_map.items():
         subcats = taxonomy_index.get(primary_value, set())
-        if not subcats:
-            # Try with "pure" variant for category 1
-            alt_key = primary_value.replace("play_and_fun", "play_and_pure_fun")
-            subcats = taxonomy_index.get(alt_key, set())
         result[primary_id] = subcats
 
     return result
@@ -159,8 +198,9 @@ def validate_subcategory_for_primary(subcategory_id: str, primary_id: str) -> bo
         True
     """
     # If primary_id is a value, convert to numeric ID
-    if primary_id in _PRIMARY_CATEGORY_VALUE_TO_ID:
-        primary_id = _PRIMARY_CATEGORY_VALUE_TO_ID[primary_id]
+    value_to_id = _build_primary_category_value_to_id()
+    if primary_id in value_to_id:
+        primary_id = value_to_id[primary_id]
 
     # Simple validation: subcategory should start with primary_id + "."
     expected_prefix = f"{primary_id}."
@@ -417,7 +457,7 @@ def get_full_taxonomy_dimension(
     Build complete TaxonomyDimension dict with all fields from schema example.
 
     This creates a rich taxonomy dimension structure that can be used
-    to populate EventSchema.taxonomy_dimensions.
+    to populate EventSchema.taxonomy_dimension.
 
     Args:
         primary_category: Normalized primary category key (e.g., "play_and_fun")

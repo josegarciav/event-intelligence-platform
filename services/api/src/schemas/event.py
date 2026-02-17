@@ -27,9 +27,9 @@ from src.schemas.taxonomy import (
     build_taxonomy_index,
     get_all_subcategory_ids,
     get_all_subcategory_options,
-    get_primary_category_id_map,
-    get_primary_category_value_to_id_map,
     get_subcategory_by_id,
+    primary_category_to_id,
+    resolve_primary_category,
     validate_subcategory_for_primary,
 )
 
@@ -44,101 +44,6 @@ def _utc_now() -> datetime:
 # ============================================================================
 
 _TAXONOMY_INDEX = build_taxonomy_index()
-
-
-class PrimaryCategory(str, Enum):
-    """
-    Primary experience categories from Human Experience Taxonomy.
-
-    Supports both string values and numeric IDs:
-    - PrimaryCategory("play_and_fun") - from string value
-    - PrimaryCategory.from_id("1") - from numeric ID
-    - PrimaryCategory.from_id_or_value("1") or ("play_and_fun") - accepts either
-    """
-
-    PLAY_AND_PURE_FUN = "play_and_fun"
-    EXPLORATION_AND_ADVENTURE = "exploration_and_adventure"
-    CREATION_AND_EXPRESSION = "creation_and_expression"
-    LEARNING_AND_INTELLECTUAL = "learning_and_intellectual"
-    SOCIAL_CONNECTION = "social_connection"
-    BODY_AND_MOVEMENT = "body_and_movement"
-    CHALLENGE_AND_ACHIEVEMENT = "challenge_and_achievement"
-    RELAXATION_AND_ESCAPISM = "relaxation_and_escapism"
-    IDENTITY_AND_MEANING = "identity_and_meaning"
-    CONTRIBUTION_AND_IMPACT = "contribution_and_impact"
-
-    @classmethod
-    def from_id(cls, category_id: str) -> "PrimaryCategory":
-        """
-        Get enum from numeric ID ('1' through '10').
-
-        Args:
-            category_id: Numeric ID string (e.g., "1", "2", ...)
-
-        Returns:
-            PrimaryCategory enum member
-
-        Raises:
-            ValueError: If category_id is not valid
-
-        Example:
-            >>> PrimaryCategory.from_id("1")
-            <PrimaryCategory.PLAY_AND_PURE_FUN: 'play_and_fun'>
-        """
-        id_map = get_primary_category_id_map()
-        if category_id not in id_map:
-            raise ValueError(f"Invalid category ID '{category_id}'. " f"Valid IDs are: {list(id_map.keys())}")
-        return cls(id_map[category_id])
-
-    @classmethod
-    def from_id_or_value(cls, value: str) -> "PrimaryCategory":
-        """
-        Accept either numeric ID ('1') or string value ('play_and_fun').
-
-        Tries to interpret the value as a numeric ID first, then as a string value.
-
-        Args:
-            value: Either a numeric ID ("1") or string value ("play_and_fun")
-
-        Returns:
-            PrimaryCategory enum member
-
-        Raises:
-            ValueError: If value is neither a valid ID nor a valid string value
-
-        Example:
-            >>> PrimaryCategory.from_id_or_value("1")
-            <PrimaryCategory.PLAY_AND_PURE_FUN: 'play_and_fun'>
-            >>> PrimaryCategory.from_id_or_value("play_and_fun")
-            <PrimaryCategory.PLAY_AND_PURE_FUN: 'play_and_fun'>
-        """
-        id_map = get_primary_category_id_map()
-
-        # Try as numeric ID first
-        if value in id_map:
-            return cls(id_map[value])
-
-        # Try as string value
-        try:
-            return cls(value)
-        except ValueError:
-            valid_ids = list(id_map.keys())
-            valid_values = [e.value for e in cls]
-            raise ValueError(f"Invalid value '{value}'. " f"Valid IDs: {valid_ids}, Valid values: {valid_values}")
-
-    def to_id(self) -> str:
-        """
-        Get numeric ID for this category.
-
-        Returns:
-            Numeric ID string (e.g., "1" for play_and_fun)
-
-        Example:
-            >>> PrimaryCategory.PLAY_AND_PURE_FUN.to_id()
-            '1'
-        """
-        value_to_id = get_primary_category_value_to_id_map()
-        return value_to_id[self.value]
 
 
 class Subcategory:
@@ -259,7 +164,9 @@ class TaxonomyDimension(BaseModel):
     """
 
     # Core taxonomy fields
-    primary_category: PrimaryCategory
+    primary_category: str = Field(
+        description="Normalized primary category value (e.g. 'play_&_pure_fun', 'other')",
+    )
     subcategory: str | None = Field(
         default=None,
         description="Subcategory id from the taxonomy (e.g. '1.4'). Must be one of Subcategory.all_ids().",
@@ -332,6 +239,12 @@ class TaxonomyDimension(BaseModel):
         description="Repeatability: 'high' | 'medium' | 'low'",
     )
 
+    @field_validator("primary_category", mode="before")
+    @classmethod
+    def normalize_primary_category(cls, v: str) -> str:
+        """Resolve any primary category representation to its normalized value."""
+        return resolve_primary_category(str(v))
+
     @field_validator("subcategory")
     @classmethod
     def validate_subcategory_id(cls, v: str | None) -> str | None:
@@ -350,12 +263,12 @@ class TaxonomyDimension(BaseModel):
     def validate_subcategory_primary_match(self) -> "TaxonomyDimension":
         """Ensure subcategory belongs to the specified primary category."""
         if self.subcategory is not None:
-            primary_id = self.primary_category.to_id()
-            if not Subcategory.validate_for_primary(self.subcategory, primary_id):
+            pid = primary_category_to_id(self.primary_category)
+            if not Subcategory.validate_for_primary(self.subcategory, pid):
                 raise ValueError(
                     f"Subcategory '{self.subcategory}' does not belong to "
-                    f"primary category '{self.primary_category.value}' (ID: {primary_id}). "
-                    f"Subcategory must start with '{primary_id}.'."
+                    f"primary category '{self.primary_category}' (ID: {pid}). "
+                    f"Subcategory must start with '{pid}.'."
                 )
         return self
 
@@ -637,10 +550,9 @@ class EventSchema(BaseModel):
     description: str | None = None
 
     # ---- TAXONOMY & EXPERIENCE DIMENSIONS ----
-    primary_category: PrimaryCategory
-    taxonomy_dimensions: list[TaxonomyDimension] = Field(
-        default_factory=list,
-        description="Multi-dimensional taxonomy mappings for this event",
+    taxonomy_dimension: TaxonomyDimension | None = Field(
+        default=None,
+        description="Taxonomy dimension mapping for this event",
     )
 
     # ---- TIMING ----

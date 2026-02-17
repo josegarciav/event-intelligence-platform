@@ -440,6 +440,11 @@ CREATE TABLE IF NOT EXISTS event_taxonomy_mappings (
     age_accessibility TEXT,
     repeatability TEXT,
 
+    -- Unconstrained columns for LLM classification
+    unconstrained_primary_category TEXT,
+    unconstrained_subcategory TEXT,
+    unconstrained_activity TEXT,
+
     CONSTRAINT fk_taxonomy_activity
         FOREIGN KEY (activity_id)
         REFERENCES activities_metadata(activity_id)

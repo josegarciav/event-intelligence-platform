@@ -49,6 +49,9 @@ sources:
                   address
                   contentUrl
                   live
+                  phone
+                  website
+                  followerCount
                   area {
                     name
                     country {
@@ -57,7 +60,13 @@ sources:
                     }
                   }
                 }
+                dateUpdated
+                lineup
                 artists {
+                  name
+                }
+                admin {
+                  username
                   name
                 }
                 images {
@@ -117,6 +126,12 @@ sources:
       is_ticketed: "event.isTicketed"
       pick_id: "event.pick.id"
       pick_blurb: "event.pick.blurb"
+      source_updated_at: "event.dateUpdated"
+      lineup: "event.lineup"
+      organizer_name: "event.admin.name"
+      venue_phone: "event.venue.phone"
+      venue_website: "event.venue.website"
+      venue_follower_count: "event.venue.followerCount"
 
     # Transformations applied after field extraction
     transformations:
@@ -176,7 +191,7 @@ sources:
     enrichment:
       geocoding: true
       compressed_html:
-        enabled: true
+        enabled: false
         engine_type: hybrid
         rate_limit_per_second: 2.0
         timeout_s: 15.0

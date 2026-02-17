@@ -11,7 +11,7 @@ import logging
 from psycopg2.extras import execute_values
 
 from src.schemas.event import EventSchema
-from src.schemas.taxonomy import get_primary_category_value_to_id_map
+from src.schemas.taxonomy import primary_category_to_id
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,6 @@ class EventDataWriter:
     def __init__(self, db_connection) -> None:
         """Initialize with an active psycopg2 connection."""
         self.conn = db_connection
-        self._value_to_id = get_primary_category_value_to_id_map()
         # Metadata cache for foreign key verification (issue #8)
         self._valid_primary_categories = set()
         self._valid_subcategories = set()
@@ -128,7 +127,20 @@ class EventDataWriter:
                 postal_code, country_code, latitude, longitude, timezone
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (city, country_code, (COALESCE(venue_name, '')))
-            DO NOTHING
+            DO UPDATE SET
+                street_address = COALESCE(EXCLUDED.street_address, locations.street_address),
+                state_or_region = COALESCE(EXCLUDED.state_or_region, locations.state_or_region),
+                postal_code = COALESCE(EXCLUDED.postal_code, locations.postal_code),
+                latitude = COALESCE(EXCLUDED.latitude, locations.latitude),
+                longitude = COALESCE(EXCLUDED.longitude, locations.longitude),
+                timezone = COALESCE(EXCLUDED.timezone, locations.timezone)
+            WHERE
+                locations.street_address IS DISTINCT FROM COALESCE(EXCLUDED.street_address, locations.street_address)
+                OR locations.state_or_region IS DISTINCT FROM COALESCE(EXCLUDED.state_or_region, locations.state_or_region)
+                OR locations.postal_code IS DISTINCT FROM COALESCE(EXCLUDED.postal_code, locations.postal_code)
+                OR locations.latitude IS DISTINCT FROM COALESCE(EXCLUDED.latitude, locations.latitude)
+                OR locations.longitude IS DISTINCT FROM COALESCE(EXCLUDED.longitude, locations.longitude)
+                OR locations.timezone IS DISTINCT FROM COALESCE(EXCLUDED.timezone, locations.timezone)
             RETURNING location_id;
             """,
             (
@@ -147,7 +159,7 @@ class EventDataWriter:
         if res:
             return res[0]
 
-        # Fallback lookup on conflict
+        # Fallback lookup when no changes (WHERE was false) or on conflict
         cur.execute(
             """
             SELECT location_id FROM locations
@@ -177,7 +189,13 @@ class EventDataWriter:
             DO UPDATE SET
                 compressed_html = COALESCE(EXCLUDED.compressed_html, sources.compressed_html),
                 source_url = COALESCE(EXCLUDED.source_url, sources.source_url),
-                source_updated_at = COALESCE(EXCLUDED.source_updated_at, sources.source_updated_at)
+                source_updated_at = COALESCE(EXCLUDED.source_updated_at, sources.source_updated_at),
+                ingestion_timestamp = EXCLUDED.ingestion_timestamp
+            WHERE
+                sources.compressed_html IS DISTINCT FROM COALESCE(EXCLUDED.compressed_html, sources.compressed_html)
+                OR sources.source_url IS DISTINCT FROM COALESCE(EXCLUDED.source_url, sources.source_url)
+                OR sources.source_updated_at IS DISTINCT FROM COALESCE(EXCLUDED.source_updated_at, sources.source_updated_at)
+                OR sources.ingestion_timestamp IS DISTINCT FROM EXCLUDED.ingestion_timestamp
             RETURNING source_id;
             """,
             (
@@ -188,6 +206,19 @@ class EventDataWriter:
                 src.ingestion_timestamp,
                 src.source_updated_at,
             ),
+        )
+        res = cur.fetchone()
+        if res:
+            return res[0]
+
+        # Fallback lookup when no changes
+        cur.execute(
+            """
+            SELECT source_id FROM sources
+            WHERE source_name = %s AND source_event_id = %s
+            LIMIT 1;
+            """,
+            (src.source_name, src.source_event_id),
         )
         return cur.fetchone()[0]
 
@@ -205,7 +236,19 @@ class EventDataWriter:
             ) VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (name) DO UPDATE SET
                 url = COALESCE(EXCLUDED.url, organizers.url),
+                email = COALESCE(EXCLUDED.email, organizers.email),
+                phone = COALESCE(EXCLUDED.phone, organizers.phone),
+                image_url = COALESCE(EXCLUDED.image_url, organizers.image_url),
+                follower_count = COALESCE(EXCLUDED.follower_count, organizers.follower_count),
+                verified = EXCLUDED.verified,
                 updated_at = NOW()
+            WHERE
+                organizers.url IS DISTINCT FROM COALESCE(EXCLUDED.url, organizers.url)
+                OR organizers.email IS DISTINCT FROM COALESCE(EXCLUDED.email, organizers.email)
+                OR organizers.phone IS DISTINCT FROM COALESCE(EXCLUDED.phone, organizers.phone)
+                OR organizers.image_url IS DISTINCT FROM COALESCE(EXCLUDED.image_url, organizers.image_url)
+                OR organizers.follower_count IS DISTINCT FROM COALESCE(EXCLUDED.follower_count, organizers.follower_count)
+                OR organizers.verified IS DISTINCT FROM EXCLUDED.verified
             RETURNING organizer_id;
             """,
             (
@@ -218,6 +261,15 @@ class EventDataWriter:
                 org.verified,
             ),
         )
+        res = cur.fetchone()
+        if res:
+            return res[0]
+
+        # Fallback lookup when no changes
+        cur.execute(
+            "SELECT organizer_id FROM organizers WHERE name = %s LIMIT 1;",
+            (org.name,),
+        )
         return cur.fetchone()[0]
 
     # ------------------------------------------------------------------
@@ -225,8 +277,9 @@ class EventDataWriter:
     # ------------------------------------------------------------------
 
     def _persist_event(self, cur, event: EventSchema, location_id, source_id, organizer_id):
-        # Convert PrimaryCategory enum value to taxonomy ID
-        primary_cat_id = self._value_to_id.get(event.primary_category)
+        # Convert primary category value to taxonomy ID
+        primary_cat_value = event.taxonomy_dimension.primary_category if event.taxonomy_dimension else None
+        primary_cat_id = primary_category_to_id(primary_cat_value) if primary_cat_value else None
 
         # Issue #8: Verify primary_category_id exists
         if primary_cat_id and primary_cat_id not in self._valid_primary_categories:
@@ -254,7 +307,39 @@ class EventDataWriter:
                 %s, NOW()
             )
             ON CONFLICT (event_id) DO UPDATE SET
-                data_quality_score = EXCLUDED.data_quality_score
+                title = EXCLUDED.title,
+                description = EXCLUDED.description,
+                primary_category_id = EXCLUDED.primary_category_id,
+                event_type = EXCLUDED.event_type,
+                event_format = EXCLUDED.event_format,
+                capacity = EXCLUDED.capacity,
+                age_restriction = EXCLUDED.age_restriction,
+                start_datetime = EXCLUDED.start_datetime,
+                end_datetime = EXCLUDED.end_datetime,
+                duration_minutes = EXCLUDED.duration_minutes,
+                is_all_day = EXCLUDED.is_all_day,
+                is_recurring = EXCLUDED.is_recurring,
+                recurrence_pattern = EXCLUDED.recurrence_pattern,
+                location_id = EXCLUDED.location_id,
+                organizer_id = EXCLUDED.organizer_id,
+                source_id = EXCLUDED.source_id,
+                data_quality_score = EXCLUDED.data_quality_score,
+                updated_at = NOW()
+            WHERE
+                events.title IS DISTINCT FROM EXCLUDED.title
+                OR events.description IS DISTINCT FROM EXCLUDED.description
+                OR events.primary_category_id IS DISTINCT FROM EXCLUDED.primary_category_id
+                OR events.event_type IS DISTINCT FROM EXCLUDED.event_type
+                OR events.event_format IS DISTINCT FROM EXCLUDED.event_format
+                OR events.capacity IS DISTINCT FROM EXCLUDED.capacity
+                OR events.age_restriction IS DISTINCT FROM EXCLUDED.age_restriction
+                OR events.start_datetime IS DISTINCT FROM EXCLUDED.start_datetime
+                OR events.end_datetime IS DISTINCT FROM EXCLUDED.end_datetime
+                OR events.duration_minutes IS DISTINCT FROM EXCLUDED.duration_minutes
+                OR events.location_id IS DISTINCT FROM EXCLUDED.location_id
+                OR events.organizer_id IS DISTINCT FROM EXCLUDED.organizer_id
+                OR events.source_id IS DISTINCT FROM EXCLUDED.source_id
+                OR events.data_quality_score IS DISTINCT FROM EXCLUDED.data_quality_score
             RETURNING event_id;
             """,
             (
@@ -278,7 +363,12 @@ class EventDataWriter:
                 event.data_quality_score,
             ),
         )
-        return cur.fetchone()[0]
+        res = cur.fetchone()
+        if res:
+            return res[0]
+
+        # No changes — event_id is deterministic, return directly
+        return event.event_id
 
     # ------------------------------------------------------------------
     # 5. Price snapshot
@@ -316,13 +406,13 @@ class EventDataWriter:
         # 1. Cleanup existing mappings (cascades to event_emotional_outputs)
         cur.execute("DELETE FROM event_taxonomy_mappings WHERE event_id = %s", (event_id,))
 
-        if not event.taxonomy_dimensions:
+        if not event.taxonomy_dimension:
             return
 
         # 2. Filter and prepare mapping data
         valid_dims_with_act = []
         mapping_rows = []
-        for dim in event.taxonomy_dimensions:
+        for dim in [event.taxonomy_dimension]:
             sub_id = dim.subcategory
             if sub_id and sub_id not in self._valid_subcategories:
                 logger.warning(
@@ -355,6 +445,9 @@ class EventDataWriter:
                     dim.risk_level,
                     dim.age_accessibility,
                     dim.repeatability,
+                    None,  # unconstrained_primary_category (future LLM)
+                    None,  # unconstrained_subcategory (future LLM)
+                    None,  # unconstrained_activity (future LLM)
                 )
             )
 
@@ -369,7 +462,9 @@ class EventDataWriter:
                 event_id, subcategory_id, activity_id, activity_name,
                 energy_level, social_intensity, cognitive_load,
                 physical_involvement, cost_level, time_scale,
-                environment, risk_level, age_accessibility, repeatability
+                environment, risk_level, age_accessibility, repeatability,
+                unconstrained_primary_category, unconstrained_subcategory,
+                unconstrained_activity
             ) VALUES %s
             RETURNING mapping_id;
             """,
@@ -466,9 +561,14 @@ class EventDataWriter:
                 ticket_count_available, early_bird_deadline
             ) VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (event_id) DO UPDATE SET
+                url = EXCLUDED.url,
                 is_sold_out = EXCLUDED.is_sold_out,
                 ticket_count_available = EXCLUDED.ticket_count_available,
-                updated_at = NOW();
+                updated_at = NOW()
+            WHERE
+                ticket_info.url IS DISTINCT FROM EXCLUDED.url
+                OR ticket_info.is_sold_out IS DISTINCT FROM EXCLUDED.is_sold_out
+                OR ticket_info.ticket_count_available IS DISTINCT FROM EXCLUDED.ticket_count_available;
             """,
             (
                 event_id,

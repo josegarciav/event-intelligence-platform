@@ -13,11 +13,12 @@ import logging
 import re
 from typing import Any
 
-from src.schemas.event import PrimaryCategory, Subcategory, TaxonomyDimension
+from src.schemas.event import Subcategory, TaxonomyDimension
 from src.schemas.taxonomy import (
     find_best_activity_match,
     get_full_taxonomy_dimension,
     get_subcategory_by_id,
+    resolve_primary_category,
 )
 
 logger = logging.getLogger(__name__)
@@ -54,13 +55,8 @@ class TaxonomyMapper:
             ValueError: If default_subcategory doesn't match default_primary
         """
         # Parse default_primary - support both numeric ID and string value
-        default_primary_raw = taxonomy_config.get("default_primary", "play_and_fun")
-        try:
-            default_primary_enum = PrimaryCategory.from_id_or_value(default_primary_raw)
-            self.default_primary = default_primary_enum.value
-        except ValueError:
-            logger.warning(f"Invalid default_primary '{default_primary_raw}', using 'play_and_fun'")
-            self.default_primary = "play_and_fun"
+        default_primary_raw = taxonomy_config.get("default_primary", "other")
+        self.default_primary = resolve_primary_category(default_primary_raw)
 
         self.default_subcategory = taxonomy_config.get("default_subcategory")
         self.rules = taxonomy_config.get("rules", [])
@@ -108,7 +104,7 @@ class TaxonomyMapper:
         if not dimensions and self.default_subcategory:
             dimensions.append(
                 TaxonomyDimension(
-                    primary_category=PrimaryCategory(self.default_primary),
+                    primary_category=self.default_primary,
                     subcategory=self.default_subcategory,
                     values=[],
                     confidence=0.5,
@@ -194,17 +190,13 @@ class TaxonomyMapper:
         values = assign_config.get("values", [])
         confidence = assign_config.get("confidence", 0.5)
 
-        # Parse primary category - support both numeric ID and string value
-        try:
-            primary_category = PrimaryCategory.from_id_or_value(primary_category_raw)
-        except ValueError:
-            logger.warning(f"Invalid primary category: {primary_category_raw}")
-            return None
+        # Resolve primary category - support both numeric ID and string value
+        primary_category = resolve_primary_category(primary_category_raw)
 
         # Validate subcategory belongs to primary category
-        if subcategory_id and not Subcategory.validate_for_primary(subcategory_id, primary_category.value):
+        if subcategory_id and not Subcategory.validate_for_primary(subcategory_id, primary_category):
             logger.warning(
-                f"Subcategory '{subcategory_id}' does not belong to " f"primary category '{primary_category.value}'"
+                f"Subcategory '{subcategory_id}' does not belong to " f"primary category '{primary_category}'"
             )
             return None
 
@@ -223,7 +215,7 @@ class TaxonomyMapper:
             subcategory_name=subcategory_name,
             values=values,
             confidence=confidence,
-        )
+        )  # type: ignore[arg-type]
 
     def get_full_taxonomy_data(
         self,
@@ -249,11 +241,7 @@ class TaxonomyMapper:
         for dim in dimensions:
             # Start with basic TaxonomyDimension data
             full_dim = get_full_taxonomy_dimension(
-                primary_category=(
-                    dim.primary_category.value
-                    if isinstance(dim.primary_category, PrimaryCategory)
-                    else dim.primary_category
-                ),
+                primary_category=dim.primary_category,
                 subcategory_id=dim.subcategory or "",
                 confidence=dim.confidence,
                 values=dim.values if dim.values else None,

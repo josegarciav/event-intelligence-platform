@@ -39,15 +39,16 @@ from src.schemas.event import (
     EventSchema,
     EventType,
     LocationInfo,
+    MediaAsset,
     NormalizationError,
     NormalizationSeverity,
     OrganizerInfo,
     PriceInfo,
-    PrimaryCategory,
     SourceInfo,
     TaxonomyDimension,
     TicketInfo,
 )
+from src.schemas.taxonomy import resolve_primary_category
 
 logger = logging.getLogger(__name__)
 
@@ -690,9 +691,7 @@ class BaseAPIPipeline(BasePipeline):
         # Convert TaxonomyDimension objects to dicts for normalize_to_schema
         dims_as_dicts = [
             {
-                "primary_category": (
-                    dim.primary_category.value if hasattr(dim.primary_category, "value") else dim.primary_category
-                ),
+                "primary_category": dim.primary_category,
                 "subcategory": dim.subcategory,
                 "values": dim.values,
             }
@@ -719,10 +718,17 @@ class BaseAPIPipeline(BasePipeline):
         # Get location defaults
         loc_defaults = self.source_config.defaults.get("location", {})
 
-        # Build location
+        # Build location — clean venue_name when it contains address fragments
+        raw_venue_name = parsed_event.get("venue_name") or ""
+        raw_venue_address = parsed_event.get("venue_address")
+        venue_name, extra_address = self._clean_venue_name(raw_venue_name)
+        # If no street_address from the API but we extracted one from venue_name, use it
+        if not raw_venue_address and extra_address:
+            raw_venue_address = extra_address
+
         location = LocationInfo(
-            venue_name=parsed_event.get("venue_name"),
-            street_address=parsed_event.get("venue_address"),
+            venue_name=venue_name or None,
+            street_address=raw_venue_address,
             city=parsed_event.get("city") or loc_defaults.get("city", "Unknown"),
             country_code=(parsed_event.get("country_code") or loc_defaults.get("country_code", "US")).upper(),
             timezone=loc_defaults.get("timezone"),
@@ -783,9 +789,21 @@ class BaseAPIPipeline(BasePipeline):
             price_raw_text=price_raw,
         )
 
-        # Build organizer
+        # Build organizer — enrich with venue contact info
+        venue_website = parsed_event.get("venue_website")
+        venue_follower_raw = parsed_event.get("venue_follower_count")
+        venue_follower_count = None
+        if venue_follower_raw is not None:
+            try:
+                venue_follower_count = int(venue_follower_raw)
+            except (ValueError, TypeError):
+                pass
+
         organizer = OrganizerInfo(
-            name=parsed_event.get("organizer_name") or parsed_event.get("venue_name") or "Unknown",
+            name=parsed_event.get("organizer_name") or "Unknown",
+            url=venue_website or None,
+            phone=parsed_event.get("venue_phone") or None,
+            follower_count=venue_follower_count,
         )
 
         # Build source info
@@ -818,28 +836,23 @@ class BaseAPIPipeline(BasePipeline):
         seed = f"{source_name}:{source_event_id}:{title_for_id}:{start_dt.isoformat()}"
         event_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, seed))
 
-        # Build taxonomy dimensions
-        taxonomy_objs = [
-            TaxonomyDimension(
-                primary_category=PrimaryCategory(dim["primary_category"]),
-                subcategory=dim.get("subcategory"),
-                subcategory_name=dim.get("subcategory_name"),
-                values=dim.get("values", []),
+        # Build taxonomy dimension (single, from first taxonomy dim)
+        taxonomy_obj: TaxonomyDimension | None = None
+        if taxonomy_dims:
+            first_dim = taxonomy_dims[0]
+            taxonomy_obj = TaxonomyDimension(
+                primary_category=resolve_primary_category(first_dim["primary_category"]),
+                subcategory=first_dim.get("subcategory"),
+                subcategory_name=first_dim.get("subcategory_name"),
+                values=first_dim.get("values", []),
             )
-            for dim in taxonomy_dims
-        ]
 
-        # Enrich taxonomy dimensions with activity-level fields using FeatureExtractor
-        if self.feature_extractor:
-            enriched_dims = []
-            for dim in taxonomy_objs:
+            # Enrich taxonomy dimension with activity-level fields using FeatureExtractor
+            if self.feature_extractor:
                 try:
-                    enriched = self.feature_extractor.enrich_taxonomy_dimension(dim, parsed_event)
-                    enriched_dims.append(enriched)
+                    taxonomy_obj = self.feature_extractor.enrich_taxonomy_dimension(taxonomy_obj, parsed_event)
                 except Exception as e:
                     logger.warning(f"Failed to enrich taxonomy dimension: {e}")
-                    enriched_dims.append(dim)
-            taxonomy_objs = enriched_dims
 
         # Determine event type from rules
         event_type = self._determine_event_type(parsed_event)
@@ -861,8 +874,20 @@ class BaseAPIPipeline(BasePipeline):
         # Get tags from extracted fields or parsed event
         tags = extracted_fields.get("tags") or parsed_event.get("tags", [])
 
-        # Build artists list
+        # Build artists list — merge structured artists with lineup text
         artist_names = parsed_event.get("artists", [])
+        lineup_raw = parsed_event.get("lineup") or ""
+        if lineup_raw:
+            lineup_artists = self._parse_lineup(lineup_raw)
+            # Merge: keep order from lineup (it's the authoritative set),
+            # but use a case-insensitive set to avoid duplicates.
+            seen = {n.strip().lower() for n in artist_names if n}
+            merged = list(artist_names)
+            for name in lineup_artists:
+                if name.strip().lower() not in seen:
+                    merged.append(name)
+                    seen.add(name.strip().lower())
+            artist_names = merged
         artists = [ArtistInfo(name=name) for name in artist_names if name]
 
         # Build engagement metrics from API fields
@@ -884,12 +909,16 @@ class BaseAPIPipeline(BasePipeline):
         if isinstance(venue_live, int) and venue_live > 0:
             capacity = venue_live
 
-        # Image URL with flyer_front fallback
+        # Build media assets from image URL / flyer
         image_url = parsed_event.get("image_url")
         if not image_url:
             flyer_front = parsed_event.get("flyer_front")
             if flyer_front:
                 image_url = flyer_front
+
+        media_assets: list[MediaAsset] = []
+        if image_url:
+            media_assets.append(MediaAsset(type="image", url=image_url))
 
         age_restriction = parsed_event.get("age_restriction")
         if age_restriction is None:
@@ -897,15 +926,20 @@ class BaseAPIPipeline(BasePipeline):
             if minimum_age is not None:
                 age_restriction = str(minimum_age)
 
-        ticket_info = TicketInfo(
-            url=parsed_event.get("ticket_url"),
-            is_sold_out=bool(parsed_event.get("is_sold_out", False)),
-        )
-
         # Build custom_fields (RA-specific metadata)
         custom_fields = {}
-        if parsed_event.get("is_ticketed") is not None:
-            custom_fields["is_ticketed"] = bool(parsed_event.get("is_ticketed"))
+        is_ticketed = parsed_event.get("is_ticketed")
+        if is_ticketed is not None:
+            custom_fields["is_ticketed"] = bool(is_ticketed)
+
+        # Build ticket info — set URL to event source page when ticketed
+        ticket_url = parsed_event.get("ticket_url")
+        if not ticket_url and bool(is_ticketed):
+            ticket_url = parsed_event.get("source_url") or ""
+        ticket_info = TicketInfo(
+            url=ticket_url or None,
+            is_sold_out=bool(parsed_event.get("is_sold_out", False)),
+        )
         pick_blurb = parsed_event.get("pick_blurb")
         if pick_blurb:
             custom_fields["pick_blurb"] = pick_blurb
@@ -917,8 +951,7 @@ class BaseAPIPipeline(BasePipeline):
             event_id=event_id,
             title=parsed_event.get("title", "Untitled Event"),
             description=parsed_event.get("description"),
-            primary_category=PrimaryCategory(primary_cat),
-            taxonomy_dimensions=taxonomy_objs,
+            taxonomy_dimension=taxonomy_obj,
             start_datetime=start_dt,
             end_datetime=end_dt,
             location=location,
@@ -927,7 +960,7 @@ class BaseAPIPipeline(BasePipeline):
             price=price,
             organizer=organizer,
             artists=artists,
-            image_url=image_url,
+            media_assets=media_assets,
             source=source,
             tags=tags,
             engagement=engagement,
@@ -1030,6 +1063,78 @@ class BaseAPIPipeline(BasePipeline):
 
         is_valid = not missing_required
         return is_valid, errors
+
+    @staticmethod
+    def _clean_venue_name(raw: str) -> tuple[str, str | None]:
+        """
+        Clean a venue name that may contain embedded address fragments.
+
+        Handles patterns like:
+        - ``"TBA - Motor Oil, Carrer Ample 46, Barcelona"``
+        - ``"TBA - Carrer Ample 46, Barcelona"``
+
+        Returns ``(cleaned_venue_name, extracted_street_address | None)``.
+        """
+        import re
+
+        if not raw:
+            return "", None
+
+        # Strip "TBA" prefix variants: "TBA -", "TBA -", "tba - "
+        venue = raw.strip()
+        tba_match = re.match(r"^[Tt][Bb][Aa]\s*[-–—]\s*", venue)
+        if tba_match:
+            venue = venue[tba_match.end() :].strip()
+
+        # Try to split "VenueName, StreetAddress, City" on comma boundaries.
+        # Heuristic: if a comma-separated segment looks like a street
+        # (contains a number), treat it and everything after as address.
+        parts = [p.strip() for p in venue.split(",")]
+        if len(parts) >= 2:
+            street_idx = None
+            for i, part in enumerate(parts):
+                # A segment with digits is likely a street address fragment
+                if i > 0 and re.search(r"\d", part):
+                    street_idx = i
+                    break
+            if street_idx is not None:
+                venue_name = ", ".join(parts[:street_idx]).strip()
+                street_address = ", ".join(parts[street_idx:]).strip()
+                # Remove trailing city name if it matches a known pattern
+                # (the city is already captured in location.city)
+                street_address = re.sub(r",\s*[A-Z][a-z]+\s*$", "", street_address).strip()
+                return venue_name or raw.strip(), street_address or None
+
+        return venue.strip(), None
+
+    @staticmethod
+    def _parse_lineup(lineup_raw: str) -> list[str]:
+        """
+        Parse RA-style lineup string into a list of artist names.
+
+        The lineup field contains newline-separated names, some wrapped in
+        ``<artist id="...">Name</artist>`` tags. Non-artist prefixes like
+        "DJ Line Up:", "SALA 1:", "Live on Stage :" are skipped.
+        """
+        import re
+
+        names: list[str] = []
+        for line in lineup_raw.split("\n"):
+            line = line.strip()
+            if not line or line.startswith("—"):
+                continue
+            # Skip section headers (e.g. "DJ Line Up:", "SALA 1:", "DECO POR :")
+            if re.match(r"^[A-Z\s\d]+:$", line):
+                continue
+            # Strip <artist> tags but keep the text inside
+            line = re.sub(r"<artist[^>]*>", "", line)
+            line = re.sub(r"</artist>", "", line)
+            # A single line may contain comma-separated artists
+            for part in re.split(r",\s*", line):
+                part = part.strip()
+                if part:
+                    names.append(part)
+        return names
 
     @staticmethod
     def _extract_source_updated_at(text: str) -> datetime | None:

@@ -396,34 +396,32 @@ class BasePipeline(ABC):
             # ---- ARTISTS ----
             artists_str = ", ".join(a.name for a in event.artists)
 
-            # ---- TAXONOMY DIMENSIONS (JSON + flattened primary) ----
-            taxonomy_json = json.dumps(
-                [
+            # ---- TAXONOMY DIMENSION (JSON + flattened) ----
+            primary_dim = event.taxonomy_dimension
+            if primary_dim:
+                taxonomy_json = json.dumps(
                     {
-                        "primary_category": dim.primary_category,
-                        "subcategory": dim.subcategory,
-                        "subcategory_name": dim.subcategory_name,
-                        "values": dim.values,
-                        "activity_id": dim.activity_id,
-                        "activity_name": dim.activity_name,
-                        "energy_level": dim.energy_level,
-                        "social_intensity": dim.social_intensity,
-                        "cognitive_load": dim.cognitive_load,
-                        "physical_involvement": dim.physical_involvement,
-                        "cost_level": dim.cost_level,
-                        "time_scale": dim.time_scale,
-                        "environment": dim.environment,
-                        "emotional_output": dim.emotional_output,
-                        "risk_level": dim.risk_level,
-                        "age_accessibility": dim.age_accessibility,
-                        "repeatability": dim.repeatability,
+                        "primary_category": primary_dim.primary_category,
+                        "subcategory": primary_dim.subcategory,
+                        "subcategory_name": primary_dim.subcategory_name,
+                        "values": primary_dim.values,
+                        "activity_id": primary_dim.activity_id,
+                        "activity_name": primary_dim.activity_name,
+                        "energy_level": primary_dim.energy_level,
+                        "social_intensity": primary_dim.social_intensity,
+                        "cognitive_load": primary_dim.cognitive_load,
+                        "physical_involvement": primary_dim.physical_involvement,
+                        "cost_level": primary_dim.cost_level,
+                        "time_scale": primary_dim.time_scale,
+                        "environment": primary_dim.environment,
+                        "emotional_output": primary_dim.emotional_output,
+                        "risk_level": primary_dim.risk_level,
+                        "age_accessibility": primary_dim.age_accessibility,
+                        "repeatability": primary_dim.repeatability,
                     }
-                    for dim in event.taxonomy_dimensions
-                ]
-            )
-
-            # Get primary taxonomy dimension for flat columns
-            primary_dim = event.taxonomy_dimensions[0] if event.taxonomy_dimensions else None
+                )
+            else:
+                taxonomy_json = None
 
             # ---- ENUM VALUE EXTRACTION ----
             def get_enum_value(val):
@@ -535,7 +533,7 @@ class BasePipeline(ABC):
                 "engagement_likes_count": eng.likes_count if eng else None,
                 "engagement_updated_at": eng.updated_at if eng else None,
                 # ==== TAXONOMY - PRIMARY CATEGORY ====
-                "primary_category": get_enum_value(event.primary_category),
+                "primary_category": (primary_dim.primary_category if primary_dim else None),
                 # ==== TAXONOMY - PRIMARY DIMENSION (flattened) ====
                 "taxonomy_subcategory": (primary_dim.subcategory if primary_dim else None),
                 "taxonomy_subcategory_name": (primary_dim.subcategory_name if primary_dim else None),
@@ -555,8 +553,8 @@ class BasePipeline(ABC):
                 "taxonomy_risk_level": primary_dim.risk_level if primary_dim else None,
                 "taxonomy_age_accessibility": (primary_dim.age_accessibility if primary_dim else None),
                 "taxonomy_repeatability": (primary_dim.repeatability if primary_dim else None),
-                # ==== FULL TAXONOMY JSON (all dimensions) ====
-                "taxonomy_dimensions_json": taxonomy_json,
+                # ==== FULL TAXONOMY JSON ====
+                "taxonomy_dimension_json": taxonomy_json,
                 # ==== QUALITY & ERRORS ====
                 "data_quality_score": event.data_quality_score,
                 "normalization_errors": (
