@@ -159,7 +159,7 @@ CREATE TABLE IF NOT EXISTS sources (
     source_url TEXT,
     compressed_html TEXT,
     ingestion_timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    source_updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE (source_name, source_event_id)
 );
 
@@ -229,7 +229,7 @@ CREATE TABLE IF NOT EXISTS events (
 
     data_quality_score FLOAT,
 
-    
+
 
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -326,7 +326,8 @@ CREATE TABLE IF NOT EXISTS engagement_snapshots (
     comments_count INT,
     likes_count INT,
 
-    captured_at TIMESTAMP NOT NULL DEFAULT NOW()
+    captured_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 
@@ -428,7 +429,7 @@ CREATE TABLE IF NOT EXISTS event_taxonomy_mappings (
     activity_id UUID,
     activity_name TEXT,
 
-    energy_level TEXT, 
+    energy_level TEXT,
     social_intensity TEXT,
     cognitive_load TEXT,
     physical_involvement TEXT,
@@ -438,6 +439,11 @@ CREATE TABLE IF NOT EXISTS event_taxonomy_mappings (
     risk_level TEXT,
     age_accessibility TEXT,
     repeatability TEXT,
+
+    -- Unconstrained columns for LLM classification
+    unconstrained_primary_category TEXT,
+    unconstrained_subcategory TEXT,
+    unconstrained_activity TEXT,
 
     CONSTRAINT fk_taxonomy_activity
         FOREIGN KEY (activity_id)
@@ -589,6 +595,7 @@ CREATE TABLE IF NOT EXISTS normalization_errors (
 
     event_id UUID,
 
+    severity TEXT NOT NULL DEFAULT 'error',
     error_message TEXT NOT NULL,
 
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -598,4 +605,3 @@ CREATE TABLE IF NOT EXISTS normalization_errors (
         REFERENCES events (event_id)
         ON DELETE SET NULL
 );
-

@@ -44,9 +44,7 @@ def write_json(path: Path, obj: Any, *, encoding: str = "utf-8") -> None:
         json.dump(obj, f, indent=2, ensure_ascii=False)
 
 
-def write_jsonl(
-    path: Path, rows: Iterable[dict[str, Any]], *, encoding: str = "utf-8"
-) -> None:
+def write_jsonl(path: Path, rows: Iterable[dict[str, Any]], *, encoding: str = "utf-8") -> None:
     """Write rows as newline-delimited JSON to the given path."""
     ensure_parent(path)
     with path.open("w", encoding=encoding) as f:
@@ -54,9 +52,7 @@ def write_jsonl(
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
 
-def append_jsonl(
-    path: Path, rows: Iterable[dict[str, Any]], *, encoding: str = "utf-8"
-) -> None:
+def append_jsonl(path: Path, rows: Iterable[dict[str, Any]], *, encoding: str = "utf-8") -> None:
     """Append rows as newline-delimited JSON to the given path."""
     ensure_parent(path)
     with path.open("a", encoding=encoding) as f:
@@ -64,9 +60,7 @@ def append_jsonl(
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
 
-def write_csv(
-    path: Path, rows: list[dict[str, Any]], *, options: WriterOptions
-) -> None:
+def write_csv(path: Path, rows: list[dict[str, Any]], *, options: WriterOptions) -> None:
     """Write rows as CSV using pandas for stable column handling."""
     try:
         import pandas as pd  # type: ignore
@@ -82,9 +76,7 @@ def write_csv(
     df.to_csv(path, index=False, encoding=options.default_encoding)
 
 
-def write_parquet(
-    path: Path, rows: list[dict[str, Any]], *, options: WriterOptions
-) -> None:
+def write_parquet(path: Path, rows: list[dict[str, Any]], *, options: WriterOptions) -> None:
     """Write rows as Parquet, preferring pyarrow with pandas fallback."""
     # Try pyarrow directly
     try:
@@ -106,13 +98,9 @@ def write_parquet(
             return
         except Exception as e_pd:
             if options.strict:
-                raise RuntimeError(
-                    f"Parquet write failed: {e_arrow} | {e_pd}"
-                ) from e_pd
+                raise RuntimeError(f"Parquet write failed: {e_arrow} | {e_pd}") from e_pd
             # fallback jsonl
-            write_jsonl(
-                path.with_suffix(".jsonl"), rows, encoding=options.default_encoding
-            )
+            write_jsonl(path.with_suffix(".jsonl"), rows, encoding=options.default_encoding)
 
 
 # ---------------------------------------------------------------------
@@ -217,9 +205,7 @@ def write_items(
     fmt: jsonl|csv|parquet
     """
     fmt = (fmt or "jsonl").lower().strip()
-    path = layout.items_path(
-        run_id, source_id, name=name, ext=fmt if fmt != "jsonl" else "jsonl"
-    )
+    path = layout.items_path(run_id, source_id, name=name, ext=fmt if fmt != "jsonl" else "jsonl")
 
     if fmt == "jsonl":
         write_jsonl(path, items, encoding=options.default_encoding)

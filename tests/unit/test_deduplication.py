@@ -9,8 +9,7 @@ Tests all deduplication strategies:
 - get_deduplicator factory function
 """
 
-from datetime import datetime, timezone
-
+from datetime import UTC, datetime
 
 from src.ingestion.deduplication import (
     CompositeDeduplicator,
@@ -85,7 +84,7 @@ class TestExactMatchDeduplicator:
         deduplicator = ExactMatchDeduplicator()
 
         # Create two events with None venue_name but same title and datetime
-        base_datetime = datetime(2024, 6, 15, 20, 0, tzinfo=timezone.utc)
+        base_datetime = datetime(2024, 6, 15, 20, 0, tzinfo=UTC)
         event1 = create_event(
             title="No Venue Event",
             venue_name=None,
@@ -107,7 +106,7 @@ class TestExactMatchDeduplicator:
         """Events with same title but different venue are NOT duplicates."""
         deduplicator = ExactMatchDeduplicator()
 
-        base_datetime = datetime(2024, 6, 15, 20, 0, tzinfo=timezone.utc)
+        base_datetime = datetime(2024, 6, 15, 20, 0, tzinfo=UTC)
         event1 = create_event(
             title="Same Title",
             venue_name="Venue A",
@@ -127,7 +126,7 @@ class TestExactMatchDeduplicator:
         """Events with same venue but different title are NOT duplicates."""
         deduplicator = ExactMatchDeduplicator()
 
-        base_datetime = datetime(2024, 6, 15, 20, 0, tzinfo=timezone.utc)
+        base_datetime = datetime(2024, 6, 15, 20, 0, tzinfo=UTC)
         event1 = create_event(
             title="Title A",
             venue_name="Same Venue",
@@ -150,12 +149,12 @@ class TestExactMatchDeduplicator:
         event1 = create_event(
             title="Same Event",
             venue_name="Same Venue",
-            start_datetime=datetime(2024, 6, 15, 20, 0, tzinfo=timezone.utc),
+            start_datetime=datetime(2024, 6, 15, 20, 0, tzinfo=UTC),
         )
         event2 = create_event(
             title="Same Event",
             venue_name="Same Venue",
-            start_datetime=datetime(2024, 6, 16, 20, 0, tzinfo=timezone.utc),
+            start_datetime=datetime(2024, 6, 16, 20, 0, tzinfo=UTC),
         )
 
         result = deduplicator.deduplicate([event1, event2])
@@ -166,7 +165,7 @@ class TestExactMatchDeduplicator:
         """First occurrence of a duplicate should be kept, order preserved."""
         deduplicator = ExactMatchDeduplicator()
 
-        base_datetime = datetime(2024, 6, 15, 20, 0, tzinfo=timezone.utc)
+        base_datetime = datetime(2024, 6, 15, 20, 0, tzinfo=UTC)
 
         # Create events with specific identifiable event_ids
         event1 = create_event(
@@ -291,9 +290,7 @@ class TestCompositeDeduplicator:
         """Each strategy operates on the output of the previous one."""
         # Use two exact match deduplicators - second should have no effect
         # since first already removed duplicates
-        deduplicator = CompositeDeduplicator(
-            strategies=[ExactMatchDeduplicator(), ExactMatchDeduplicator()]
-        )
+        deduplicator = CompositeDeduplicator(strategies=[ExactMatchDeduplicator(), ExactMatchDeduplicator()])
         result = deduplicator.deduplicate(duplicate_events)
 
         # Should still be 3 - second strategy has nothing to remove

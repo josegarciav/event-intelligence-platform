@@ -363,7 +363,7 @@ storage/
 # configs/ingestion.yaml
 
 sources:
-  
+
   ra_co:
     enabled: true
     base_url: "https://ra.co/graphql"
@@ -387,7 +387,7 @@ sources:
     custom:
       cities: ["London", "Berlin", "Barcelona", "Amsterdam"]
       event_types: ["DJ", "Live", "Festival"]
-  
+
   meetup:
     enabled: true
     base_url: "https://api.meetup.com"
@@ -469,34 +469,34 @@ from normalization.event_schema import PrimaryCategory, Subcategory, TaxonomyDim
 
 class RaCoEventPipeline(BasePipeline):
     """Pipeline for ingesting events from ra.co (electronic music platform)."""
-    
+
     def fetch_raw_data(self, cities: List[str] = None, **kwargs) -> List[Dict[str, Any]]:
         """Fetch events from ra.co GraphQL API."""
         # Implementation: Call ra.co API with pagination
         pass
-    
+
     def parse_raw_event(self, raw_event: Dict[str, Any]) -> Dict[str, Any]:
         """Parse ra.co event JSON into intermediate format."""
         # Implementation: Extract fields from ra.co response
         pass
-    
+
     def map_to_taxonomy(self, parsed_event: Dict[str, Any]) -> Tuple[str, List[Dict[str, Any]]]:
         """Map ra.co event to Human Experience Taxonomy."""
         # Implementation: DJ/live event -> music_and_rhythm_play + social_connection
         pass
-    
-    def normalize_to_schema(self, parsed_event: Dict[str, Any], 
+
+    def normalize_to_schema(self, parsed_event: Dict[str, Any],
                            primary_cat: str,
                            taxonomy_dims: List[Dict[str, Any]]) -> EventSchema:
         """Normalize to EventSchema."""
         # Implementation: Create EventSchema from parsed data
         pass
-    
+
     def validate_event(self, event: EventSchema) -> Tuple[bool, List[str]]:
         """Validate ra.co event."""
         # Implementation: Venue must exist, start time must be reasonable, etc.
         pass
-    
+
     def enrich_event(self, event: EventSchema) -> EventSchema:
         """Enrich event with additional data."""
         # Implementation: Geocode venue, fetch artist info, etc.

@@ -4,19 +4,18 @@ Unit tests for the base_api module.
 Tests for BaseAPIPipeline, APISourceConfig, and ConfigDrivenAPIAdapter.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
-
+from src.ingestion.adapters import FetchResult, SourceType
+from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
 from src.ingestion.pipelines.apis.base_api import (
-    BaseAPIPipeline,
     APISourceConfig,
+    BaseAPIPipeline,
     ConfigDrivenAPIAdapter,
     create_api_pipeline_from_config,
 )
-from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
-from src.ingestion.adapters import FetchResult, SourceType
 from src.schemas.event import (
     EventType,
     LocationInfo,
@@ -327,9 +326,7 @@ class TestBaseAPIPipelineParseRawEvent:
     """Tests for parse_raw_event method."""
 
     @patch.object(ConfigDrivenAPIAdapter, "__init__", return_value=None)
-    def test_parse_uses_field_mapper(
-        self, mock_adapter_init, sample_pipeline_config, sample_source_config
-    ):
+    def test_parse_uses_field_mapper(self, mock_adapter_init, sample_pipeline_config, sample_source_config):
         """Should use field mapper for parsing."""
         sample_source_config.field_mappings = {
             "title": "name",
@@ -461,7 +458,7 @@ class TestBaseAPIPipelineParseDatetime:
         result = pipeline._parse_datetime(None)
 
         # Should be within last few seconds
-        assert (datetime.now(timezone.utc) - result).total_seconds() < 5
+        assert (datetime.now(UTC) - result).total_seconds() < 5
 
 
 class TestBaseAPIPipelineValidateEvent:
@@ -478,7 +475,7 @@ class TestBaseAPIPipelineValidateEvent:
 
         is_valid, errors = pipeline.validate_event(event)
 
-        assert "Title is required" in errors
+        assert any(e.message == "Title is required" for e in errors)
 
     def test_validate_future_event(self, sample_source_config, create_event):
         """Should warn for past events."""
@@ -489,12 +486,12 @@ class TestBaseAPIPipelineValidateEvent:
 
         event = create_event(
             title="Past Event",
-            start_datetime=datetime.now(timezone.utc) - timedelta(days=1),
+            start_datetime=datetime.now(UTC) - timedelta(days=1),
         )
 
         is_valid, errors = pipeline.validate_event(event)
 
-        assert any("past" in e.lower() for e in errors)
+        assert any("past" in e.message.lower() for e in errors)
 
     def test_validate_city_required(self, sample_source_config, create_event):
         """Should require city."""
@@ -510,7 +507,7 @@ class TestBaseAPIPipelineValidateEvent:
 
         is_valid, errors = pipeline.validate_event(event)
 
-        assert "City is required" in errors
+        assert any(e.message == "City is required" for e in errors)
 
 
 class TestBaseAPIPipelineEnrichEvent:
@@ -521,7 +518,7 @@ class TestBaseAPIPipelineEnrichEvent:
         pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
         pipeline.source_config = sample_source_config
 
-        start = datetime.now(timezone.utc)
+        start = datetime.now(UTC)
         end = start + timedelta(hours=3)
 
         event = create_event(
@@ -565,6 +562,108 @@ class TestBaseAPIPipelineEnrichEvent:
         result = pipeline.enrich_event(event)
 
         assert result.location.timezone == "Europe/Madrid"
+
+    def test_enrich_records_error_when_compressed_html_unavailable(self, sample_source_config, create_event):
+        """Should not synthesize compressed_html when scraper returns None."""
+        pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
+        pipeline.source_config = sample_source_config
+        pipeline.html_enrichment_scraper = MagicMock()
+        pipeline.html_enrichment_scraper.fetch_compressed_html.return_value = None
+
+        event = create_event(
+            title="Fallback Title",
+            description="Fallback description text",
+        )
+        # Ensure source URL exists to trigger enrichment path.
+        event.source.source_url = "https://example.com/event/1"
+
+        result = pipeline.enrich_event(event)
+
+        assert result.source.compressed_html is None
+        assert any("HTML enrichment returned no content" in e.message for e in result.normalization_errors)
+
+
+class TestBaseAPIPipelineNormalizeToSchema:
+    """Tests for normalize_to_schema mapping behavior."""
+
+    def test_maps_age_restriction_from_minimum_age(self, sample_source_config, sample_pipeline_config):
+        """Should map minimum_age from main query into age_restriction."""
+        pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
+        pipeline.source_config = sample_source_config
+        pipeline.config = sample_pipeline_config
+        pipeline.feature_extractor = None
+
+        parsed = {
+            "source_event_id": "ev-1",
+            "title": "Age Restricted Event",
+            "start_time": "2026-06-15T20:00:00Z",
+            "minimum_age": 21,
+            "city": "Barcelona",
+            "country_code": "ES",
+            "source_url": "https://example.com/event/1",
+        }
+        event = pipeline.normalize_to_schema(
+            parsed_event=parsed,
+            primary_cat="play_and_fun",
+            taxonomy_dims=[],
+        )
+
+        assert event.age_restriction == "21"
+
+    def test_maps_coordinates_from_main_query_fields(self, sample_source_config, sample_pipeline_config):
+        """Should map venue_latitude/venue_longitude from main query."""
+        pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
+        pipeline.source_config = sample_source_config
+        pipeline.config = sample_pipeline_config
+        pipeline.feature_extractor = None
+
+        parsed = {
+            "source_event_id": "ev-2",
+            "title": "Geo Event",
+            "start_time": "2026-06-15T20:00:00Z",
+            "venue_latitude": "41.3851",
+            "venue_longitude": "2.1734",
+            "city": "Barcelona",
+            "country_code": "ES",
+            "source_url": "https://example.com/event/2",
+        }
+        event = pipeline.normalize_to_schema(
+            parsed_event=parsed,
+            primary_cat="play_and_fun",
+            taxonomy_dims=[],
+        )
+
+        assert event.location.coordinates is not None
+        assert event.location.coordinates.latitude == 41.3851
+        assert event.location.coordinates.longitude == 2.1734
+
+
+class TestBaseAPIPipelineExecuteNormalizationNoise:
+    """Tests to prevent non-event-specific normalization noise."""
+
+    def test_execute_does_not_add_batch_info_normalization_error(
+        self, sample_source_config, sample_pipeline_config, create_event
+    ):
+        """Batch-level ingestion info should not be persisted per event."""
+        sample_source_config.defaults = {"areas": {"Barcelona": 20}}
+
+        pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
+        pipeline.source_config = sample_source_config
+        pipeline.config = sample_pipeline_config
+        pipeline.adapter = MagicMock()
+        pipeline.logger = MagicMock()
+        pipeline.execution_id = None
+        pipeline.execution_start_time = None
+
+        pipeline._fetch_with_date_splitting = MagicMock(return_value=[{"id": "x"}])
+        event = create_event(title="No Noise")
+        pipeline._process_events_batch = MagicMock(return_value=[event])
+
+        result = pipeline.execute()
+
+        assert result.events
+        # Verify no spurious normalization errors added by pipeline infrastructure
+        assert not any("api_ingestion" in err.message.lower() for err in result.events[0].normalization_errors)
 
 
 class TestCreateAPIPipelineFromConfig:
@@ -781,11 +880,7 @@ class TestFetchWithDateSplitting:
         # Saturated window data (50) + two non-saturated windows (10 + 10)
         assert len(events) == 50 + 10 + 10
         # Verify warning was logged for the saturated-at-min case
-        warning_calls = [
-            c
-            for c in pipeline.logger.warning.call_args_list
-            if "SATURATED at min window" in str(c)
-        ]
+        warning_calls = [c for c in pipeline.logger.warning.call_args_list if "SATURATED at min window" in str(c)]
         assert len(warning_calls) >= 1
 
     def test_window_restores_after_non_saturated(self):
@@ -813,6 +908,39 @@ class TestFetchWithDateSplitting:
         # Verify the windows advance forward
         for i in range(1, len(call_dates)):
             assert call_dates[i][0] >= call_dates[i - 1][0]
+
+    def test_relaxes_low_pagination_constraints_at_min_window(self):
+        """Should retry min window with source defaults when caller is too restrictive."""
+        pipeline = _make_pipeline_for_date_splitting()
+
+        seen_page_sizes = []
+        seen_max_pages = []
+
+        def adaptive_fetch(**kwargs):
+            ps = kwargs.get("page_size")
+            mp = kwargs.get("max_pages")
+            seen_page_sizes.append(ps)
+            seen_max_pages.append(mp)
+
+            # If relaxed to defaults, pretend saturation is solved.
+            if ps == pipeline.source_config.default_page_size and mp == pipeline.source_config.max_pages:
+                return _make_fetch_result(20, total_available=20)
+            return _make_fetch_result(5, total_available=53)
+
+        pipeline.adapter.fetch.side_effect = adaptive_fetch
+
+        events = pipeline._fetch_with_date_splitting(
+            area_id=20,
+            city_name="Barcelona",
+            date_from="2025-06-01",
+            date_to="2025-06-02",
+            page_size=5,
+            max_pages=1,
+        )
+
+        assert len(events) > 0
+        assert pipeline.source_config.default_page_size in seen_page_sizes
+        assert pipeline.source_config.max_pages in seen_max_pages
 
     def test_empty_fetch_advances_cursor(self):
         """Empty/failed fetch should advance cursor to avoid infinite loop."""
@@ -859,7 +987,7 @@ class TestFetchWithDateSplitting:
         pipeline.adapter.fetch.return_value = _make_fetch_result(10, 10)
 
         with patch("src.ingestion.pipelines.apis.base_api.datetime") as mock_dt:
-            mock_dt.now.return_value = datetime(2025, 6, 1, tzinfo=timezone.utc)
+            mock_dt.now.return_value = datetime(2025, 6, 1, tzinfo=UTC)
             mock_dt.strptime = datetime.strptime
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
 
@@ -1006,9 +1134,7 @@ class TestMultiCityExecution:
     @patch.object(BaseAPIPipeline, "_process_events_batch", return_value=[])
     @patch.object(BaseAPIPipeline, "_fetch_with_date_splitting")
     @patch.object(BaseAPIPipeline, "__init__", return_value=None)
-    def test_execute_continues_on_city_failure(
-        self, mock_init, mock_fetch, mock_process
-    ):
+    def test_execute_continues_on_city_failure(self, mock_init, mock_fetch, mock_process):
         """Should continue with other cities if one fails."""
         pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
         pipeline.source_config = APISourceConfig(
@@ -1056,8 +1182,6 @@ class TestMultiCityExecution:
         pipeline.adapter.source_type = SourceType.API
 
         # Mock the parent execute
-        with patch.object(
-            BasePipeline, "execute", return_value=MagicMock()
-        ) as mock_base_exec:
+        with patch.object(BasePipeline, "execute", return_value=MagicMock()) as mock_base_exec:
             pipeline.execute()
             mock_base_exec.assert_called_once()

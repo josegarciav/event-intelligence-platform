@@ -4,15 +4,17 @@ Unit tests for the scraper_adapter module.
 Tests for ScraperAdapterConfig and ScraperAdapter classes.
 """
 
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
-
+from src.ingestion.adapters.base_adapter import SourceType
 from src.ingestion.adapters.scraper_adapter import (
+    HtmlEnrichmentConfig,
+    HtmlEnrichmentScraper,
     ScraperAdapter,
     ScraperAdapterConfig,
 )
-from src.ingestion.adapters.base_adapter import SourceType
 
 # =============================================================================
 # FIXTURES
@@ -152,9 +154,7 @@ class TestScraperAdapterGetScraper:
         adapter = ScraperAdapter(scraper_config)
 
         # Mock the scraper inside _get_scraper
-        with patch(
-            "src.ingestion.pipelines.scrapers.base_scraper.EventScraper"
-        ) as mock_scraper_class:
+        with patch("src.ingestion.pipelines.scrapers.base_scraper.EventScraper") as mock_scraper_class:
             mock_scraper = MagicMock()
             mock_scraper_class.return_value = mock_scraper
 
@@ -196,9 +196,7 @@ class TestScraperAdapterFetch:
         assert result.total_fetched >= 0
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_with_html_parser(
-        self, mock_get_scraper, scraper_config, mock_fetch_result
-    ):
+    def test_fetch_with_html_parser(self, mock_get_scraper, scraper_config, mock_fetch_result):
         """Should use custom HTML parser."""
         mock_scraper = MagicMock()
         mock_scraper.fetch_listing_pages.return_value = [mock_fetch_result]
@@ -214,9 +212,7 @@ class TestScraperAdapterFetch:
         parser.assert_called()
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_tracks_metadata(
-        self, mock_get_scraper, scraper_config, mock_fetch_result
-    ):
+    def test_fetch_tracks_metadata(self, mock_get_scraper, scraper_config, mock_fetch_result):
         """Should track metadata."""
         mock_scraper = MagicMock()
         mock_scraper.fetch_listing_pages.return_value = [
@@ -251,9 +247,7 @@ class TestScraperAdapterFetch:
         assert "Scraper failed" in result.errors
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_with_kwargs(
-        self, mock_get_scraper, scraper_config, mock_fetch_result
-    ):
+    def test_fetch_with_kwargs(self, mock_get_scraper, scraper_config, mock_fetch_result):
         """Should pass kwargs to scraper."""
         mock_scraper = MagicMock()
         mock_scraper.fetch_listing_pages.return_value = [mock_fetch_result]
@@ -270,9 +264,7 @@ class TestScraperAdapterFetch:
         )
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_dedupes_urls(
-        self, mock_get_scraper, scraper_config, mock_fetch_result
-    ):
+    def test_fetch_dedupes_urls(self, mock_get_scraper, scraper_config, mock_fetch_result):
         """Should deduplicate event URLs."""
         mock_scraper = MagicMock()
         mock_scraper.fetch_listing_pages.return_value = [
@@ -294,9 +286,7 @@ class TestScraperAdapterFetch:
         mock_scraper.fetch_event_pages.assert_called_once()
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_tracks_parse_failures(
-        self, mock_get_scraper, scraper_config, mock_fetch_result
-    ):
+    def test_fetch_tracks_parse_failures(self, mock_get_scraper, scraper_config, mock_fetch_result):
         """Should track parse failures in metadata."""
         mock_scraper = MagicMock()
         mock_scraper.fetch_listing_pages.return_value = [mock_fetch_result]
@@ -332,9 +322,7 @@ class TestScraperAdapterFetch:
         assert result.metadata["pages_fetched"] == 0
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_timestamps(
-        self, mock_get_scraper, scraper_config, mock_fetch_result
-    ):
+    def test_fetch_timestamps(self, mock_get_scraper, scraper_config, mock_fetch_result):
         """Should track fetch timestamps."""
         mock_scraper = MagicMock()
         mock_scraper.fetch_listing_pages.return_value = [mock_fetch_result]
@@ -383,3 +371,62 @@ class TestScraperAdapterContextManager:
             with adapter as ctx:
                 assert ctx is adapter
             mock_close.assert_called_once()
+
+
+class TestHtmlEnrichmentScraper:
+    """Tests for HtmlEnrichmentScraper behavior."""
+
+    def test_loads_render_hints_from_generated_config(self, tmp_path):
+        """Should load wait_for/actions and engine hints from generated config."""
+        cfg_dir = tmp_path / "sources"
+        cfg_dir.mkdir(parents=True, exist_ok=True)
+        cfg_path = cfg_dir / "ra_co_scraper_auto.json"
+        cfg_path.write_text(
+            json.dumps(
+                {
+                    "engine": {"type": "browser"},
+                    "discovery": {"wait_for": ".event-content"},
+                    "actions": [{"type": "wait_for", "selector": "main"}],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        scraper = HtmlEnrichmentScraper(
+            HtmlEnrichmentConfig(
+                enabled=True,
+                engine_type="http",
+                source_name="ra_co",
+                generated_config_dir=str(cfg_dir),
+            )
+        )
+
+        assert scraper.config.engine_type == "browser"
+        assert scraper._wait_for == ".event-content"
+        assert scraper._actions == [{"type": "wait_for", "selector": "main"}]
+
+    def test_fetch_uses_rendered_path_for_hybrid_engine(self):
+        """Hybrid/browser enrichment should use rendered fetch with optional hints."""
+        scraper = HtmlEnrichmentScraper(
+            HtmlEnrichmentConfig(
+                enabled=True,
+                engine_type="hybrid",
+                min_text_len=10,
+                wait_for="main",
+                actions=[{"type": "wait_for", "selector": "main"}],
+            )
+        )
+        mock_engine = MagicMock()
+        mock_result = MagicMock()
+        mock_result.ok = True
+        mock_result.status_code = 200
+        mock_result.block_signals = []
+        mock_result.text = "<html><body><main>" + ("content " * 50) + "</main></body></html>"
+        mock_engine.get_rendered.return_value = mock_result
+        scraper._get_engine = MagicMock(return_value=mock_engine)
+
+        text = scraper.fetch_compressed_html("https://example.com/event/1")
+
+        assert text is not None
+        assert mock_engine.get_rendered.call_count >= 1
+        assert mock_engine.get_rendered.call_args_list[-1].args[0] == ("https://example.com/event/1")

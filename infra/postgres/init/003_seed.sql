@@ -83,5 +83,3 @@ INSERT INTO currency_codes (
 ('PEN', 'Peruvian Sol', 'S/', 604, 2),
 ('ZAR', 'South African Rand', 'R', 710, 2)
 ON CONFLICT (currency_code) DO NOTHING;
-
-

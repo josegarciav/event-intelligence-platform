@@ -57,9 +57,7 @@ def test_save_artifacts_path_creation(tmp_path):
 def test_browser_engine_hardened_results_on_failure():
     engine = BrowserEngine()
     # Mocking _ensure_started to fail
-    with patch.object(
-        BrowserEngine, "_ensure_started", side_effect=Exception("Failed to launch")
-    ):
+    with patch.object(BrowserEngine, "_ensure_started", side_effect=Exception("Failed to launch")):
         res = engine.get("https://example.com")
         assert res.ok is False
         assert res.text == ""
@@ -99,9 +97,7 @@ async def test_async_browser_engine_hardened_results_on_failure():
 
     engine = AsyncBrowserEngine()
     # Mocking _ensure_started to fail
-    with patch.object(
-        AsyncBrowserEngine, "_ensure_started", side_effect=Exception("Async failed")
-    ):
+    with patch.object(AsyncBrowserEngine, "_ensure_started", side_effect=Exception("Async failed")):
         res = await engine.get("https://example.com")
         assert res.ok is False
         assert res.text == ""

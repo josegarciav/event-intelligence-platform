@@ -95,9 +95,7 @@ class HttpEngine(BaseEngine):
         """Perform the operation."""
         ctx = ctx or EngineContext()
         timeout_s = float(ctx.timeout_s or self.options.timeout_s)
-        verify_ssl = bool(
-            ctx.verify_ssl if ctx.verify_ssl is not None else self.options.verify_ssl
-        )
+        verify_ssl = bool(ctx.verify_ssl if ctx.verify_ssl is not None else self.options.verify_ssl)
 
         headers: Headers = {}
         if self.options.user_agent:
@@ -158,9 +156,7 @@ class HttpEngine(BaseEngine):
                     text=text,
                     elapsed_ms=elapsed_ms,
                     request_meta=req_meta,
-                    response_meta=ResponseMeta(
-                        headers=resp_headers, redirects=redirects
-                    ),
+                    response_meta=ResponseMeta(headers=resp_headers, redirects=redirects),
                     engine_trace=trace,
                 )
 
@@ -171,9 +167,7 @@ class HttpEngine(BaseEngine):
                     return result
 
                 last_result = result
-                trace.append(
-                    {"attempt": attempt, "status": result.status_code, "ok": False}
-                )
+                trace.append({"attempt": attempt, "status": result.status_code, "ok": False})
 
                 # Check if retryable
                 if attempt < self._retry_policy.max_retries and result.is_retryable:
@@ -186,9 +180,7 @@ class HttpEngine(BaseEngine):
 
             except requests.RequestException as e:
                 elapsed_ms = (time.time() - t0) * 1000
-                err = EngineError(
-                    type=type(e).__name__, message=str(e), is_retryable=True
-                )
+                err = EngineError(type=type(e).__name__, message=str(e), is_retryable=True)
 
                 result = FetchResult(
                     final_url=url,

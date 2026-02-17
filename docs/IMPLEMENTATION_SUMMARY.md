@@ -296,13 +296,13 @@ docs/
 
 ## What's Ready to Use
 
-✅ **Complete pipeline system** - Ready to execute immediately  
-✅ **Ra.co integration** - Fully implemented with GraphQL support  
-✅ **Canonical schema** - Validated, Pydantic-based, taxonomy-integrated  
-✅ **Orchestration** - Execute single, multiple, or all pipelines  
-✅ **Configuration** - YAML-based, environment variable support  
-✅ **Documentation** - Architecture guide + quick-start guide  
-✅ **Extensibility** - Clear patterns for adding new sources  
+✅ **Complete pipeline system** - Ready to execute immediately
+✅ **Ra.co integration** - Fully implemented with GraphQL support
+✅ **Canonical schema** - Validated, Pydantic-based, taxonomy-integrated
+✅ **Orchestration** - Execute single, multiple, or all pipelines
+✅ **Configuration** - YAML-based, environment variable support
+✅ **Documentation** - Architecture guide + quick-start guide
+✅ **Extensibility** - Clear patterns for adding new sources
 
 ---
 
@@ -383,34 +383,34 @@ from typing import List, Dict, Any, Tuple
 from normalization.event_schema import EventSchema
 
 class MySourcePipeline(BasePipeline):
-    
+
     def fetch_raw_data(self, **kwargs) -> List[Dict[str, Any]]:
         # 1. Call your API
         # 2. Handle pagination
         # 3. Return list of raw dicts
         pass
-    
+
     def parse_raw_event(self, raw_event: Dict[str, Any]) -> Dict[str, Any]:
         # Extract title, date, venue, price, organizer
         # Return normalized dict with standard keys
         pass
-    
+
     def map_to_taxonomy(self, parsed_event: Dict[str, Any]) -> Tuple[str, List[Dict]]:
         # Classify event to Human Experience Taxonomy
         # Return (primary_category, taxonomy_dimensions)
         pass
-    
-    def normalize_to_schema(self, parsed: Dict, prim_cat: str, 
+
+    def normalize_to_schema(self, parsed: Dict, prim_cat: str,
                            tax_dims: List[Dict]) -> EventSchema:
         # Create EventSchema from all parts
         # This is where the magic happens - full data transformation
         pass
-    
+
     def validate_event(self, event: EventSchema) -> Tuple[bool, List[str]]:
         # Custom validation for your source
         # Return (is_valid, error_messages)
         pass
-    
+
     def enrich_event(self, event: EventSchema) -> EventSchema:
         # Optional: Add extra data
         # Geocoding, image validation, etc.
@@ -469,4 +469,3 @@ You now have a **complete, production-ready pipeline architecture** that:
 - **Is documented thoroughly** with both architecture and practical guides
 
 The system is ready to ingest events from ra.co immediately, and provides a clear blueprint for adding additional sources.
-

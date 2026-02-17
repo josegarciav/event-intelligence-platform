@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import re
 from decimal import Decimal, InvalidOperation
-from typing import Optional, Tuple
 
 
 class CurrencyParser:
@@ -45,9 +44,7 @@ class CurrencyParser:
     }
 
     @classmethod
-    def parse_price_string(
-        cls, price_str: str
-    ) -> Tuple[Optional[Decimal], Optional[Decimal], str]:
+    def parse_price_string(cls, price_str: str) -> tuple[Decimal | None, Decimal | None, str]:
         """
         Parse a price string into (min_price, max_price, currency_code).
 
@@ -179,7 +176,7 @@ class CurrencyParser:
     @classmethod
     def format_price(
         cls,
-        amount: Optional[Decimal],
+        amount: Decimal | None,
         currency: str = "",
         include_symbol: bool = True,
     ) -> str:

@@ -135,9 +135,7 @@ def load_sources(
     return LoadResult(sources=sources, meta=meta, warnings=warnings, errors=errors)
 
 
-def _resolve_paths(
-    *, config_path: str | Path | None, configs_glob: str | None
-) -> list[Path]:
+def _resolve_paths(*, config_path: str | Path | None, configs_glob: str | None) -> list[Path]:
     if config_path and configs_glob:
         raise ValueError("Provide only one of config_path or configs_glob")
 

@@ -5,14 +5,12 @@ Provides reusable fixtures for creating EventSchema test objects.
 """
 
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 import pytest
-
 from src.schemas.event import (
-    EventSchema,
     EventFormat,
+    EventSchema,
     LocationInfo,
     OrganizerInfo,
     PrimaryCategory,
@@ -34,12 +32,12 @@ def create_event():
 
     def _create_event(
         title: str = "Test Event",
-        venue_name: Optional[str] = "Test Venue",
-        start_datetime: Optional[datetime] = None,
+        venue_name: str | None = "Test Venue",
+        start_datetime: datetime | None = None,
         **kwargs,
     ) -> EventSchema:
         if start_datetime is None:
-            start_datetime = datetime(2024, 6, 15, 20, 0, tzinfo=timezone.utc)
+            start_datetime = datetime(2024, 6, 15, 20, 0, tzinfo=UTC)
 
         defaults = {
             "event_id": str(uuid.uuid4()),
@@ -57,7 +55,7 @@ def create_event():
                 source_name="test",
                 source_event_id=str(uuid.uuid4()),
                 source_url="https://test.com/event",
-                updated_at=datetime.now(timezone.utc),
+                source_updated_at=datetime.now(UTC),
             ),
         }
 
@@ -90,22 +88,22 @@ def sample_events(create_event):
         create_event(
             title="Electronic Night",
             venue_name="Club Alpha",
-            start_datetime=datetime(2024, 6, 15, 22, 0, tzinfo=timezone.utc),
+            start_datetime=datetime(2024, 6, 15, 22, 0, tzinfo=UTC),
         ),
         create_event(
             title="Jazz Evening",
             venue_name="Jazz Cafe",
-            start_datetime=datetime(2024, 6, 16, 20, 0, tzinfo=timezone.utc),
+            start_datetime=datetime(2024, 6, 16, 20, 0, tzinfo=UTC),
         ),
         create_event(
             title="Rock Concert",
             venue_name="Stadium Arena",
-            start_datetime=datetime(2024, 6, 17, 19, 0, tzinfo=timezone.utc),
+            start_datetime=datetime(2024, 6, 17, 19, 0, tzinfo=UTC),
         ),
         create_event(
             title="Comedy Show",
             venue_name="Comedy Club",
-            start_datetime=datetime(2024, 6, 18, 21, 0, tzinfo=timezone.utc),
+            start_datetime=datetime(2024, 6, 18, 21, 0, tzinfo=UTC),
         ),
     ]
 
@@ -121,7 +119,7 @@ def duplicate_events(create_event):
 
     The ExactMatchDeduplicator should keep only the first occurrence of duplicates.
     """
-    base_datetime = datetime(2024, 6, 15, 22, 0, tzinfo=timezone.utc)
+    base_datetime = datetime(2024, 6, 15, 22, 0, tzinfo=UTC)
 
     return [
         create_event(
@@ -142,6 +140,6 @@ def duplicate_events(create_event):
         create_event(
             title="Unique Event 2",
             venue_name="Another Venue",
-            start_datetime=datetime(2024, 6, 16, 20, 0, tzinfo=timezone.utc),
+            start_datetime=datetime(2024, 6, 16, 20, 0, tzinfo=UTC),
         ),
     ]

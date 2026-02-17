@@ -11,12 +11,11 @@ Tests for all schema components:
 - EventBatch creation
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
 from pydantic import ValidationError
-
 from src.schemas.event import (
     Coordinates,
     EngagementMetrics,
@@ -45,30 +44,15 @@ class TestPrimaryCategory:
     def test_enum_values(self):
         """All category values should be correct."""
         assert PrimaryCategory.PLAY_AND_PURE_FUN.value == "play_and_fun"
-        assert (
-            PrimaryCategory.EXPLORATION_AND_ADVENTURE.value
-            == "exploration_and_adventure"
-        )
-        assert (
-            PrimaryCategory.CREATION_AND_EXPRESSION.value == "creation_and_expression"
-        )
-        assert (
-            PrimaryCategory.LEARNING_AND_INTELLECTUAL.value
-            == "learning_and_intellectual"
-        )
+        assert PrimaryCategory.EXPLORATION_AND_ADVENTURE.value == "exploration_and_adventure"
+        assert PrimaryCategory.CREATION_AND_EXPRESSION.value == "creation_and_expression"
+        assert PrimaryCategory.LEARNING_AND_INTELLECTUAL.value == "learning_and_intellectual"
         assert PrimaryCategory.SOCIAL_CONNECTION.value == "social_connection"
         assert PrimaryCategory.BODY_AND_MOVEMENT.value == "body_and_movement"
-        assert (
-            PrimaryCategory.CHALLENGE_AND_ACHIEVEMENT.value
-            == "challenge_and_achievement"
-        )
-        assert (
-            PrimaryCategory.RELAXATION_AND_ESCAPISM.value == "relaxation_and_escapism"
-        )
+        assert PrimaryCategory.CHALLENGE_AND_ACHIEVEMENT.value == "challenge_and_achievement"
+        assert PrimaryCategory.RELAXATION_AND_ESCAPISM.value == "relaxation_and_escapism"
         assert PrimaryCategory.IDENTITY_AND_MEANING.value == "identity_and_meaning"
-        assert (
-            PrimaryCategory.CONTRIBUTION_AND_IMPACT.value == "contribution_and_impact"
-        )
+        assert PrimaryCategory.CONTRIBUTION_AND_IMPACT.value == "contribution_and_impact"
 
     def test_from_id_valid(self):
         """from_id should convert numeric ID to enum."""
@@ -200,40 +184,37 @@ class TestCoordinates:
     """Tests for Coordinates validation."""
 
     def test_valid_coordinates(self):
-        """Valid lat/lon should create Coordinates."""
-        coords = Coordinates(latitude=40.7128, longitude=-74.0060)
+        """Valid lat/lon with sufficient precision should create Coordinates."""
+        coords = Coordinates(latitude=40.7128, longitude=-74.0059)
         assert coords.latitude == 40.7128
-        assert coords.longitude == -74.0060
+        assert coords.longitude == -74.0059
 
-    def test_edge_valid_coordinates(self):
-        """Edge case valid coordinates."""
-        coords = Coordinates(latitude=90, longitude=180)
-        assert coords.latitude == 90
-        assert coords.longitude == 180
-
-        coords = Coordinates(latitude=-90, longitude=-180)
-        assert coords.latitude == -90
-        assert coords.longitude == -180
+    def test_insufficient_precision_rejected(self):
+        """Coordinates with < 4 decimal places should be rejected."""
+        with pytest.raises(ValidationError, match="insufficient precision"):
+            Coordinates(latitude=41.0, longitude=2.0)
+        with pytest.raises(ValidationError, match="insufficient precision"):
+            Coordinates(latitude=90, longitude=180)
 
     def test_latitude_too_high(self):
         """Latitude > 90 should raise ValidationError."""
-        with pytest.raises(ValidationError, match="Latitude must be between"):
-            Coordinates(latitude=91, longitude=0)
+        with pytest.raises(ValidationError):
+            Coordinates(latitude=91.1234, longitude=2.1734)
 
     def test_latitude_too_low(self):
         """Latitude < -90 should raise ValidationError."""
-        with pytest.raises(ValidationError, match="Latitude must be between"):
-            Coordinates(latitude=-91, longitude=0)
+        with pytest.raises(ValidationError):
+            Coordinates(latitude=-91.1234, longitude=2.1734)
 
     def test_longitude_too_high(self):
         """Longitude > 180 should raise ValidationError."""
-        with pytest.raises(ValidationError, match="Longitude must be between"):
-            Coordinates(latitude=0, longitude=181)
+        with pytest.raises(ValidationError):
+            Coordinates(latitude=41.3851, longitude=181.1234)
 
     def test_longitude_too_low(self):
         """Longitude < -180 should raise ValidationError."""
-        with pytest.raises(ValidationError, match="Longitude must be between"):
-            Coordinates(latitude=0, longitude=-181)
+        with pytest.raises(ValidationError):
+            Coordinates(latitude=41.3851, longitude=-181.1234)
 
 
 class TestLocationInfo:
@@ -292,9 +273,7 @@ class TestPriceInfo:
 
     def test_price_range_invalid(self):
         """Invalid price range where max < min should raise."""
-        with pytest.raises(
-            ValidationError, match="maximum_price cannot be less than minimum_price"
-        ):
+        with pytest.raises(ValidationError, match="maximum_price cannot be less than minimum_price"):
             PriceInfo(minimum_price=50, maximum_price=10)
 
     def test_negative_price_rejected(self):
@@ -358,7 +337,7 @@ class TestSourceInfo:
             source_name="test_source",
             source_event_id="12345",
             source_url="https://source.com/event/12345",
-            updated_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(UTC),
         )
         assert source.source_name == "test_source"
         assert source.ingestion_timestamp is not None  # Auto-set
@@ -517,9 +496,7 @@ class TestEventSchema:
 
     def test_custom_fields_stored(self, create_event):
         """Custom fields should be stored."""
-        event = create_event(
-            custom_fields={"spotify_url": "https://spotify.com/artist"}
-        )
+        event = create_event(custom_fields={"spotify_url": "https://spotify.com/artist"})
         assert event.custom_fields["spotify_url"] == "https://spotify.com/artist"
 
     def test_event_with_price(self, create_event):

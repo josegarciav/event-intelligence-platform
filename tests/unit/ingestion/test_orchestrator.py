@@ -8,21 +8,20 @@ from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-from src.ingestion.orchestrator import (
-    PipelineOrchestrator,
-    ScheduledPipeline,
-    load_orchestrator_from_config,
-    register_pipeline,
-    PIPELINE_REGISTRY,
-)
+from src.ingestion.adapters import SourceType
 from src.ingestion.base_pipeline import (
     BasePipeline,
     PipelineExecutionResult,
     PipelineStatus,
 )
-from src.ingestion.adapters import SourceType
 from src.ingestion.deduplication import ExactMatchDeduplicator
+from src.ingestion.orchestrator import (
+    PIPELINE_REGISTRY,
+    PipelineOrchestrator,
+    ScheduledPipeline,
+    load_orchestrator_from_config,
+    register_pipeline,
+)
 
 # =============================================================================
 # FIXTURES
@@ -726,9 +725,10 @@ class TestRunFullIngestion:
         orchestrator.register_pipeline("test", pipe)
 
         # Mock database persistence
-        with patch("src.ingestion.orchestrator.get_connection"), patch(
-            "src.ingestion.orchestrator.EventDataWriter"
-        ) as mock_writer:
+        with (
+            patch("src.ingestion.orchestrator.get_connection"),
+            patch("src.ingestion.orchestrator.EventDataWriter") as mock_writer,
+        ):
             mock_writer_instance = MagicMock()
             mock_writer_instance.persist_batch.return_value = 5
             mock_writer.return_value = mock_writer_instance
@@ -740,9 +740,7 @@ class TestRunFullIngestion:
         assert stats["total_saved_to_db"] == 5
         assert "test" in stats["pipelines_executed"]
 
-    def test_run_full_ingestion_deduplicates_across_sources(
-        self, orchestrator, create_event
-    ):
+    def test_run_full_ingestion_deduplicates_across_sources(self, orchestrator, create_event):
         """Should deduplicate events across multiple sources."""
         base_time = datetime.utcnow() + timedelta(days=1)
         shared_event = create_event(
@@ -786,9 +784,10 @@ class TestRunFullIngestion:
         orchestrator.register_pipeline("source1", pipe1)
         orchestrator.register_pipeline("source2", pipe2)
 
-        with patch("src.ingestion.orchestrator.get_connection"), patch(
-            "src.ingestion.orchestrator.EventDataWriter"
-        ) as mock_writer:
+        with (
+            patch("src.ingestion.orchestrator.get_connection"),
+            patch("src.ingestion.orchestrator.EventDataWriter") as mock_writer,
+        ):
             mock_writer_instance = MagicMock()
             mock_writer_instance.persist_batch.return_value = 2
             mock_writer.return_value = mock_writer_instance
@@ -800,9 +799,7 @@ class TestRunFullIngestion:
         assert stats["total_saved_to_db"] == 2
         assert len(stats["pipelines_executed"]) == 2
 
-    def test_run_full_ingestion_handles_persistence_error(
-        self, orchestrator, create_event
-    ):
+    def test_run_full_ingestion_handles_persistence_error(self, orchestrator, create_event):
         """Should handle persistence errors gracefully."""
         events = [create_event(title="Test Event")]
 

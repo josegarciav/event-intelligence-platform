@@ -198,9 +198,7 @@ def validate_config(cfg: dict[str, Any], *, verbose: bool = False) -> dict[str, 
                 )
 
         discovery = s.get("discovery") or {}
-        link_extract = (
-            discovery.get("link_extract") if isinstance(discovery, dict) else None
-        )
+        link_extract = discovery.get("link_extract") if isinstance(discovery, dict) else None
         if not isinstance(link_extract, dict):
             issues.append(
                 {
@@ -355,9 +353,7 @@ def doctor_environment(*, verbose: bool = False) -> dict[str, Any]:
             import concurrent.futures
 
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                ok_br, msg_br, hint_br, apt_br = executor.submit(
-                    _check_browsers
-                ).result()
+                ok_br, msg_br, hint_br, apt_br = executor.submit(_check_browsers).result()
         else:
             ok_br, msg_br, hint_br, apt_br = _check_browsers()
 
@@ -434,9 +430,7 @@ class Orchestrator:
         sources = all_sources
         if self.options.only_sources:
             only = set(self.options.only_sources)
-            sources = [
-                s for s in sources if isinstance(s, dict) and s.get("source_id") in only
-            ]
+            sources = [s for s in sources if isinstance(s, dict) and s.get("source_id") in only]
 
         if not sources:
             report.finish()
@@ -476,13 +470,9 @@ class Orchestrator:
 
             # source meta
             try:
-                write_source_meta(
-                    layout, run_id, source_id, meta=s, options=writer_opts
-                )
+                write_source_meta(layout, run_id, source_id, meta=s, options=writer_opts)
             except Exception as e:
-                slog.error(
-                    "Failed writing source meta", extra={"payload": {"error": str(e)}}
-                )
+                slog.error("Failed writing source meta", extra={"payload": {"error": str(e)}})
 
             # SourceReport setup
             sr = SourceReport(source_id=source_id, ok=False)
@@ -507,9 +497,7 @@ class Orchestrator:
                 try:
                     slog.info("Running pipeline")
                     emit_event(slog, "source.pipeline.started", stage="pipeline")
-                    with report.metrics.time(
-                        "source.run", labels={"source_id": source_id}
-                    ):
+                    with report.metrics.time("source.run", labels={"source_id": source_id}):
                         artifacts = run_pipeline_v1(
                             s,
                             engine=engine,
@@ -546,9 +534,7 @@ class Orchestrator:
                 if artifacts.listing_pages:
                     first_res = artifacts.listing_pages[0].fetch
                     if first_res.request_meta.method == "RENDER":
-                        representative_diagnosis = diagnose_rendered_dom(
-                            first_res.text or ""
-                        )
+                        representative_diagnosis = diagnose_rendered_dom(first_res.text or "")
                     else:
                         representative_diagnosis = diagnose_http_response(
                             first_res.status_code or 0,
@@ -558,9 +544,7 @@ class Orchestrator:
                 elif artifacts.detail_pages:
                     first_res = artifacts.detail_pages[0].fetch
                     if first_res.request_meta.method == "RENDER":
-                        representative_diagnosis = diagnose_rendered_dom(
-                            first_res.text or ""
-                        )
+                        representative_diagnosis = diagnose_rendered_dom(first_res.text or "")
                     else:
                         representative_diagnosis = diagnose_http_response(
                             first_res.status_code or 0,
@@ -577,9 +561,7 @@ class Orchestrator:
                     }
                     emit_event(slog, "diagnosis.result", sr.diagnosis)
 
-                self._write_artifacts(
-                    s, artifacts, layout, run_id, source_id, sr, writer_opts
-                )
+                self._write_artifacts(s, artifacts, layout, run_id, source_id, sr, writer_opts)
                 sr.timings = {"elapsed_s": time.time() - t0}
 
                 # Metrics update
@@ -594,9 +576,7 @@ class Orchestrator:
                     labels={"source_id": source_id},
                 )
 
-                emit_event(
-                    slog, "source.items_saved", {"count": artifacts.stats.items_saved}
-                )
+                emit_event(slog, "source.items_saved", {"count": artifacts.stats.items_saved})
                 emit_event(slog, "source.done", {"stats": sr.stats})
 
                 slog.info(
@@ -609,9 +589,7 @@ class Orchestrator:
                 sr.ok = False
                 sr.errors.append(exception_to_error_dict(e))
                 sr.timings = {"elapsed_s": time.time() - t0}
-                report.metrics.inc(
-                    "source_failures", 1, labels={"source_id": source_id}
-                )
+                report.metrics.inc("source_failures", 1, labels={"source_id": source_id})
                 emit_event(slog, "source.failed", {"error": str(e)}, level="error")
                 slog.exception("Source failed", extra={"payload": {"error": str(e)}})
 
@@ -685,12 +663,10 @@ class Orchestrator:
 
         # raw pages
         listing_records = [
-            {"url": lp.url, **fetchresult_to_raw_record(lp.fetch)}
-            for lp in artifacts.listing_pages
+            {"url": lp.url, **fetchresult_to_raw_record(lp.fetch)} for lp in artifacts.listing_pages
         ]
         detail_records = [
-            {"url": dp.url, **fetchresult_to_raw_record(dp.fetch)}
-            for dp in artifacts.detail_pages
+            {"url": dp.url, **fetchresult_to_raw_record(dp.fetch)} for dp in artifacts.detail_pages
         ]
 
         lp_paths = write_raw_pages_jsonl(
@@ -781,8 +757,7 @@ class Orchestrator:
         max_retries = int(retry_policy.get("max_retries", 3))
         backoff_mode = str(retry_policy.get("backoff", "exp"))
         retry_on_status = tuple(
-            int(x)
-            for x in (retry_policy.get("retry_on_status") or (429, 500, 502, 503, 504))
+            int(x) for x in (retry_policy.get("retry_on_status") or (429, 500, 502, 503, 504))
         )
 
         rate = eng.get("rate_limit_policy") or {}
@@ -826,9 +801,7 @@ class Orchestrator:
         if et == "browser":
             return BrowserEngine(options=browser_opts)
         if et == "hybrid":
-            return HybridEngine(
-                options=HybridEngineOptions(http=http_opts, browser=browser_opts)
-            )
+            return HybridEngine(options=HybridEngineOptions(http=http_opts, browser=browser_opts))
 
         # fallback
         return HttpEngine(options=http_opts)

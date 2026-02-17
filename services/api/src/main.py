@@ -1,5 +1,5 @@
 """
-services.api.src.main.
+src.main.
 
 FastAPI entrypoint for the Event Intelligence Platform.
 
@@ -19,8 +19,8 @@ postgresql://user:password@host:port/event_intelligence
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from contextlib import asynccontextmanager
-from typing import Generator
 
 import psycopg2
 import psycopg2.pool
@@ -183,14 +183,16 @@ def list_categories(
     try:
         cur = db.cursor()
 
-        cur.execute("""
+        cur.execute(
+            """
             SELECT
                 primary_category_id,
                 name,
                 description
             FROM primary_categories
             ORDER BY name;
-            """)
+            """
+        )
 
         rows = cur.fetchall()
 

@@ -8,7 +8,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
-
 from src.ingestion.adapters.api_adapter import (
     APIAdapter,
     APIAdapterConfig,
@@ -231,9 +230,7 @@ class TestAPIAdapterFetch:
 
     @patch.object(APIAdapter, "_get_session")
     @patch.object(APIAdapter, "_make_request")
-    def test_fetch_with_custom_query_builder(
-        self, mock_request, mock_get_session, api_config
-    ):
+    def test_fetch_with_custom_query_builder(self, mock_request, mock_get_session, api_config):
         """Should use custom query builder."""
         mock_session = MagicMock()
         mock_get_session.return_value = mock_session
@@ -247,9 +244,7 @@ class TestAPIAdapterFetch:
 
     @patch.object(APIAdapter, "_get_session")
     @patch.object(APIAdapter, "_make_request")
-    def test_fetch_with_custom_response_parser(
-        self, mock_request, mock_get_session, api_config
-    ):
+    def test_fetch_with_custom_response_parser(self, mock_request, mock_get_session, api_config):
         """Should use custom response parser."""
         mock_session = MagicMock()
         mock_get_session.return_value = mock_session

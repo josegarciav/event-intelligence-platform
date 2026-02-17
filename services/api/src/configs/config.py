@@ -28,7 +28,7 @@ class Config:
         if not cls.INGESTION_CONFIG_PATH.exists():
             raise FileNotFoundError(f"Missing config at {cls.INGESTION_CONFIG_PATH}")
 
-        with open(cls.INGESTION_CONFIG_PATH, "r", encoding="utf-8") as f:
+        with open(cls.INGESTION_CONFIG_PATH, encoding="utf-8") as f:
             content = f.read()
 
             # Substitute environment variables from settings
@@ -37,11 +37,7 @@ class Config:
                 placeholder = f"${{{key}}}"
                 if placeholder in content:
                     # Handle SecretStr
-                    val_str = (
-                        value.get_secret_value()
-                        if hasattr(value, "get_secret_value")
-                        else str(value)
-                    )
+                    val_str = value.get_secret_value() if hasattr(value, "get_secret_value") else str(value)
                     content = content.replace(placeholder, val_str)
 
             return yaml.safe_load(content)

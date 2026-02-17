@@ -6,7 +6,6 @@ Tests for Instructor-based extraction model schemas.
 
 import pytest
 from pydantic import ValidationError
-
 from src.ingestion.normalization.extraction_models import (
     EventTypeExtraction,
     MissingFieldsExtraction,
@@ -176,9 +175,7 @@ class TestTaxonomyAttributesExtraction:
 
     def test_emotional_output_list(self):
         """Emotional output should accept list of strings."""
-        extraction = TaxonomyAttributesExtraction(
-            emotional_output=["joy", "connection", "energy", "fulfillment"]
-        )
+        extraction = TaxonomyAttributesExtraction(emotional_output=["joy", "connection", "energy", "fulfillment"])
         assert len(extraction.emotional_output) == 4
 
 

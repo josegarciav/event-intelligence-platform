@@ -17,12 +17,12 @@ import logging
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from src.ingestion.adapters import BaseSourceAdapter, SourceType
-from src.schemas.event import EventSchema
+from src.schemas.event import EventSchema, NormalizationSeverity
 
 
 class PipelineStatus(str, Enum):
@@ -51,7 +51,7 @@ class PipelineConfig:
     rate_limit_per_second: float = 1.0
     deduplicate: bool = True
     deduplication_strategy: str = "exact"
-    custom_config: Dict[str, Any] = field(default_factory=dict)
+    custom_config: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -67,9 +67,9 @@ class PipelineExecutionResult:
     total_events_processed: int = 0
     successful_events: int = 0
     failed_events: int = 0
-    events: List[EventSchema] = field(default_factory=list)
-    errors: List[Dict[str, Any]] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    events: list[EventSchema] = field(default_factory=list)
+    errors: list[dict[str, Any]] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def duration_seconds(self) -> float:
@@ -112,8 +112,8 @@ class BasePipeline(ABC):
         self.config = config
         self.adapter = adapter
         self.logger = self._setup_logger()
-        self.execution_id: Optional[str] = None
-        self.execution_start_time: Optional[datetime] = None
+        self.execution_id: str | None = None
+        self.execution_start_time: datetime | None = None
 
     def _setup_logger(self) -> logging.Logger:
         """Set up source-specific logger."""
@@ -131,7 +131,7 @@ class BasePipeline(ABC):
     # ========================================================================
 
     @abstractmethod
-    def parse_raw_event(self, raw_event: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_raw_event(self, raw_event: dict[str, Any]) -> dict[str, Any]:
         """
         Parse raw event data into intermediate structured format.
 
@@ -144,9 +144,7 @@ class BasePipeline(ABC):
         pass
 
     @abstractmethod
-    def map_to_taxonomy(
-        self, parsed_event: Dict[str, Any]
-    ) -> Tuple[str, List[Dict[str, Any]]]:
+    def map_to_taxonomy(self, parsed_event: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
         """
         Map parsed event to Human Experience Taxonomy.
 
@@ -159,11 +157,11 @@ class BasePipeline(ABC):
         pass
 
     @abstractmethod
-    def normalize_to_schema(
+    async def normalize_to_schema(
         self,
-        parsed_event: Dict[str, Any],
+        parsed_event: dict[str, Any],
         primary_cat: str,
-        taxonomy_dims: List[Dict[str, Any]],
+        taxonomy_dims: list[dict[str, Any]],
     ) -> EventSchema:
         """
         Normalize parsed event to canonical EventSchema.
@@ -179,7 +177,7 @@ class BasePipeline(ABC):
         pass
 
     @abstractmethod
-    def validate_event(self, event: EventSchema) -> Tuple[bool, List[str]]:
+    def validate_event(self, event: EventSchema) -> tuple[bool, list[str]]:
         """
         Validate a normalized event.
 
@@ -192,7 +190,7 @@ class BasePipeline(ABC):
         pass
 
     @abstractmethod
-    def enrich_event(self, event: EventSchema) -> EventSchema:
+    async def enrich_event(self, event: EventSchema) -> EventSchema:
         """
         Enrich event with additional data.
 
@@ -208,7 +206,7 @@ class BasePipeline(ABC):
     # CONCRETE METHODS - Pipeline execution
     # ========================================================================
 
-    def execute(self, **kwargs) -> PipelineExecutionResult:
+    async def execute(self, **kwargs) -> PipelineExecutionResult:
         """
         Execute the full pipeline workflow.
 
@@ -219,14 +217,14 @@ class BasePipeline(ABC):
             PipelineExecutionResult with summary and events
         """
         self.execution_id = self._generate_execution_id()
-        self.execution_start_time = datetime.now(timezone.utc)
+        self.execution_start_time = datetime.now(UTC)
 
         self.logger.info(f"Starting pipeline execution: {self.execution_id}")
         self.logger.info(f"Source type: {self.source_type.value}")
 
         try:
             # Step 1: Fetch raw data via adapter
-            fetch_result = self.adapter.fetch(**kwargs)
+            fetch_result = await self.adapter.fetch(**kwargs)
 
             if not fetch_result.success:
                 self.logger.error(f"Fetch failed: {fetch_result.errors}")
@@ -236,17 +234,15 @@ class BasePipeline(ABC):
                     source_type=self.source_type,
                     execution_id=self.execution_id,
                     started_at=self.execution_start_time,
-                    ended_at=datetime.now(timezone.utc),
-                    errors=[
-                        {"error": e, "stage": "fetch"} for e in fetch_result.errors
-                    ],
+                    ended_at=datetime.now(UTC),
+                    errors=[{"error": e, "stage": "fetch"} for e in fetch_result.errors],
                     metadata=fetch_result.metadata,
                 )
 
             self.logger.info(f"Fetched {fetch_result.total_fetched} raw events")
 
             # Step 2-6: Process events through pipeline
-            normalized_events = self._process_events_batch(fetch_result.raw_data)
+            normalized_events = await self._process_events_batch(fetch_result.raw_data)
 
             # Step 7: Deduplication
             if self.config.deduplicate and normalized_events:
@@ -255,21 +251,13 @@ class BasePipeline(ABC):
                     get_deduplicator,
                 )
 
-                deduplicator = get_deduplicator(
-                    DeduplicationStrategy(self.config.deduplication_strategy)
-                )
+                deduplicator = get_deduplicator(DeduplicationStrategy(self.config.deduplication_strategy))
                 before_count = len(normalized_events)
                 normalized_events = deduplicator.deduplicate(normalized_events)
-                self.logger.info(
-                    f"Deduplication: {before_count} -> {len(normalized_events)} events"
-                )
+                self.logger.info(f"Deduplication: {before_count} -> {len(normalized_events)} events")
 
-            status = (
-                PipelineStatus.SUCCESS if normalized_events else PipelineStatus.FAILED
-            )
-            if normalized_events and len(normalized_events) < len(
-                fetch_result.raw_data
-            ):
+            status = PipelineStatus.SUCCESS if normalized_events else PipelineStatus.FAILED
+            if normalized_events and len(normalized_events) < len(fetch_result.raw_data):
                 status = PipelineStatus.PARTIAL_SUCCESS
 
             result = PipelineExecutionResult(
@@ -278,7 +266,7 @@ class BasePipeline(ABC):
                 source_type=self.source_type,
                 execution_id=self.execution_id,
                 started_at=self.execution_start_time,
-                ended_at=datetime.now(timezone.utc),
+                ended_at=datetime.now(UTC),
                 total_events_processed=len(fetch_result.raw_data),
                 successful_events=len(normalized_events),
                 failed_events=len(fetch_result.raw_data) - len(normalized_events),
@@ -302,13 +290,11 @@ class BasePipeline(ABC):
                 source_type=self.source_type,
                 execution_id=self.execution_id,
                 started_at=self.execution_start_time,
-                ended_at=datetime.now(timezone.utc),
+                ended_at=datetime.now(UTC),
                 errors=[{"error": str(e), "stage": "execution"}],
             )
 
-    def _process_events_batch(
-        self, raw_events: List[Dict[str, Any]]
-    ) -> List[EventSchema]:
+    async def _process_events_batch(self, raw_events: list[dict[str, Any]]) -> list[EventSchema]:
         """Process a batch of raw events through the pipeline."""
         normalized_events = []
 
@@ -321,21 +307,24 @@ class BasePipeline(ABC):
                 primary_cat, taxonomy_dims = self.map_to_taxonomy(parsed_event)
 
                 # Step 4: Normalize
-                event = self.normalize_to_schema(
-                    parsed_event, primary_cat, taxonomy_dims
-                )
+                event = await self.normalize_to_schema(parsed_event, primary_cat, taxonomy_dims)
 
                 # Step 5: Validate
                 is_valid, validation_messages = self.validate_event(event)
-                event.normalization_errors.extend(validation_messages)
+                normalized_messages = []
+                for msg in validation_messages:
+                    if isinstance(msg, str):
+                        if msg.strip():
+                            normalized_messages.append({"message": msg.strip()})
+                    else:
+                        normalized_messages.append(msg)
+                event.normalization_errors.extend(normalized_messages)
 
                 if not is_valid:
-                    self.logger.warning(
-                        f"Validation warnings for event {idx}: {validation_messages}"
-                    )
+                    self.logger.warning(f"Validation warnings for event {idx}: {normalized_messages}")
 
                 # Step 6: Enrich
-                event = self.enrich_event(event)
+                event = await self.enrich_event(event)
 
                 # Calculate quality score
                 event.data_quality_score = self._calculate_quality_score(event)
@@ -364,7 +353,7 @@ class BasePipeline(ABC):
 
         # Enrichment fields (30%)
         enrichment_bonus = 0.0
-        enrichment_bonus += 0.05 if event.image_url else 0.0
+        enrichment_bonus += 0.05 if event.media_assets else 0.0
         enrichment_bonus += 0.05 if event.location.coordinates else 0.0
         enrichment_bonus += 0.05 if event.price and not event.price.is_free else 0.0
         enrichment_bonus += 0.05 if event.organizer and event.organizer.name else 0.0
@@ -372,15 +361,16 @@ class BasePipeline(ABC):
         enrichment_bonus += 0.05 if event.description else 0.0
         score += min(enrichment_bonus, 0.3)
 
-        # Penalize validation errors (up to -10%)
-        error_penalty = min(len(event.normalization_errors) * 0.02, 0.1)
+        # Penalize validation errors (up to -10%), excluding INFO severity
+        real_errors = [e for e in event.normalization_errors if e.severity != NormalizationSeverity.INFO]
+        error_penalty = min(len(real_errors) * 0.02, 0.1)
         score -= error_penalty
 
-        return max(0.0, min(score, 1.0))
+        return round(max(0.0, min(score, 1.0)), 2)
 
     def _generate_execution_id(self) -> str:
         """Generate unique execution identifier."""
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         unique_id = str(uuid.uuid4())[:8]
         return f"{self.config.source_name}_{timestamp}_{unique_id}"
 
@@ -388,7 +378,7 @@ class BasePipeline(ABC):
     # HELPER METHODS
     # ========================================================================
 
-    def to_dataframe(self, events: List[EventSchema]):
+    def to_dataframe(self, events: list[EventSchema]):
         """
         Convert events to comprehensive pandas DataFrame (Master Schema).
 
@@ -403,43 +393,35 @@ class BasePipeline(ABC):
 
         rows = []
         for event in events:
-            # ---- ARTISTS (from custom_fields) ----
-            artists_list = event.custom_fields.get("artists", [])
-            artists_str = ", ".join(
-                a.get("name", "") if isinstance(a, dict) else str(a)
-                for a in artists_list
-            )
+            # ---- ARTISTS ----
+            artists_str = ", ".join(a.name for a in event.artists)
 
-            # ---- TAXONOMY DIMENSIONS (JSON + flattened primary) ----
-            taxonomy_json = json.dumps(
-                [
+            # ---- TAXONOMY DIMENSION (JSON + flattened) ----
+            primary_dim = event.taxonomy_dimension
+            if primary_dim:
+                taxonomy_json = json.dumps(
                     {
-                        "primary_category": dim.primary_category,
-                        "subcategory": dim.subcategory,
-                        "subcategory_name": dim.subcategory_name,
-                        "values": dim.values,
-                        "activity_id": dim.activity_id,
-                        "activity_name": dim.activity_name,
-                        "energy_level": dim.energy_level,
-                        "social_intensity": dim.social_intensity,
-                        "cognitive_load": dim.cognitive_load,
-                        "physical_involvement": dim.physical_involvement,
-                        "cost_level": dim.cost_level,
-                        "time_scale": dim.time_scale,
-                        "environment": dim.environment,
-                        "emotional_output": dim.emotional_output,
-                        "risk_level": dim.risk_level,
-                        "age_accessibility": dim.age_accessibility,
-                        "repeatability": dim.repeatability,
+                        "primary_category": primary_dim.primary_category,
+                        "subcategory": primary_dim.subcategory,
+                        "subcategory_name": primary_dim.subcategory_name,
+                        "values": primary_dim.values,
+                        "activity_id": primary_dim.activity_id,
+                        "activity_name": primary_dim.activity_name,
+                        "energy_level": primary_dim.energy_level,
+                        "social_intensity": primary_dim.social_intensity,
+                        "cognitive_load": primary_dim.cognitive_load,
+                        "physical_involvement": primary_dim.physical_involvement,
+                        "cost_level": primary_dim.cost_level,
+                        "time_scale": primary_dim.time_scale,
+                        "environment": primary_dim.environment,
+                        "emotional_output": primary_dim.emotional_output,
+                        "risk_level": primary_dim.risk_level,
+                        "age_accessibility": primary_dim.age_accessibility,
+                        "repeatability": primary_dim.repeatability,
                     }
-                    for dim in event.taxonomy_dimensions
-                ]
-            )
-
-            # Get primary taxonomy dimension for flat columns
-            primary_dim = (
-                event.taxonomy_dimensions[0] if event.taxonomy_dimensions else None
-            )
+                )
+            else:
+                taxonomy_json = None
 
             # ---- ENUM VALUE EXTRACTION ----
             def get_enum_value(val):
@@ -514,39 +496,17 @@ class BasePipeline(ABC):
                 # ==== PRICE (flattened) ====
                 "price_currency": price.currency if price else None,
                 "price_is_free": price.is_free if price else None,
-                "price_minimum": (
-                    float(price.minimum_price)
-                    if price and price.minimum_price
-                    else None
-                ),
-                "price_maximum": (
-                    float(price.maximum_price)
-                    if price and price.maximum_price
-                    else None
-                ),
-                "price_early_bird": (
-                    float(price.early_bird_price)
-                    if price and price.early_bird_price
-                    else None
-                ),
-                "price_standard": (
-                    float(price.standard_price)
-                    if price and price.standard_price
-                    else None
-                ),
-                "price_vip": (
-                    float(price.vip_price) if price and price.vip_price else None
-                ),
+                "price_minimum": (float(price.minimum_price) if price and price.minimum_price else None),
+                "price_maximum": (float(price.maximum_price) if price and price.maximum_price else None),
+                "price_early_bird": (float(price.early_bird_price) if price and price.early_bird_price else None),
+                "price_standard": (float(price.standard_price) if price and price.standard_price else None),
+                "price_vip": (float(price.vip_price) if price and price.vip_price else None),
                 "price_raw_text": price.price_raw_text if price else None,
                 # ==== TICKET INFO (flattened) ====
                 "ticket_url": ticket.url if ticket else None,
                 "ticket_is_sold_out": ticket.is_sold_out if ticket else None,
-                "ticket_count_available": (
-                    ticket.ticket_count_available if ticket else None
-                ),
-                "ticket_early_bird_deadline": (
-                    ticket.early_bird_deadline if ticket else None
-                ),
+                "ticket_count_available": (ticket.ticket_count_available if ticket else None),
+                "ticket_early_bird_deadline": (ticket.early_bird_deadline if ticket else None),
                 # ==== ORGANIZER (flattened) ====
                 "organizer_name": org.name if org else None,
                 "organizer_url": org.url if org else None,
@@ -559,10 +519,9 @@ class BasePipeline(ABC):
                 "source_name": src.source_name if src else None,
                 "source_event_id": src.source_event_id if src else None,
                 "source_url": src.source_url if src else None,
-                "source_last_updated": src.updated_at if src else None,
+                "source_updated_at": src.source_updated_at if src else None,
                 "source_ingestion_timestamp": src.ingestion_timestamp if src else None,
                 # ==== MEDIA ====
-                "image_url": event.image_url,
                 "media_assets_json": media_json,
                 # ==== ENGAGEMENT (flattened) ====
                 "engagement_going_count": eng.going_count if eng else None,
@@ -571,71 +530,39 @@ class BasePipeline(ABC):
                 "engagement_shares_count": eng.shares_count if eng else None,
                 "engagement_comments_count": eng.comments_count if eng else None,
                 "engagement_likes_count": eng.likes_count if eng else None,
-                "engagement_last_updated": eng.last_updated if eng else None,
+                "engagement_updated_at": eng.updated_at if eng else None,
                 # ==== TAXONOMY - PRIMARY CATEGORY ====
-                "primary_category": get_enum_value(event.primary_category),
+                "primary_category": (primary_dim.primary_category if primary_dim else None),
                 # ==== TAXONOMY - PRIMARY DIMENSION (flattened) ====
-                "taxonomy_subcategory": (
-                    primary_dim.subcategory if primary_dim else None
-                ),
-                "taxonomy_subcategory_name": (
-                    primary_dim.subcategory_name if primary_dim else None
-                ),
-                "taxonomy_values": (
-                    ", ".join(primary_dim.values)
-                    if primary_dim and primary_dim.values
-                    else None
-                ),
-                "taxonomy_activity_id": (
-                    primary_dim.activity_id if primary_dim else None
-                ),
-                "taxonomy_activity_name": (
-                    primary_dim.activity_name if primary_dim else None
-                ),
-                "taxonomy_energy_level": (
-                    primary_dim.energy_level if primary_dim else None
-                ),
-                "taxonomy_social_intensity": (
-                    primary_dim.social_intensity if primary_dim else None
-                ),
-                "taxonomy_cognitive_load": (
-                    primary_dim.cognitive_load if primary_dim else None
-                ),
-                "taxonomy_physical_involvement": (
-                    primary_dim.physical_involvement if primary_dim else None
-                ),
+                "taxonomy_subcategory": (primary_dim.subcategory if primary_dim else None),
+                "taxonomy_subcategory_name": (primary_dim.subcategory_name if primary_dim else None),
+                "taxonomy_values": (", ".join(primary_dim.values) if primary_dim and primary_dim.values else None),
+                "taxonomy_activity_id": (primary_dim.activity_id if primary_dim else None),
+                "taxonomy_activity_name": (primary_dim.activity_name if primary_dim else None),
+                "taxonomy_energy_level": (primary_dim.energy_level if primary_dim else None),
+                "taxonomy_social_intensity": (primary_dim.social_intensity if primary_dim else None),
+                "taxonomy_cognitive_load": (primary_dim.cognitive_load if primary_dim else None),
+                "taxonomy_physical_involvement": (primary_dim.physical_involvement if primary_dim else None),
                 "taxonomy_cost_level": primary_dim.cost_level if primary_dim else None,
                 "taxonomy_time_scale": primary_dim.time_scale if primary_dim else None,
-                "taxonomy_environment": (
-                    primary_dim.environment if primary_dim else None
-                ),
+                "taxonomy_environment": (primary_dim.environment if primary_dim else None),
                 "taxonomy_emotional_output": (
-                    ", ".join(primary_dim.emotional_output)
-                    if primary_dim and primary_dim.emotional_output
-                    else None
+                    ", ".join(primary_dim.emotional_output) if primary_dim and primary_dim.emotional_output else None
                 ),
                 "taxonomy_risk_level": primary_dim.risk_level if primary_dim else None,
-                "taxonomy_age_accessibility": (
-                    primary_dim.age_accessibility if primary_dim else None
-                ),
-                "taxonomy_repeatability": (
-                    primary_dim.repeatability if primary_dim else None
-                ),
-                # ==== FULL TAXONOMY JSON (all dimensions) ====
-                "taxonomy_dimensions_json": taxonomy_json,
+                "taxonomy_age_accessibility": (primary_dim.age_accessibility if primary_dim else None),
+                "taxonomy_repeatability": (primary_dim.repeatability if primary_dim else None),
+                # ==== FULL TAXONOMY JSON ====
+                "taxonomy_dimension_json": taxonomy_json,
                 # ==== QUALITY & ERRORS ====
                 "data_quality_score": event.data_quality_score,
                 "normalization_errors": (
-                    ", ".join(event.normalization_errors)
-                    if event.normalization_errors
-                    else None
+                    ", ".join(e.message for e in event.normalization_errors) if event.normalization_errors else None
                 ),
                 # ==== ADDITIONAL METADATA ====
                 "tags": ", ".join(event.tags) if event.tags else None,
                 "artists": artists_str,
-                "custom_fields_json": (
-                    json.dumps(event.custom_fields) if event.custom_fields else None
-                ),
+                "custom_fields_json": (json.dumps(event.custom_fields) if event.custom_fields else None),
                 # ==== PLATFORM TIMESTAMPS ====
                 "created_at": event.created_at,
                 "updated_at": event.updated_at,
@@ -644,7 +571,7 @@ class BasePipeline(ABC):
 
         return pd.DataFrame(rows)
 
-    def close(self) -> None:
+    async def close(self) -> None:
         """Release adapter resources."""
         if self.adapter:
-            self.adapter.close()
+            await self.adapter.close()

@@ -3,7 +3,7 @@ Normalization module for event data.
 
 This package provides:
 - EventSchema: Canonical event data model
-- Taxonomy models: PrimaryCategory, TaxonomyDimension, Subcategory
+- Taxonomy models: TaxonomyDimension, Subcategory
 - Location/Price/Organizer models: LocationInfo, PriceInfo, OrganizerInfo, etc.
 - CurrencyParser: Price string parsing utilities
 - TaxonomyMapper: Taxonomy classification helpers

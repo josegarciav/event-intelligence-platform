@@ -17,11 +17,7 @@ sources:
       protocol: "graphql"
       timeout_seconds: 30
 
-    # Legacy settings (for backwards compatibility)
-    graphql_endpoint: "https://ra.co/graphql"
-    request_timeout: 30
     max_retries: 3
-    batch_size: 50
     rate_limit_per_second: 1.0
 
     # GraphQL Query Configuration
@@ -39,11 +35,23 @@ sources:
                 startTime
                 endTime
                 attending
+                interestedCount
                 isTicketed
+                flyerFront
+                minimumAge
+                pick {
+                  id
+                  blurb
+                }
                 venue {
+                  id
                   name
                   address
+                  contentUrl
                   live
+                  phone
+                  website
+                  followerCount
                   area {
                     name
                     country {
@@ -52,7 +60,13 @@ sources:
                     }
                   }
                 }
+                dateUpdated
+                lineup
                 artists {
+                  name
+                }
+                admin {
+                  username
                   name
                 }
                 images {
@@ -94,17 +108,30 @@ sources:
       end_time: "event.endTime"
       venue_name: "event.venue.name"
       venue_address: "event.venue.address"
+      venue_id: "event.venue.id"
+      venue_content_url: "event.venue.contentUrl"
       city: "event.venue.area.name"
       country_name: "event.venue.area.country.name"
       country_code: "event.venue.area.country.urlCode"
+      minimum_age: "event.minimumAge"
       artists: "event.artists[*].name"
       cost: "event.cost"
       content_url: "event.contentUrl"
       image_filename: "event.images[0].filename"
       image_crop: "event.images[0].crop"
+      flyer_front: "event.flyerFront"
       venue_live: "event.venue.live"
       attending: "event.attending"
+      interested_count: "event.interestedCount"
       is_ticketed: "event.isTicketed"
+      pick_id: "event.pick.id"
+      pick_blurb: "event.pick.blurb"
+      source_updated_at: "event.dateUpdated"
+      lineup: "event.lineup"
+      organizer_name: "event.admin.name"
+      venue_phone: "event.venue.phone"
+      venue_website: "event.venue.website"
+      venue_follower_count: "event.venue.followerCount"
 
     # Transformations applied after field extraction
     transformations:
@@ -146,7 +173,7 @@ sources:
     # Default values
     defaults:
       page_size: 100
-      days_ahead: 120
+      days_ahead: 1
       areas:
         Barcelona: 20
         Madrid: 41
@@ -164,7 +191,7 @@ sources:
     enrichment:
       geocoding: true
       compressed_html:
-        enabled: true
+        enabled: false
         engine_type: hybrid
         rate_limit_per_second: 2.0
         timeout_s: 15.0
@@ -205,7 +232,7 @@ sources:
   # TICKETMASTER - REST API-based ingestion
   # =========================================================================
   ticketmaster:
-    enabled: false
+    enabled: true
     pipeline_type: "api"
 
     # Connection settings

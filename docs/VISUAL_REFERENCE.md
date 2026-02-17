@@ -384,35 +384,35 @@ Base Score: 0.0
 
 ```yaml
 sources:
-  
+
   ra_co:  # Source name
     enabled: true  # On/off toggle
-    
+
     base_url: "https://ra.co/graphql"  # API endpoint
     api_key: "${RA_CO_API_KEY}"        # Environment variable
-    
+
     # HTTP Settings
     request_timeout: 30  # seconds
     max_retries: 3       # attempts
     batch_size: 100      # events per request
     rate_limit_per_second: 1.0  # API rate limiting
-    
+
     # Scheduling
     schedule:
       type: "interval"      # or "cron"
       interval_hours: 6     # Execute every 6 hours
-    
+
     # Feature toggles
     enrichment:
       geocoding: true              # Geocode venues
       organizer_metrics: false     # Future feature
       image_validation: true       # Check image URLs
-    
+
     validation:
       require_coordinates: false   # Soft requirement
       future_events_only: true     # Only future events
       days_ahead: 90               # Within 90 days
-    
+
     # Source-specific config
     custom:
       cities: ["London", "Berlin", "Barcelona"]
@@ -715,7 +715,7 @@ python show_all_events.py
 The Event Intelligence Platform has successfully transitioned from **theoretical architecture** to **working implementation**. The system is:
 
 - ✅ Retrieving real event data
-- ✅ Normalizing heterogeneous formats  
+- ✅ Normalizing heterogeneous formats
 - ✅ Applying intelligent taxonomy classification
 - ✅ Maintaining high data quality
 - ✅ Handling errors gracefully

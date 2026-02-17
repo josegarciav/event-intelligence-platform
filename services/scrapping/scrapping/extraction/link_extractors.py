@@ -71,9 +71,7 @@ def extract_links(req: LinkExtractRequest) -> list[str]:
     elif method == "js":
         # Placeholder for future: if html is from browser engine we can also do page.evaluate,
         # but that belongs to engine/actions; here we stay HTML-only.
-        raise NotImplementedError(
-            "js extraction is not supported in pure HTML mode yet"
-        )
+        raise NotImplementedError("js extraction is not supported in pure HTML mode yet")
 
     else:
         raise ValueError(f"unknown link extract method: {method}")
@@ -174,10 +172,8 @@ def _extract_xpath(html: str, xpath: str) -> list[str]:
         return []
     out: list[str] = []
     for x in res:
-        if isinstance(x, (str, bytes)):
-            out.append(
-                x.decode("utf-8", errors="ignore") if isinstance(x, bytes) else x
-            )
+        if isinstance(x, str | bytes):
+            out.append(x.decode("utf-8", errors="ignore") if isinstance(x, bytes) else x)
         else:
             # lxml may return nodes; attempt href/src
             try:

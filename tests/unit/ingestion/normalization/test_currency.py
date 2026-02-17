@@ -6,7 +6,6 @@ Tests for CurrencyParser price parsing and currency detection.
 
 from decimal import Decimal
 
-
 from src.ingestion.normalization.currency import CurrencyParser
 
 

@@ -5,7 +5,6 @@ Tests for TaxonomyMapper rule evaluation and dimension creation.
 """
 
 import pytest
-
 from src.ingestion.normalization.taxonomy_mapper import (
     TaxonomyMapper,
     create_taxonomy_mapper_from_config,
@@ -64,9 +63,7 @@ class TestTaxonomyMapperInit:
 
     def test_init_with_rules(self, valid_subcategory_id):
         """Should store rules."""
-        rules = [
-            {"match": {"always": True}, "assign": {"primary_category": "play_and_fun"}}
-        ]
+        rules = [{"match": {"always": True}, "assign": {"primary_category": "play_and_fun"}}]
         mapper = TaxonomyMapper(
             {
                 "default_primary": "play_and_fun",
@@ -117,105 +114,59 @@ class TestEvaluateMatch:
     def test_title_contains_match(self, basic_mapper):
         """Should match when title contains keyword."""
         event = {"title": "Techno Party Night"}
-        assert (
-            basic_mapper._evaluate_match(event, {"title_contains": ["techno", "house"]})
-            is True
-        )
+        assert basic_mapper._evaluate_match(event, {"title_contains": ["techno", "house"]}) is True
 
     def test_title_contains_no_match(self, basic_mapper):
         """Should not match when title doesn't contain keyword."""
         event = {"title": "Jazz Concert"}
-        assert (
-            basic_mapper._evaluate_match(event, {"title_contains": ["techno", "house"]})
-            is False
-        )
+        assert basic_mapper._evaluate_match(event, {"title_contains": ["techno", "house"]}) is False
 
     def test_title_contains_case_insensitive(self, basic_mapper):
         """Should match case-insensitively."""
         event = {"title": "TECHNO PARTY"}
-        assert (
-            basic_mapper._evaluate_match(event, {"title_contains": ["techno"]}) is True
-        )
+        assert basic_mapper._evaluate_match(event, {"title_contains": ["techno"]}) is True
 
     def test_description_contains_match(self, basic_mapper):
         """Should match when description contains keyword."""
         event = {"description": "Join us for a night of electronic music"}
-        assert (
-            basic_mapper._evaluate_match(
-                event, {"description_contains": ["electronic"]}
-            )
-            is True
-        )
+        assert basic_mapper._evaluate_match(event, {"description_contains": ["electronic"]}) is True
 
     def test_description_contains_no_match(self, basic_mapper):
         """Should not match when description doesn't contain keyword."""
         event = {"description": "Classical music concert"}
-        assert (
-            basic_mapper._evaluate_match(
-                event, {"description_contains": ["electronic"]}
-            )
-            is False
-        )
+        assert basic_mapper._evaluate_match(event, {"description_contains": ["electronic"]}) is False
 
     def test_field_equals_match(self, basic_mapper):
         """Should match when field equals value."""
         event = {"event_type": "concert"}
-        assert (
-            basic_mapper._evaluate_match(
-                event, {"field_equals": {"event_type": "concert"}}
-            )
-            is True
-        )
+        assert basic_mapper._evaluate_match(event, {"field_equals": {"event_type": "concert"}}) is True
 
     def test_field_equals_no_match(self, basic_mapper):
         """Should not match when field doesn't equal value."""
         event = {"event_type": "workshop"}
-        assert (
-            basic_mapper._evaluate_match(
-                event, {"field_equals": {"event_type": "concert"}}
-            )
-            is False
-        )
+        assert basic_mapper._evaluate_match(event, {"field_equals": {"event_type": "concert"}}) is False
 
     def test_field_in_match(self, basic_mapper):
         """Should match when field value in list."""
         event = {"event_type": "concert"}
         assert (
-            basic_mapper._evaluate_match(
-                event, {"field_in": {"event_type": ["concert", "festival", "party"]}}
-            )
-            is True
+            basic_mapper._evaluate_match(event, {"field_in": {"event_type": ["concert", "festival", "party"]}}) is True
         )
 
     def test_field_in_no_match(self, basic_mapper):
         """Should not match when field value not in list."""
         event = {"event_type": "workshop"}
-        assert (
-            basic_mapper._evaluate_match(
-                event, {"field_in": {"event_type": ["concert", "festival"]}}
-            )
-            is False
-        )
+        assert basic_mapper._evaluate_match(event, {"field_in": {"event_type": ["concert", "festival"]}}) is False
 
     def test_regex_match(self, basic_mapper):
         """Should match with regex pattern."""
         event = {"title": "Festival 2024 - Electronic Music"}
-        assert (
-            basic_mapper._evaluate_match(
-                event, {"regex": {"title": r"festival.*\d{4}"}}
-            )
-            is True
-        )
+        assert basic_mapper._evaluate_match(event, {"regex": {"title": r"festival.*\d{4}"}}) is True
 
     def test_regex_no_match(self, basic_mapper):
         """Should not match when regex doesn't match."""
         event = {"title": "Regular Party Night"}
-        assert (
-            basic_mapper._evaluate_match(
-                event, {"regex": {"title": r"festival.*\d{4}"}}
-            )
-            is False
-        )
+        assert basic_mapper._evaluate_match(event, {"regex": {"title": r"festival.*\d{4}"}}) is False
 
     def test_no_conditions(self, basic_mapper):
         """Should match when no specific conditions."""

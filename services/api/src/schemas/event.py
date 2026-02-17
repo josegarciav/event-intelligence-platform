@@ -9,10 +9,10 @@ capturing multi-dimensional aspects of human activities and experiences.
 The schema serves as the source of truth for all downstream analytics, ML, and application logic.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import (
     BaseModel,
@@ -27,16 +27,16 @@ from src.schemas.taxonomy import (
     build_taxonomy_index,
     get_all_subcategory_ids,
     get_all_subcategory_options,
-    get_primary_category_id_map,
-    get_primary_category_value_to_id_map,
     get_subcategory_by_id,
+    primary_category_to_id,
+    resolve_primary_category,
     validate_subcategory_for_primary,
 )
 
 
 def _utc_now() -> datetime:
     """Return current UTC time as timezone-aware datetime."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 # ============================================================================
@@ -44,107 +44,6 @@ def _utc_now() -> datetime:
 # ============================================================================
 
 _TAXONOMY_INDEX = build_taxonomy_index()
-
-
-class PrimaryCategory(str, Enum):
-    """
-    Primary experience categories from Human Experience Taxonomy.
-
-    Supports both string values and numeric IDs:
-    - PrimaryCategory("play_and_fun") - from string value
-    - PrimaryCategory.from_id("1") - from numeric ID
-    - PrimaryCategory.from_id_or_value("1") or ("play_and_fun") - accepts either
-    """
-
-    PLAY_AND_PURE_FUN = "play_and_fun"
-    EXPLORATION_AND_ADVENTURE = "exploration_and_adventure"
-    CREATION_AND_EXPRESSION = "creation_and_expression"
-    LEARNING_AND_INTELLECTUAL = "learning_and_intellectual"
-    SOCIAL_CONNECTION = "social_connection"
-    BODY_AND_MOVEMENT = "body_and_movement"
-    CHALLENGE_AND_ACHIEVEMENT = "challenge_and_achievement"
-    RELAXATION_AND_ESCAPISM = "relaxation_and_escapism"
-    IDENTITY_AND_MEANING = "identity_and_meaning"
-    CONTRIBUTION_AND_IMPACT = "contribution_and_impact"
-
-    @classmethod
-    def from_id(cls, category_id: str) -> "PrimaryCategory":
-        """
-        Get enum from numeric ID ('1' through '10').
-
-        Args:
-            category_id: Numeric ID string (e.g., "1", "2", ...)
-
-        Returns:
-            PrimaryCategory enum member
-
-        Raises:
-            ValueError: If category_id is not valid
-
-        Example:
-            >>> PrimaryCategory.from_id("1")
-            <PrimaryCategory.PLAY_AND_PURE_FUN: 'play_and_fun'>
-        """
-        id_map = get_primary_category_id_map()
-        if category_id not in id_map:
-            raise ValueError(
-                f"Invalid category ID '{category_id}'. "
-                f"Valid IDs are: {list(id_map.keys())}"
-            )
-        return cls(id_map[category_id])
-
-    @classmethod
-    def from_id_or_value(cls, value: str) -> "PrimaryCategory":
-        """
-        Accept either numeric ID ('1') or string value ('play_and_fun').
-
-        Tries to interpret the value as a numeric ID first, then as a string value.
-
-        Args:
-            value: Either a numeric ID ("1") or string value ("play_and_fun")
-
-        Returns:
-            PrimaryCategory enum member
-
-        Raises:
-            ValueError: If value is neither a valid ID nor a valid string value
-
-        Example:
-            >>> PrimaryCategory.from_id_or_value("1")
-            <PrimaryCategory.PLAY_AND_PURE_FUN: 'play_and_fun'>
-            >>> PrimaryCategory.from_id_or_value("play_and_fun")
-            <PrimaryCategory.PLAY_AND_PURE_FUN: 'play_and_fun'>
-        """
-        id_map = get_primary_category_id_map()
-
-        # Try as numeric ID first
-        if value in id_map:
-            return cls(id_map[value])
-
-        # Try as string value
-        try:
-            return cls(value)
-        except ValueError:
-            valid_ids = list(id_map.keys())
-            valid_values = [e.value for e in cls]
-            raise ValueError(
-                f"Invalid value '{value}'. "
-                f"Valid IDs: {valid_ids}, Valid values: {valid_values}"
-            )
-
-    def to_id(self) -> str:
-        """
-        Get numeric ID for this category.
-
-        Returns:
-            Numeric ID string (e.g., "1" for play_and_fun)
-
-        Example:
-            >>> PrimaryCategory.PLAY_AND_PURE_FUN.to_id()
-            '1'
-        """
-        value_to_id = get_primary_category_value_to_id_map()
-        return value_to_id[self.value]
 
 
 class Subcategory:
@@ -157,11 +56,11 @@ class Subcategory:
     `Subcategory.ids_for_primary(primary_key)` to map category -> subcategory ids.
     """
 
-    _ALL_OPTIONS: Optional[List[Dict[str, Any]]] = None
-    _ALL_IDS: Optional[set] = None
+    _ALL_OPTIONS: list[dict[str, Any]] | None = None
+    _ALL_IDS: set | None = None
 
     @classmethod
-    def all_options(cls) -> List[Dict[str, Any]]:
+    def all_options(cls) -> list[dict[str, Any]]:
         """List of all subcategory options: {id, name, primary_category}."""
         if cls._ALL_OPTIONS is None:
             cls._ALL_OPTIONS = get_all_subcategory_options()
@@ -180,7 +79,7 @@ class Subcategory:
         return _TAXONOMY_INDEX.get(primary_key, set())
 
     @classmethod
-    def get_by_id(cls, subcategory_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(cls, subcategory_id: str) -> dict[str, Any] | None:
         """
         Get full subcategory data by ID.
 
@@ -265,12 +164,14 @@ class TaxonomyDimension(BaseModel):
     """
 
     # Core taxonomy fields
-    primary_category: PrimaryCategory
-    subcategory: Optional[str] = Field(
+    primary_category: str = Field(
+        description="Normalized primary category value (e.g. 'play_&_pure_fun', 'other')",
+    )
+    subcategory: str | None = Field(
         default=None,
         description="Subcategory id from the taxonomy (e.g. '1.4'). Must be one of Subcategory.all_ids().",
     )
-    subcategory_name: Optional[str] = Field(
+    subcategory_name: str | None = Field(
         default=None,
         description="Human-readable subcategory name (e.g. 'Music & Rhythm Play')",
     )
@@ -280,67 +181,73 @@ class TaxonomyDimension(BaseModel):
         le=1.0,
         description="Confidence score for this taxonomy mapping (0.0-1.0)",
     )
-    values: List[str] = Field(default_factory=list)
+    values: list[str] = Field(default_factory=list)
 
     # Activity identification
-    activity_id: Optional[str] = Field(
+    activity_id: str | None = Field(
         default=None,
         description="UUID of matched activity from taxonomy",
     )
-    activity_name: Optional[str] = Field(
+    activity_name: str | None = Field(
         default=None,
         description="Name of matched activity",
     )
 
     # Activity-level attributes (selected from template options)
-    energy_level: Optional[str] = Field(
+    energy_level: str | None = Field(
         default=None,
         description="Energy level: 'low' | 'medium' | 'high'",
     )
-    social_intensity: Optional[str] = Field(
+    social_intensity: str | None = Field(
         default=None,
         description="Social intensity: 'solo' | 'small_group' | 'large_group'",
     )
-    cognitive_load: Optional[str] = Field(
+    cognitive_load: str | None = Field(
         default=None,
         description="Cognitive load: 'low' | 'medium' | 'high'",
     )
-    physical_involvement: Optional[str] = Field(
+    physical_involvement: str | None = Field(
         default=None,
         description="Physical involvement: 'none' | 'light' | 'moderate'",
     )
-    cost_level: Optional[str] = Field(
+    cost_level: str | None = Field(
         default=None,
         description="Cost level: 'free' | 'low' | 'medium' | 'high'",
     )
-    time_scale: Optional[str] = Field(
+    time_scale: str | None = Field(
         default=None,
         description="Time scale: 'short' | 'long' | 'recurring'",
     )
-    environment: Optional[str] = Field(
+    environment: str | None = Field(
         default=None,
         description="Environment: 'indoor' | 'outdoor' | 'digital' | 'mixed'",
     )
-    emotional_output: List[str] = Field(
+    emotional_output: list[str] = Field(
         default_factory=list,
         description="List of emotional outputs (e.g., ['joy', 'connection', 'energy'])",
     )
-    risk_level: Optional[str] = Field(
+    risk_level: str | None = Field(
         default=None,
         description="Risk level: 'none' | 'very_low' | 'low' | 'medium'",
     )
-    age_accessibility: Optional[str] = Field(
+    age_accessibility: str | None = Field(
         default=None,
         description="Age accessibility: 'all' | 'teens+' | 'adults'",
     )
-    repeatability: Optional[str] = Field(
+    repeatability: str | None = Field(
         default=None,
         description="Repeatability: 'high' | 'medium' | 'low'",
     )
 
+    @field_validator("primary_category", mode="before")
+    @classmethod
+    def normalize_primary_category(cls, v: str) -> str:
+        """Resolve any primary category representation to its normalized value."""
+        return resolve_primary_category(str(v))
+
     @field_validator("subcategory")
     @classmethod
-    def validate_subcategory_id(cls, v: Optional[str]) -> Optional[str]:
+    def validate_subcategory_id(cls, v: str | None) -> str | None:
         """Validate that subcategory ID exists in taxonomy."""
         if v is None or v == "":
             return None
@@ -356,12 +263,12 @@ class TaxonomyDimension(BaseModel):
     def validate_subcategory_primary_match(self) -> "TaxonomyDimension":
         """Ensure subcategory belongs to the specified primary category."""
         if self.subcategory is not None:
-            primary_id = self.primary_category.to_id()
-            if not Subcategory.validate_for_primary(self.subcategory, primary_id):
+            pid = primary_category_to_id(self.primary_category)
+            if not Subcategory.validate_for_primary(self.subcategory, pid):
                 raise ValueError(
                     f"Subcategory '{self.subcategory}' does not belong to "
-                    f"primary category '{self.primary_category.value}' (ID: {primary_id}). "
-                    f"Subcategory must start with '{primary_id}.'."
+                    f"primary category '{self.primary_category}' (ID: {pid}). "
+                    f"Subcategory must start with '{pid}.'."
                 )
         return self
 
@@ -379,16 +286,22 @@ class Coordinates(BaseModel):
 
     @field_validator("latitude")
     def validate_latitude(cls, v):
-        """Validate latitude is within range."""
+        """Validate latitude is within range and has sufficient precision."""
         if not -90 <= v <= 90:
             raise ValueError("Latitude must be between -90 and 90")
+        decimal_str = str(v).split(".")[-1] if "." in str(v) else ""
+        if len(decimal_str) < 4:
+            raise ValueError(f"Latitude {v} has insufficient precision (min 4 decimals, ~11m accuracy)")
         return v
 
     @field_validator("longitude")
     def validate_longitude(cls, v):
-        """Validate longitude is within range."""
+        """Validate longitude is within range and has sufficient precision."""
         if not -180 <= v <= 180:
             raise ValueError("Longitude must be between -180 and 180")
+        decimal_str = str(v).split(".")[-1] if "." in str(v) else ""
+        if len(decimal_str) < 4:
+            raise ValueError(f"Longitude {v} has insufficient precision (min 4 decimals, ~11m accuracy)")
         return v
 
 
@@ -410,16 +323,14 @@ class LocationInfo(BaseModel):
         }
     )
 
-    venue_name: Optional[str] = None
-    street_address: Optional[str] = None
+    venue_name: str | None = None
+    street_address: str | None = None
     city: str
-    state_or_region: Optional[str] = None
-    postal_code: Optional[str] = None
-    country_code: str = Field(
-        default="US", description="ISO 3166-1 alpha-2 country code"
-    )
-    coordinates: Optional[Coordinates] = None
-    timezone: Optional[str] = None  # e.g., 'America/New_York'
+    state_or_region: str | None = None
+    postal_code: str | None = None
+    country_code: str = Field(default="US", description="ISO 3166-1 alpha-2 country code")
+    coordinates: Coordinates | None = None
+    timezone: str | None = None  # e.g., 'America/New_York'
 
 
 # ============================================================================
@@ -433,13 +344,13 @@ class PriceInfo(BaseModel):
     currency: str = Field(default="USD", description="ISO 4217 currency code")
     is_free: bool = False
 
-    minimum_price: Optional[Decimal] = Field(default=None, ge=0)
-    maximum_price: Optional[Decimal] = Field(default=None, ge=0)
-    early_bird_price: Optional[Decimal] = Field(default=None, ge=0)
-    standard_price: Optional[Decimal] = Field(default=None, ge=0)
-    vip_price: Optional[Decimal] = Field(default=None, ge=0)
+    minimum_price: Decimal | None = Field(default=None, ge=0)
+    maximum_price: Decimal | None = Field(default=None, ge=0)
+    early_bird_price: Decimal | None = Field(default=None, ge=0)
+    standard_price: Decimal | None = Field(default=None, ge=0)
+    vip_price: Decimal | None = Field(default=None, ge=0)
 
-    price_raw_text: Optional[str] = Field(
+    price_raw_text: str | None = Field(
         default=None,
         description="Original price text from source (for debugging/validation)",
     )
@@ -479,7 +390,7 @@ class PriceInfo(BaseModel):
         "standard_price",
         "vip_price",
     )
-    def serialize_decimal(self, v: Optional[Decimal]) -> Optional[float]:
+    def serialize_decimal(self, v: Decimal | None) -> float | None:
         """Serialize Decimal to float for JSON compatibility."""
         if v is None:
             return None
@@ -489,10 +400,10 @@ class PriceInfo(BaseModel):
 class TicketInfo(BaseModel):
     """Ticket availability and link information."""
 
-    url: Optional[str] = None
+    url: str | None = None
     is_sold_out: bool = False
-    ticket_count_available: Optional[int] = None
-    early_bird_deadline: Optional[datetime] = None
+    ticket_count_available: int | None = None
+    early_bird_deadline: datetime | None = None
 
 
 # ============================================================================
@@ -504,33 +415,29 @@ class OrganizerInfo(BaseModel):
     """Information about the event organizer."""
 
     name: str
-    url: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    image_url: Optional[str] = None
-    follower_count: Optional[int] = None
+    url: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    image_url: str | None = None
+    follower_count: int | None = None
     verified: bool = False
 
 
 class SourceInfo(BaseModel):
     """Metadata about where the event came from."""
 
-    source_name: str = Field(
-        description="Name of the source (e.g., 'fever', 'meetup', 'ticketmaster')"
-    )
+    source_name: str = Field(description="Name of the source (e.g., 'fever', 'meetup', 'ticketmaster')")
     source_event_id: str = Field(description="Event ID from the original source")
     source_url: str = Field(description="Direct URL to event on source platform")
-    compressed_html: Optional[str] = Field(
+    compressed_html: str | None = Field(
         default=None,
         description="Parsed HTML or JSON data from source for debugging/validation",
     )
-    updated_at: datetime = Field(
-        default_factory=_utc_now,
-        description="When we last updated this event from the source",
+    source_updated_at: datetime | None = Field(
+        default=None,
+        description="Timestamp of last update at the source platform (None = unknown)",
     )
-    ingestion_timestamp: datetime = Field(
-        default_factory=_utc_now, description="When we ingested this event"
-    )
+    ingestion_timestamp: datetime = Field(default_factory=_utc_now, description="When we ingested this event")
 
 
 # ============================================================================
@@ -549,12 +456,12 @@ class MediaAsset(BaseModel):
 
     type: str = Field(description="Type of media (image, video, flyer, etc.)")
     url: str
-    title: Optional[str] = None
-    description: Optional[str] = (
+    title: str | None = None
+    description: str | None = (
         None  # could be implemented with a model in the future, analyzing image/video content to extract features.
     )
-    width: Optional[int] = None
-    height: Optional[int] = None
+    width: int | None = None
+    height: int | None = None
 
 
 class ArtistInfo(BaseModel):
@@ -565,22 +472,37 @@ class ArtistInfo(BaseModel):
     """
 
     name: str
-    soundcloud_url: Optional[str] = None
-    spotify_url: Optional[str] = None
-    instagram_url: Optional[str] = None
-    genre: Optional[str] = None
+    soundcloud_url: str | None = None
+    spotify_url: str | None = None
+    instagram_url: str | None = None
+    genre: str | None = None
 
 
 class EngagementMetrics(BaseModel):
     """Engagement metrics from the source."""
 
-    going_count: Optional[int] = None
-    interested_count: Optional[int] = None
-    views_count: Optional[int] = None
-    shares_count: Optional[int] = None
-    comments_count: Optional[int] = None
-    likes_count: Optional[int] = None
-    last_updated: Optional[datetime] = None
+    going_count: int | None = None
+    interested_count: int | None = None
+    views_count: int | None = None
+    shares_count: int | None = None
+    comments_count: int | None = None
+    likes_count: int | None = None
+    updated_at: datetime | None = None
+
+
+class NormalizationSeverity(str, Enum):
+    """Severity level for normalization messages."""
+
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+
+
+class NormalizationError(BaseModel):
+    """Structured normalization error/info message."""
+
+    message: str
+    severity: NormalizationSeverity = NormalizationSeverity.ERROR
 
 
 # ============================================================================
@@ -623,26 +545,23 @@ class EventSchema(BaseModel):
     )
 
     # ---- CORE EVENT INFORMATION ----
-    event_id: str = Field(
-        description="Platform-wide unique event identifier (generated from source_event_id)"
-    )
+    event_id: str = Field(description="Platform-wide unique event identifier (generated from source_event_id)")
     title: str
-    description: Optional[str] = None
+    description: str | None = None
 
     # ---- TAXONOMY & EXPERIENCE DIMENSIONS ----
-    primary_category: PrimaryCategory
-    taxonomy_dimensions: List[TaxonomyDimension] = Field(
-        default_factory=list,
-        description="Multi-dimensional taxonomy mappings for this event",
+    taxonomy_dimension: TaxonomyDimension | None = Field(
+        default=None,
+        description="Taxonomy dimension mapping for this event",
     )
 
     # ---- TIMING ----
     start_datetime: datetime
-    end_datetime: Optional[datetime] = None
-    duration_minutes: Optional[int] = None
+    end_datetime: datetime | None = None
+    duration_minutes: int | None = None
     is_all_day: bool = False
     is_recurring: bool = False
-    recurrence_pattern: Optional[str] = None  # e.g., 'weekly', 'monthly', 'one_time'
+    recurrence_pattern: str | None = None  # e.g., 'weekly', 'monthly', 'one_time'
 
     # ---- LOCATION ----
     location: LocationInfo
@@ -650,8 +569,8 @@ class EventSchema(BaseModel):
     # ---- EVENT DETAILS ----
     event_type: EventType = EventType.OTHER
     format: EventFormat = EventFormat.IN_PERSON
-    capacity: Optional[int] = None
-    age_restriction: Optional[str] = None
+    capacity: int | None = None
+    age_restriction: str | None = None
 
     # ---- PRICING & TICKETS ----
     price: PriceInfo = Field(default_factory=lambda: PriceInfo())
@@ -661,17 +580,16 @@ class EventSchema(BaseModel):
     organizer: OrganizerInfo
 
     # ---- ARTISTS ----
-    artists: List[ArtistInfo] = Field(default_factory=list)
+    artists: list[ArtistInfo] = Field(default_factory=list)
 
     # ---- MEDIA & VISUAL ----
-    image_url: Optional[str] = None
-    media_assets: List[MediaAsset] = Field(default_factory=list)
+    media_assets: list[MediaAsset] = Field(default_factory=list)
 
     # ---- SOURCE METADATA ----
     source: SourceInfo
 
     # ---- ENGAGEMENT & POPULARITY ----
-    engagement: Optional[EngagementMetrics] = None
+    engagement: EngagementMetrics | None = None
 
     # ---- QUALITY & NORMALIZATION ----
     data_quality_score: float = Field(
@@ -680,14 +598,14 @@ class EventSchema(BaseModel):
         le=1.0,
         description="Quality assessment of normalized data (0.0-1.0)",
     )
-    normalization_errors: List[str] = Field(
+    normalization_errors: list[NormalizationError] = Field(
         default_factory=list,
         description="Warnings/errors encountered during normalization",
     )
 
     # ---- ADDITIONAL METADATA ----
-    tags: List[str] = Field(default_factory=list)
-    custom_fields: Dict[str, Any] = Field(
+    tags: list[str] = Field(default_factory=list)
+    custom_fields: dict[str, Any] = Field(
         default_factory=dict,
         description="Source-specific fields that don't fit standard schema",
     )
@@ -707,9 +625,9 @@ class EventBatch(BaseModel):
 
     source_name: str
     batch_id: str = Field(description="Unique identifier for this batch")
-    events: List[EventSchema]
+    events: list[EventSchema]
     ingestion_timestamp: datetime = Field(default_factory=_utc_now)
     total_count: int
     successful_count: int = 0
     failed_count: int = 0
-    errors: List[Dict[str, Any]] = Field(default_factory=list)
+    errors: list[dict[str, Any]] = Field(default_factory=list)

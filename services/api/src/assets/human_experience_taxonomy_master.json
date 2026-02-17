@@ -5,6 +5,36 @@
   "created_at": "2026-01-19T12:03:17.906760Z",
   "categories": [
     {
+      "category_id": "0",
+      "category": "OTHER",
+      "description": "Fallback category for events that do not clearly fit any other primary category.",
+      "subcategories": [
+        {
+          "id": "0.1",
+          "name": "Other",
+          "values": [],
+          "activities": [
+            {
+              "activity_id": "00000000-0000-0000-0000-000000000000",
+              "name": "Other activity",
+              "energy_level": "low | medium | high",
+              "social_intensity": "solo | small_group | large_group",
+              "cognitive_load": "low | medium | high",
+              "physical_involvement": "none | light | moderate",
+              "cost_level": "free | low | medium | high",
+              "time_scale": "micro (minutes) | short | long",
+              "environment": "indoor | outdoor | digital | mixed",
+              "emotional_output": [],
+              "risk_level": "none | very_low | low",
+              "age_accessibility": "all | teens+ | adults",
+              "repeatability": "high | medium | low",
+              "notes": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
       "category_id": "1",
       "category": "PLAY & PURE FUN",
       "description": "Activities pursued for immediate pleasure, joy, amusement, and light engagement without obligation or long-term goals.",

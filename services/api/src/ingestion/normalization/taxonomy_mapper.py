@@ -11,13 +11,14 @@ Supports:
 
 import logging
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-from src.schemas.event import PrimaryCategory, Subcategory, TaxonomyDimension
+from src.schemas.event import Subcategory, TaxonomyDimension
 from src.schemas.taxonomy import (
     find_best_activity_match,
     get_full_taxonomy_dimension,
     get_subcategory_by_id,
+    resolve_primary_category,
 )
 
 logger = logging.getLogger(__name__)
@@ -40,7 +41,7 @@ class TaxonomyMapper:
     - always: Always matches (for default dimensions)
     """
 
-    def __init__(self, taxonomy_config: Dict[str, Any]):
+    def __init__(self, taxonomy_config: dict[str, Any]):
         """
         Initialize the taxonomy mapper.
 
@@ -54,24 +55,15 @@ class TaxonomyMapper:
             ValueError: If default_subcategory doesn't match default_primary
         """
         # Parse default_primary - support both numeric ID and string value
-        default_primary_raw = taxonomy_config.get("default_primary", "play_and_fun")
-        try:
-            default_primary_enum = PrimaryCategory.from_id_or_value(default_primary_raw)
-            self.default_primary = default_primary_enum.value
-        except ValueError:
-            logger.warning(
-                f"Invalid default_primary '{default_primary_raw}', using 'play_and_fun'"
-            )
-            self.default_primary = "play_and_fun"
+        default_primary_raw = taxonomy_config.get("default_primary", "other")
+        self.default_primary = resolve_primary_category(default_primary_raw)
 
         self.default_subcategory = taxonomy_config.get("default_subcategory")
         self.rules = taxonomy_config.get("rules", [])
 
         # Validate that default_subcategory belongs to default_primary
         if self.default_subcategory:
-            if not Subcategory.validate_for_primary(
-                self.default_subcategory, self.default_primary
-            ):
+            if not Subcategory.validate_for_primary(self.default_subcategory, self.default_primary):
                 raise ValueError(
                     f"default_subcategory '{self.default_subcategory}' does not belong to "
                     f"default_primary '{self.default_primary}'. "
@@ -80,8 +72,8 @@ class TaxonomyMapper:
 
     def map_event(
         self,
-        parsed_event: Dict[str, Any],
-    ) -> Tuple[str, List[TaxonomyDimension]]:
+        parsed_event: dict[str, Any],
+    ) -> tuple[str, list[TaxonomyDimension]]:
         """
         Map event to taxonomy dimensions based on rules.
 
@@ -91,7 +83,7 @@ class TaxonomyMapper:
         Returns:
             Tuple of (primary_category, list of TaxonomyDimension objects)
         """
-        dimensions: List[TaxonomyDimension] = []
+        dimensions: list[TaxonomyDimension] = []
         primary_category = self.default_primary
 
         # Evaluate each rule
@@ -106,15 +98,13 @@ class TaxonomyMapper:
 
                     # First matching rule sets the primary category
                     if not dimensions[:-1]:  # First dimension
-                        primary_category = assign_config.get(
-                            "primary_category", self.default_primary
-                        )
+                        primary_category = assign_config.get("primary_category", self.default_primary)
 
         # If no rules matched, use defaults
         if not dimensions and self.default_subcategory:
             dimensions.append(
                 TaxonomyDimension(
-                    primary_category=PrimaryCategory(self.default_primary),
+                    primary_category=self.default_primary,
                     subcategory=self.default_subcategory,
                     values=[],
                     confidence=0.5,
@@ -125,8 +115,8 @@ class TaxonomyMapper:
 
     def _evaluate_match(
         self,
-        event: Dict[str, Any],
-        match_config: Dict[str, Any],
+        event: dict[str, Any],
+        match_config: dict[str, Any],
     ) -> bool:
         """
         Evaluate if event matches the rule conditions.
@@ -182,9 +172,9 @@ class TaxonomyMapper:
 
     def _create_dimension(
         self,
-        event: Dict[str, Any],
-        assign_config: Dict[str, Any],
-    ) -> Optional[TaxonomyDimension]:
+        event: dict[str, Any],
+        assign_config: dict[str, Any],
+    ) -> TaxonomyDimension | None:
         """
         Create a TaxonomyDimension from assignment config.
 
@@ -195,27 +185,18 @@ class TaxonomyMapper:
         Returns:
             TaxonomyDimension or None
         """
-        primary_category_raw = assign_config.get(
-            "primary_category", self.default_primary
-        )
+        primary_category_raw = assign_config.get("primary_category", self.default_primary)
         subcategory_id = assign_config.get("subcategory", self.default_subcategory)
         values = assign_config.get("values", [])
         confidence = assign_config.get("confidence", 0.5)
 
-        # Parse primary category - support both numeric ID and string value
-        try:
-            primary_category = PrimaryCategory.from_id_or_value(primary_category_raw)
-        except ValueError:
-            logger.warning(f"Invalid primary category: {primary_category_raw}")
-            return None
+        # Resolve primary category - support both numeric ID and string value
+        primary_category = resolve_primary_category(primary_category_raw)
 
         # Validate subcategory belongs to primary category
-        if subcategory_id and not Subcategory.validate_for_primary(
-            subcategory_id, primary_category.value
-        ):
+        if subcategory_id and not Subcategory.validate_for_primary(subcategory_id, primary_category):
             logger.warning(
-                f"Subcategory '{subcategory_id}' does not belong to "
-                f"primary category '{primary_category.value}'"
+                f"Subcategory '{subcategory_id}' does not belong to " f"primary category '{primary_category}'"
             )
             return None
 
@@ -234,13 +215,13 @@ class TaxonomyMapper:
             subcategory_name=subcategory_name,
             values=values,
             confidence=confidence,
-        )
+        )  # type: ignore[arg-type]
 
     def get_full_taxonomy_data(
         self,
-        parsed_event: Dict[str, Any],
+        parsed_event: dict[str, Any],
         include_activity: bool = True,
-    ) -> Tuple[str, List[Dict[str, Any]]]:
+    ) -> tuple[str, list[dict[str, Any]]]:
         """
         Get full taxonomy dimension data including activity-level details.
 
@@ -260,11 +241,7 @@ class TaxonomyMapper:
         for dim in dimensions:
             # Start with basic TaxonomyDimension data
             full_dim = get_full_taxonomy_dimension(
-                primary_category=(
-                    dim.primary_category.value
-                    if isinstance(dim.primary_category, PrimaryCategory)
-                    else dim.primary_category
-                ),
+                primary_category=dim.primary_category,
                 subcategory_id=dim.subcategory or "",
                 confidence=dim.confidence,
                 values=dim.values if dim.values else None,
@@ -273,34 +250,24 @@ class TaxonomyMapper:
             # Try to find matching activity
             if include_activity and dim.subcategory:
                 event_context = f"{parsed_event.get('title', '')} {parsed_event.get('description', '')}"
-                activity_match = find_best_activity_match(
-                    event_context, dim.subcategory
-                )
+                activity_match = find_best_activity_match(event_context, dim.subcategory)
                 if activity_match:
                     full_dim["activity_id"] = activity_match.get("activity_id")
                     full_dim["activity_name"] = activity_match.get("name")
                     full_dim["energy_level"] = activity_match.get("energy_level")
-                    full_dim["social_intensity"] = activity_match.get(
-                        "social_intensity"
-                    )
+                    full_dim["social_intensity"] = activity_match.get("social_intensity")
                     full_dim["cognitive_load"] = activity_match.get("cognitive_load")
-                    full_dim["physical_involvement"] = activity_match.get(
-                        "physical_involvement"
-                    )
+                    full_dim["physical_involvement"] = activity_match.get("physical_involvement")
                     full_dim["environment"] = activity_match.get("environment")
-                    full_dim["emotional_output"] = activity_match.get(
-                        "emotional_output", []
-                    )
-                    full_dim["_activity_match_score"] = activity_match.get(
-                        "_match_score"
-                    )
+                    full_dim["emotional_output"] = activity_match.get("emotional_output", [])
+                    full_dim["_activity_match_score"] = activity_match.get("_match_score")
 
             full_dimensions.append(full_dim)
 
         return primary_category, full_dimensions
 
 
-def create_taxonomy_mapper_from_config(config: Dict[str, Any]) -> TaxonomyMapper:
+def create_taxonomy_mapper_from_config(config: dict[str, Any]) -> TaxonomyMapper:
     """
     Create a TaxonomyMapper from YAML config section.
 
