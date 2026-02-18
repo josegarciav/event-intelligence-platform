@@ -250,8 +250,8 @@ sources:
         apikey: "${TICKETMASTER_API_KEY}"
         city: "{{city}}"
         countryCode: "{{country_code}}"
-        startDateTime: "{{date_from}}T00:00:00Z"
-        endDateTime: "{{date_to}}T23:59:59Z"
+        startDateTime: "{{date_from_iso}}"
+        endDateTime: "{{date_to_iso}}"
         size: "{{page_size}}"
         page: "{{page}}"
         sort: "date,asc"
@@ -259,28 +259,77 @@ sources:
       total_results_path: "page.totalElements"
 
     # Pagination
+    # NOTE: Ticketmaster Discovery API is 0-indexed (page=0 is first page)
     pagination:
       type: "page_number"
       max_pages: 5
       default_page_size: 50
+      start_page: 0
 
     # Field mappings: target_field -> source_path
     field_mappings:
+      # Core identifiers
       source_event_id: "id"
       title: "name"
       description: "info"
+      please_note: "pleaseNote"
+
+      # Datetime
       date: "dates.start.localDate"
       start_time: "dates.start.dateTime"
       end_time: "dates.end.dateTime"
+      source_updated_at: "lastInfoModifiedAt"
+      event_status: "dates.status.code"         # onsale | offsale | cancelled | postponed | rescheduled
+      sale_start: "sales.public.startDateTime"  # when ticket sales open
+      sale_end: "sales.public.endDateTime"      # when ticket sales close
+
+      # Venue — all sourced from _embedded.venues[0]
+      venue_id: "_embedded.venues[0].id"
       venue_name: "_embedded.venues[0].name"
       venue_address: "_embedded.venues[0].address.line1"
+      venue_website: "_embedded.venues[0].url"
       city: "_embedded.venues[0].city.name"
+      state_or_region: "_embedded.venues[0].state.name"
+      postal_code: "_embedded.venues[0].postalCode"
       country_code: "_embedded.venues[0].country.countryCode"
-      content_url: "url"
-      image_url_raw: "images[0].url"
+      country_name: "_embedded.venues[0].country.name"
+      venue_latitude: "_embedded.venues[0].location.latitude"
+      venue_longitude: "_embedded.venues[0].location.longitude"
+      timezone: "_embedded.venues[0].timezone"
+      venue_box_office_phone: "_embedded.venues[0].boxOfficeInfo.phoneNumberDetail"
+      venue_general_info: "_embedded.venues[0].generalInfo.generalRule"
+      venue_child_rule: "_embedded.venues[0].generalInfo.childRule"
+      venue_accessible_seating: "_embedded.venues[0].accessibleSeatingDetail"
+
+      # Artists / performers from attractions
+      artists: "_embedded.attractions[*].name"
+      organizer_name: "_embedded.attractions[0].name"
+      organizer_url: "_embedded.attractions[0].url"
+      attraction_genre: "_embedded.attractions[0].classifications[0].genre.name"
+
+      # Promoter (event organizer / promoter company)
+      promoter_name: "promoter.name"
+
+      # Pricing
       cost_min: "priceRanges[0].min"
       cost_max: "priceRanges[0].max"
       cost_currency: "priceRanges[0].currency"
+
+      # Ticket availability
+      ticket_url: "url"                                     # event page also serves as ticket purchase URL
+      ticket_limit: "ticketLimit.info"                      # text description of limit
+      age_restriction: "ageRestrictions.legalAgeEnforced"  # boolean: true = legal age enforced
+
+      # Media & links
+      content_url: "url"
+      image_url_raw: "images[0].url"
+      seatmap_url: "seatmap.staticUrl"
+
+      # Classification (used for event_type rules)
+      classification_segment: "classifications[0].segment.name"
+      classification_genre: "classifications[0].genre.name"
+      classification_subgenre: "classifications[0].subGenre.name"
+      classification_type: "classifications[0].type.name"
 
     # Transformations applied after field extraction
     transformations:
@@ -294,6 +343,11 @@ sources:
       description:
         type: "strip_html"
         source: "description"
+      please_note:
+        type: "strip_html"
+        source: "please_note"
+      country_code:
+        type: "uppercase"
 
     # Taxonomy mapping rules
     taxonomy_suggestions:
@@ -301,34 +355,42 @@ sources:
       default_subcategory: "1.4"  # Music & Rhythm Play
 
     # Event type determination rules
+    # NOTE: TM classification_segment/genre are also available for matching
     event_type_rules:
       - match:
-          title_contains: ["festival"]
+          title_contains: ["festival", "fest"]
         type: "festival"
       - match:
-          title_contains: ["concert", "live", "tour"]
+          title_contains: ["concert", "live", "tour", "gig"]
         type: "concert"
       - match:
-          title_contains: ["workshop", "masterclass"]
+          title_contains: ["workshop", "masterclass", "seminar", "class"]
         type: "workshop"
       - match:
-          title_contains: ["comedy", "stand-up"]
+          title_contains: ["comedy", "stand-up", "standup", "improv"]
         type: "theater"
       - match:
-          title_contains: ["exhibition", "exhibit"]
+          title_contains: ["theatre", "theater", "opera", "ballet", "musical"]
+        type: "theater"
+      - match:
+          title_contains: ["exhibition", "exhibit", "expo", "museum", "gallery"]
         type: "exhibition"
+      - match:
+          title_contains: ["sport", "football", "basketball", "tennis", "race", "match"]
+        type: "sport"
       - default: true
-        type: "other"
+        type: "concert"
 
     # Default values
     defaults:
       page_size: 50
-      days_ahead: 120
+      days_ahead: 1
       country_code: "ES"
       cities: ["Barcelona", "Madrid"]
       location:
         country_code: "ES"
         timezone: "Europe/Madrid"
+        currency: "EUR"
 
     # Validation rules
     validation:

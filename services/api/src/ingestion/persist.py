@@ -294,8 +294,7 @@ class EventDataWriter:
         # Issue #8: Verify primary_category_id exists
         if primary_cat_id and primary_cat_id not in self._valid_primary_categories:
             logger.warning(
-                f"Event '{event.title}': primary_category_id '{primary_cat_id}' "
-                "not found in metadata. Setting to NULL."
+                f"Event '{event.title}': primary_category_id '{primary_cat_id}' not found in metadata. Setting to NULL."
             )
             primary_cat_id = None
 
@@ -433,9 +432,7 @@ class EventDataWriter:
 
             act_id = dim.activity_id
             if act_id and str(act_id) not in self._valid_activities:
-                logger.warning(
-                    f"Event '{event.title}': activity_id '{act_id}' " "not found in metadata. Setting to NULL."
-                )
+                logger.warning(f"Event '{event.title}': activity_id '{act_id}' not found in metadata. Setting to NULL.")
                 act_id = None
 
             valid_dims_with_act.append((dim, act_id))

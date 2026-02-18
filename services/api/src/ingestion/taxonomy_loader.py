@@ -15,8 +15,7 @@ from __future__ import annotations
 import json
 
 import psycopg2
-
-from src.configs.settings import get_settings
+from services.api.src.configs.settings import get_settings
 
 # ---------------------------------------------------------------------------
 # SETTINGS

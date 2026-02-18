@@ -90,6 +90,7 @@ class APISourceConfig:
     pagination_type: str = "page_number"  # "page_number" | "cursor" | "offset"
     max_pages: int = 10
     default_page_size: int = 50
+    pagination_start_page: int = 1  # 0 for REST APIs like Ticketmaster, 1 for GraphQL like Ra.co
 
     # Field mapping
     field_mappings: dict[str, str] = field(default_factory=dict)
@@ -289,7 +290,7 @@ class ConfigDrivenAPIAdapter(APIAdapter):
         Handles page-based, cursor-based, and offset-based pagination.
         """
         all_data = []
-        page = kwargs.pop("page", 1)
+        page = kwargs.pop("page", self.source_config.pagination_start_page)
         max_pages = kwargs.pop("max_pages", self.source_config.max_pages)
         page_size = kwargs.get("page_size", self.source_config.default_page_size)
         errors = []
@@ -297,8 +298,9 @@ class ConfigDrivenAPIAdapter(APIAdapter):
 
         fetch_started = datetime.now(UTC)
 
-        while page <= max_pages:
-            logger.info(f"Fetching page {page}/{max_pages}...")
+        end_page = self.source_config.pagination_start_page + max_pages - 1
+        while page <= end_page:
+            logger.info(f"Fetching page {page}/{end_page}...")
 
             # Add pagination params
             page_params = {**kwargs, "page": page, "page_size": page_size}
@@ -329,7 +331,8 @@ class ConfigDrivenAPIAdapter(APIAdapter):
 
             page += 1
 
-        logger.info(f"Pagination complete: fetched {len(all_data)} total events across {page} pages")
+        pages_fetched = page - self.source_config.pagination_start_page + 1
+        logger.info(f"Pagination complete: fetched {len(all_data)} total events across {pages_fetched} pages")
 
         return FetchResult(
             success=len(all_data) > 0,
@@ -449,7 +452,7 @@ class BaseAPIPipeline(BasePipeline):
         self.execution_id = self._generate_execution_id()
         self.execution_start_time = datetime.now(UTC)
         total_cities = len(areas) + len(cities) if not areas else len(areas)
-        self.logger.info(f"Starting multi-city execution: {self.execution_id} " f"({total_cities} cities)")
+        self.logger.info(f"Starting multi-city execution: {self.execution_id} ({total_cities} cities)")
 
         all_raw_events = []
         fetch_errors = []
@@ -458,7 +461,7 @@ class BaseAPIPipeline(BasePipeline):
         for city_name, area_id in areas.items():
             self.logger.info(f"Fetching events for {city_name} (area_id={area_id})...")
             try:
-                raw_events = await self._fetch_with_date_splitting(area_id=area_id, city_name=city_name, **kwargs)
+                raw_events = await self._fetch_with_date_splitting(city_name=city_name, area_id=area_id, **kwargs)
                 self.logger.info(f"  {city_name}: {len(raw_events)} raw events fetched")
                 all_raw_events.extend(raw_events)
             except Exception as e:
@@ -470,7 +473,7 @@ class BaseAPIPipeline(BasePipeline):
             for city_name in cities:
                 self.logger.info(f"Fetching events for {city_name}...")
                 try:
-                    raw_events = await self._fetch_with_date_splitting(city=city_name, city_name=city_name, **kwargs)
+                    raw_events = await self._fetch_with_date_splitting(city_name=city_name, city=city_name, **kwargs)
                     self.logger.info(f"  {city_name}: {len(raw_events)} raw events fetched")
                     all_raw_events.extend(raw_events)
                 except Exception as e:
@@ -480,7 +483,7 @@ class BaseAPIPipeline(BasePipeline):
         self.logger.info(f"Total raw events across all cities: {len(all_raw_events)}")
 
         # Process all events through pipeline stages
-        normalized_events = self._process_events_batch(all_raw_events)
+        normalized_events = await self._process_events_batch(all_raw_events)
 
         # Deduplication
         if self.config.deduplicate and normalized_events:
@@ -511,20 +514,20 @@ class BaseAPIPipeline(BasePipeline):
             events=normalized_events,
             errors=fetch_errors,
             metadata={
-                "cities": list(areas.keys()),
+                "cities": list(areas.keys()) if areas else list(cities),
                 "total_raw_fetched": len(all_raw_events),
             },
         )
 
         self.logger.info(
-            f"Multi-city pipeline completed: " f"{result.successful_events}/{result.total_events_processed} successful"
+            f"Multi-city pipeline completed: {result.successful_events}/{result.total_events_processed} successful"
         )
         return result
 
-    def _fetch_with_date_splitting(
+    async def _fetch_with_date_splitting(
         self,
-        area_id: int,
         city_name: str,
+        area_id: int | None = None,
         **kwargs,
     ) -> list[dict[str, Any]]:
         """
@@ -594,6 +597,14 @@ class BaseAPIPipeline(BasePipeline):
             date_from_str = cursor.strftime("%Y-%m-%d")
             date_to_str = window_end.strftime("%Y-%m-%d")
 
+            # Full ISO datetime strings for APIs that support datetime filtering (e.g. Ticketmaster).
+            # date_to_iso is 1 second before window_end so consecutive windows have no overlap:
+            #   window N:   [date_from_iso .. date_to_iso]       = [...T00:00:00Z .. ...T23:59:59Z]
+            #   window N+1: [date_from_iso .. date_to_iso]       = [next dayT00:00:00Z ..]
+            # This prevents boundary-day events from appearing in two consecutive windows.
+            date_from_iso = cursor.strftime("%Y-%m-%dT%H:%M:%SZ")
+            date_to_iso = (window_end - timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
             # Avoid zero-width windows when sub-day and dates collapse
             if date_from_str == date_to_str and window_hours < 24:
                 # Sub-day window within same calendar day — use next day as end
@@ -604,14 +615,18 @@ class BaseAPIPipeline(BasePipeline):
             relaxed_pagination = False
 
             while True:
-                fetch_result = self.adapter.fetch(
-                    area_id=area_id,
-                    date_from=date_from_str,
-                    date_to=date_to_str,
-                    page_size=window_page_size,
-                    max_pages=window_max_pages,
+                fetch_kwargs: dict[str, Any] = {
+                    "date_from": date_from_str,
+                    "date_to": date_to_str,
+                    "date_from_iso": date_from_iso,
+                    "date_to_iso": date_to_iso,
+                    "page_size": window_page_size,
+                    "max_pages": window_max_pages,
                     **kwargs,
-                )
+                }
+                if area_id is not None:
+                    fetch_kwargs["area_id"] = area_id
+                fetch_result = await self.adapter.fetch(**fetch_kwargs)
 
                 if fetch_result.success and fetch_result.raw_data:
                     fetched = len(fetch_result.raw_data)
@@ -660,7 +675,7 @@ class BaseAPIPipeline(BasePipeline):
                         )
                     else:
                         self.logger.info(
-                            f"  {city_name}: [{date_from_str}..{date_to_str}] " f"{fetched}/{total_available} events"
+                            f"  {city_name}: [{date_from_str}..{date_to_str}] {fetched}/{total_available} events"
                         )
 
                     # Advance cursor past this window
@@ -673,12 +688,12 @@ class BaseAPIPipeline(BasePipeline):
                 else:
                     # Fetch failed or empty — advance to avoid infinite loop
                     self.logger.warning(
-                        f"  {city_name}: [{date_from_str}..{date_to_str}] " f"no results or fetch failed, advancing"
+                        f"  {city_name}: [{date_from_str}..{date_to_str}] no results or fetch failed, advancing"
                     )
                     cursor = window_end
                     break
 
-        self.logger.info(f"  {city_name}: sliding window complete — " f"{len(all_events)} total raw events")
+        self.logger.info(f"  {city_name}: sliding window complete — {len(all_events)} total raw events")
         return all_events
 
     # ========================================================================
@@ -724,7 +739,7 @@ class BaseAPIPipeline(BasePipeline):
 
         return primary_cat, dims_as_dicts
 
-    def normalize_to_schema(
+    async def normalize_to_schema(
         self,
         parsed_event: dict[str, Any],
         primary_cat: str,
@@ -754,8 +769,10 @@ class BaseAPIPipeline(BasePipeline):
             venue_name=venue_name or None,
             street_address=raw_venue_address,
             city=parsed_event.get("city") or loc_defaults.get("city", "Unknown"),
+            state_or_region=parsed_event.get("state_or_region") or None,
+            postal_code=parsed_event.get("postal_code") or None,
             country_code=(parsed_event.get("country_code") or loc_defaults.get("country_code", "US")).upper(),
-            timezone=loc_defaults.get("timezone"),
+            timezone=parsed_event.get("timezone") or loc_defaults.get("timezone"),
         )
         # Coordinates are optional and should come from the same source query.
         lat_raw = parsed_event.get("venue_latitude") or parsed_event.get("latitude")
@@ -824,8 +841,8 @@ class BaseAPIPipeline(BasePipeline):
                 pass
 
         organizer = OrganizerInfo(
-            name=parsed_event.get("organizer_name") or "Unknown",
-            url=venue_website or None,
+            name=parsed_event.get("organizer_name") or parsed_event.get("promoter_name") or "Unknown",
+            url=parsed_event.get("organizer_url") or venue_website or None,
             phone=parsed_event.get("venue_phone") or None,
             follower_count=venue_follower_count,
         )
@@ -945,7 +962,10 @@ class BaseAPIPipeline(BasePipeline):
             media_assets.append(MediaAsset(type="image", url=image_url))
 
         age_restriction = parsed_event.get("age_restriction")
-        if age_restriction is None:
+        if isinstance(age_restriction, bool):
+            # Boolean from sources like Ticketmaster (ageRestrictions.legalAgeEnforced)
+            age_restriction = "18+" if age_restriction else None
+        elif age_restriction is None:
             minimum_age = parsed_event.get("minimum_age")
             if minimum_age is not None:
                 age_restriction = str(minimum_age)
@@ -960,9 +980,16 @@ class BaseAPIPipeline(BasePipeline):
         ticket_url = parsed_event.get("ticket_url")
         if not ticket_url and bool(is_ticketed):
             ticket_url = parsed_event.get("source_url") or ""
+        # Determine sold-out from boolean flag or status code
+        event_status = str(parsed_event.get("event_status") or "").lower()
+        is_sold_out = bool(parsed_event.get("is_sold_out", False)) or event_status in (
+            "offsale",
+            "cancelled",
+            "postponed",
+        )
         ticket_info = TicketInfo(
             url=ticket_url or None,
-            is_sold_out=bool(parsed_event.get("is_sold_out", False)),
+            is_sold_out=is_sold_out,
         )
         pick_blurb = parsed_event.get("pick_blurb")
         if pick_blurb:
@@ -971,10 +998,23 @@ class BaseAPIPipeline(BasePipeline):
         if pick_id:
             custom_fields["pick_id"] = pick_id
 
+        # Combine description + please_note when both present
+        description_raw = parsed_event.get("description") or None
+        please_note = parsed_event.get("please_note") or None
+        if description_raw and please_note:
+            combined_description = f"{description_raw}\n\n{please_note}"
+        else:
+            combined_description = description_raw or please_note
+
+        # Add seatmap URL as a media asset if provided
+        seatmap_url = parsed_event.get("seatmap_url")
+        if seatmap_url:
+            media_assets.append(MediaAsset(type="seatmap", url=seatmap_url))
+
         return EventSchema(
             event_id=event_id,
             title=parsed_event.get("title", "Untitled Event"),
-            description=parsed_event.get("description"),
+            description=combined_description,
             taxonomy_dimension=taxonomy_obj,
             start_datetime=start_dt,
             end_datetime=end_dt,
@@ -1235,7 +1275,7 @@ class BaseAPIPipeline(BasePipeline):
 
         return None
 
-    def enrich_event(self, event: EventSchema) -> EventSchema:
+    async def enrich_event(self, event: EventSchema) -> EventSchema:
         """Enrich event with additional computed data."""
         # Fetch compressed HTML if enrichment scraper is configured
         if (
@@ -1351,6 +1391,7 @@ def create_api_pipeline_from_config(
         pagination_type=pagination.get("type", "page_number"),
         max_pages=pagination.get("max_pages", 10),
         default_page_size=pagination.get("default_page_size", source_config_dict.get("batch_size", 50)),
+        pagination_start_page=pagination.get("start_page", 1),
         field_mappings=source_config_dict.get("field_mappings", {}),
         transformations=source_config_dict.get("transformations", {}),
         taxonomy_config=source_config_dict.get("taxonomy_suggestions", {}),

@@ -313,7 +313,7 @@ class LocationParser:
             try:
                 from geopy.geocoders import Nominatim
 
-                user_agent = os.environ.get("GEOCODING_API_KEY", "pulsecity-event-platform")
+                user_agent = os.environ.get("GEOCODING_API_KEY") or "pulsecity-event-platform"
                 self._geocoder = Nominatim(user_agent=user_agent, timeout=10)
             except ImportError:
                 logger.warning("geopy not installed; geocoding disabled")

@@ -23,7 +23,7 @@ const values = [
     description: "Explain why something is suggested. Always.",
   },
   {
-    title: "Personal growth",
+    title: "Personal growth through travel",
     description: "Travel enlightens our soul.",
   },
   {
