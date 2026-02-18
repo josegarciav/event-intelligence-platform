@@ -631,6 +631,10 @@ class BaseAPIPipeline(BasePipeline):
                 }
                 if area_id is not None:
                     fetch_kwargs["area_id"] = area_id
+                # Dynamic URL path substitution for sources with {{area_id}} in the endpoint path
+                # (e.g. Eventbrite: /v3/organizers/{{area_id}}/events/)
+                if area_id is not None and "{{area_id}}" in self.source_config.endpoint:
+                    self.adapter.api_config.base_url = self.source_config.endpoint.replace("{{area_id}}", str(area_id))
                 fetch_result = await self.adapter.fetch(**fetch_kwargs)
 
                 if fetch_result.success and fetch_result.raw_data:

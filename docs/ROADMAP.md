@@ -142,6 +142,14 @@ Audits:
 
 ---
 
+### Anti Duplication Agent
+Audits:
+
+- Subtly duplicated events
+- Groups recurring events (Some events happen every hour like a show at a museum, these should be grouped in the app)
+
+---
+
 # 6. Provider Abstraction
 
 Providers plug into MCP workflows.

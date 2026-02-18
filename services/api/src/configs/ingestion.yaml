@@ -417,7 +417,7 @@ sources:
   # TRIPADVISOR - Content API (location/attraction search)
   # =========================================================================
   tripadvisor:
-    enabled: true
+    enabled: false
     pipeline_type: "api"
 
     connection:
@@ -535,7 +535,7 @@ sources:
   # CIVITATIS - Affiliate Activity API (tours, shows, guided experiences)
   # =========================================================================
   civitatis:
-    enabled: true
+    enabled: false
     pipeline_type: "api"
 
     connection:
@@ -781,10 +781,163 @@ sources:
       cron_expression: "0 0 * * 1"   # Weekly on Monday
       enabled: false
 
+  # =========================================================================
+  # EVENTBRITE - Partner REST API (ticketed events, concerts, workshops, etc.)
+  # =========================================================================
+  eventbrite:
+    enabled: true
+    pipeline_type: "api"
+
+    connection:
+      endpoint: "https://www.eventbriteapi.com/v3/organizers/{{area_id}}/events/"
+      protocol: "rest"
+      timeout_seconds: 30
+      headers:
+        Authorization: "Bearer ${EVENTBRITE_API_KEY}"
+        Accept: "application/json"
+
+    max_retries: 3
+    rate_limit_per_second: 0.25     # 1000 req/hr cap → 0.28 req/s; 0.25 leaves headroom
+
+    query:
+      params:
+        status: "live"
+        order_by: "start_asc"
+        expand: "venue,logo,ticket_availability,category,organizer"
+        start_date.range_start: "{{date_from_iso}}"
+        start_date.range_end:   "{{date_to_iso}}"
+        page:      "{{page}}"
+        page_size: "{{page_size}}"
+      response_path: "events"
+      total_results_path: "pagination.object_count"
+
+    pagination:
+      type: "page_number"
+      max_pages: 5
+      default_page_size: 50
+      start_page: 1
+
+    field_mappings:
+      source_event_id:    "id"
+      title:              "name.text"
+      description:        "description.text"
+      start_datetime_raw: "start.utc"
+      end_datetime_raw:   "end.utc"
+      timezone_raw:       "start.timezone"
+      venue_name:         "venue.name"
+      venue_address:      "venue.address.address_1"
+      city:               "venue.address.city"
+      state:              "venue.address.region"
+      postal_code:        "venue.address.postal_code"
+      country_code:       "venue.address.country"
+      latitude:           "venue.latitude"
+      longitude:          "venue.longitude"
+      is_free:            "is_free"
+      currency:           "currency"
+      capacity:           "capacity"
+      online_event:       "online_event"
+      image_url_raw:      "logo.url"
+      source_url_raw:     "url"
+      cost_min:           "ticket_availability.minimum_ticket_price.value"
+      cost_max:           "ticket_availability.maximum_ticket_price.value"
+      is_sold_out:        "ticket_availability.is_sold_out"
+      category_name:      "category.name"
+      organizer_name:     "organizer.name"
+      source_updated_at:  "changed"
+      status:             "status"
+
+    transformations:
+      source_url:
+        type: "template"
+        template: "{{source_url_raw}}"
+        when: "source_url_raw"
+      image_url:
+        type: "template"
+        template: "{{image_url_raw}}"
+        when: "image_url_raw"
+      country_code:
+        type: "uppercase"
+        source: "country_code"
+      description:
+        type: "strip_html"
+        source: "description"
+
+    # Taxonomy: ticketed events → Play & Pure Fun (same primary as Ra.co)
+    taxonomy_suggestions:
+      default_primary: "1"       # Play & Pure Fun
+      default_subcategory: "1.1" # Social & Playful Gatherings
+
+    event_type_rules:
+      - match:
+          title_contains: ["festival", "fest"]
+        type: "festival"
+      - match:
+          title_contains: ["party", "fiesta", "rave", "club night", "nightlife"]
+        type: "party"
+      - match:
+          title_contains: ["concert", "live music", "gig", "recital", "opera", "live show"]
+        type: "concert"
+      - match:
+          title_contains: ["workshop", "class", "course", "masterclass", "training", "taller"]
+        type: "workshop"
+      - match:
+          title_contains: ["conference", "summit", "symposium", "seminar", "meetup", "networking"]
+        type: "conference"
+      - match:
+          title_contains: ["exhibition", "expo", "fair", "trade show", "museum", "gallery", "art show"]
+        type: "exhibition"
+      - match:
+          title_contains: ["comedy", "stand-up", "standup", "humor", "improv"]
+        type: "comedy"
+      - match:
+          title_contains: ["food", "wine", "tasting", "gastronomy", "culinary", "tapas", "cooking"]
+        type: "food_beverage"
+      - match:
+          regex:
+            category_name: "music|concert"
+        type: "concert"
+      - match:
+          regex:
+            category_name: "business|professional|technology|science"
+        type: "conference"
+      - match:
+          regex:
+            category_name: "food|drink|wine"
+        type: "food_beverage"
+      - default: true
+        type: "other"
+
+    defaults:
+      page_size: 50
+      days_ahead: 7
+      areas:
+        # Map city name → Eventbrite organizer ID for major promoters in each city.
+        Barcelona: 28166836273
+        Madrid: 24081003379
+      location:
+        country_code: "ES"
+        timezone: "Europe/Madrid"
+        currency: "EUR"
+
+    validation:
+      required_fields: ["title", "source_event_id", "start_datetime"]
+      future_events_only: true
+
+    enrichment:
+      geocoding: false        # venue.latitude/longitude provided directly via expand=venue
+      compressed_html:
+        enabled: false
+
+    schedule:
+      type: "cron"
+      cron_expression: "0 */12 * * *"   # Every 12 hours (same cadence as Ra.co)
+      enabled: false
+
+  # FEVER has no API. TODO: test scraping adapter for custom pipeline.
+
 # =========================================================================
 # GLOBAL SETTINGS
 # =========================================================================
-
 global:
   # Storage settings
   storage:
