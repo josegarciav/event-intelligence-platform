@@ -15,7 +15,6 @@ user_prompt: |
   - environment: [indoor, outdoor, mixed].
   - risk_level: [none, very_low, low, medium].
   - age_accessibility: [all, teens+, adults].
-  - capacity: Estimate venue size if not stated (e.g., 'intimate club' = 200).
   - time_scale: [short, long, recurring].
 
   LOGIC:

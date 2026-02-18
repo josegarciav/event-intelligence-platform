@@ -195,31 +195,6 @@ sources:
         engine_type: hybrid
         rate_limit_per_second: 2.0
         timeout_s: 15.0
-      # Feature extraction (LLM-based)
-      feature_extraction:
-        enabled: false
-        provider: "openai"
-        model_name: "gpt-4o-mini"
-        fill_missing:
-          - "event_type"
-          - "tags"
-          - "activity_id"
-          - "activity_name"
-          - "energy_level"
-          - "social_intensity"
-          - "cognitive_load"
-          - "physical_involvement"
-          - "cost_level"
-          - "time_scale"
-          - "environment"
-          - "emotional_output"
-          - "risk_level"
-          - "age_accessibility"
-          - "repeatability"
-          - "event_type"
-          - "capacity"
-          - "event_format"
-          - "tags"
 
     # Scheduling
     schedule:

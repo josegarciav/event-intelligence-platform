@@ -1,0 +1,7 @@
+prompt_name: "experience_pulse"
+active_version: "v1"
+versions:
+  v1:
+    description: "Behavioral taxonomy dimensions — the 'Pulse' of the event"
+    created_at: "2026-02-18"
+    notes: "Maps event to activity + fills energy_level, social_intensity, cognitive_load, physical_involvement, emotional_output, repeatability. Used by TaxonomyClassifierAgent."

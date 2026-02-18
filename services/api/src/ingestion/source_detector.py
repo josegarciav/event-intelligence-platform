@@ -182,7 +182,11 @@ class SourceDetector:
 
     def _extract_meta_title(self, html: str) -> str | None:
         # Try og:title first, then <title>
-        og = re.search(r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)', html, re.I)
+        og = re.search(
+            r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)',
+            html,
+            re.I,
+        )
         if og:
             return og.group(1).strip()
         title = re.search(r"<title[^>]*>([^<]+)</title>", html, re.I)

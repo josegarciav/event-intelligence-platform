@@ -170,7 +170,7 @@ uv venv
 uv sync
 
 # Activate it
-source .venv/bin/activate
+source services/api/.venv/bin/activate
 
 # Sync your dependencies
 uv sync
@@ -181,7 +181,7 @@ uv lock
 Running pre-commit:
 
 ```bash
-uv run pre-commit run --all-files
+uv run pre-commit run --all-files --unsafe-fixes
 ```
 
 ## Contribution Guidelines

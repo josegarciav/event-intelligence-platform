@@ -1,0 +1,7 @@
+prompt_name: "logistics"
+active_version: "v1"
+versions:
+  v1:
+    description: "Environmental and practical constraint inference"
+    created_at: "2026-02-18"
+    notes: "Infers cost_level, environment, risk_level, age_accessibility, time_scale. Used by TaxonomyClassifierAgent."

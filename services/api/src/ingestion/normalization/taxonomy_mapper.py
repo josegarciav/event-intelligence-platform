@@ -195,9 +195,7 @@ class TaxonomyMapper:
 
         # Validate subcategory belongs to primary category
         if subcategory_id and not Subcategory.validate_for_primary(subcategory_id, primary_category):
-            logger.warning(
-                f"Subcategory '{subcategory_id}' does not belong to " f"primary category '{primary_category}'"
-            )
+            logger.warning(f"Subcategory '{subcategory_id}' does not belong to primary category '{primary_category}'")
             return None
 
         # If no values provided, get from subcategory

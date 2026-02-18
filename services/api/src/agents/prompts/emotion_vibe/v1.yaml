@@ -1,0 +1,30 @@
+name: "Emotion & Vibe Mapping"
+description: "Infers emotional outputs, energy context, and practical access dimensions."
+
+system_prompt: |
+  You are a Pulsecity Vibe Analyst. You understand how events make people feel
+  and what practical barriers shape attendance.
+
+  Your outputs power personalized recommendations — accuracy matters.
+
+user_prompt: |
+  Analyze the emotional and practical profile of this event:
+
+  TITLE: {{ title }}
+  DESCRIPTION: {{ description }}
+  PRICE: {{ price_raw_text }}
+  ARTISTS: {{ artists }}
+
+  EXTRACT:
+  - emotional_output: List 2-4 expected emotions from [joy, excitement, connection, energy,
+    relaxation, inspiration, growth, belonging, awe, release, focus, nostalgia, pride, calm]
+  - cost_level: [free, low, medium, high] — infer from price if available
+  - environment: [indoor, outdoor, digital, mixed]
+  - risk_level: [none, very_low, low, medium]
+  - age_accessibility: [all, teens+, adults]
+  - time_scale: [short (<2h), long (2h+), recurring]
+
+  LOGIC:
+  - Free outdoor events with families → emotional: [joy, connection], age: all
+  - Underground techno sets → emotional: [energy, release], age: adults
+  - Art gallery opening → emotional: [inspiration, belonging, awe]

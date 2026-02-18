@@ -1,0 +1,7 @@
+prompt_name: "core_metadata"
+active_version: "v1"
+versions:
+  v1:
+    description: "Initial core metadata classification prompt"
+    created_at: "2026-02-18"
+    notes: "Covers event_type (15 types), event_format, and tag generation. Used by FeatureAlignmentAgent."

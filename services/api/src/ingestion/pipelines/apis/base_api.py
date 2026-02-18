@@ -7,7 +7,6 @@ This module provides a single BaseAPIPipeline class that handles ALL API sources
 The pipeline uses:
 - FieldMapper for extracting fields from raw API responses
 - TaxonomyMapper for rule-based taxonomy assignment
-- FeatureExtractor for LLM-based field filling
 """
 
 import asyncio
@@ -18,10 +17,6 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from src.agents.feature_extractor import (
-    FeatureExtractor,
-    create_feature_extractor_from_config,
-)
 from src.ingestion.adapters import FetchResult, SourceType
 from src.ingestion.adapters.api_adapter import APIAdapter, APIAdapterConfig
 from src.ingestion.normalization.currency import CurrencyParser
@@ -108,9 +103,6 @@ class APISourceConfig:
 
     # Validation
     validation: dict[str, Any] = field(default_factory=dict)
-
-    # Feature extraction
-    feature_extraction: dict[str, Any] = field(default_factory=dict)
 
     # HTML enrichment (compressed_html scraping)
     html_enrichment: dict[str, Any] = field(default_factory=dict)
@@ -384,11 +376,6 @@ class BaseAPIPipeline(BasePipeline):
             transformations=source_config.transformations,
         )
         self.taxonomy_mapper = TaxonomyMapper(source_config.taxonomy_config)
-
-        # Create feature extractor if enabled
-        self.feature_extractor: FeatureExtractor | None = None
-        if source_config.feature_extraction.get("enabled"):
-            self.feature_extractor = create_feature_extractor_from_config(source_config.feature_extraction)
 
         # Create HTML enrichment scraper if enabled
         self.html_enrichment_scraper = None
@@ -897,32 +884,11 @@ class BaseAPIPipeline(BasePipeline):
                 values=first_dim.get("values", []),
             )
 
-            # Enrich taxonomy dimension with activity-level fields using FeatureExtractor
-            if self.feature_extractor:
-                try:
-                    taxonomy_obj = self.feature_extractor.enrich_taxonomy_dimension(taxonomy_obj, parsed_event)
-                except Exception as e:
-                    logger.warning(f"Failed to enrich taxonomy dimension: {e}")
-
         # Determine event type from rules
         event_type = self._determine_event_type(parsed_event)
 
-        # Use feature extractor for missing fields
-        extracted_fields = {}
-        if self.feature_extractor:
-            missing_fields = self.source_config.feature_extraction.get("fill_missing", [])
-            if missing_fields:
-                extracted_fields = self.feature_extractor.fill_missing_fields(parsed_event, missing_fields)
-
-                # Apply extracted event_type
-                if "event_type" in extracted_fields and not event_type:
-                    try:
-                        event_type = EventType(extracted_fields["event_type"])
-                    except ValueError:
-                        pass
-
-        # Get tags from extracted fields or parsed event
-        tags = extracted_fields.get("tags") or parsed_event.get("tags", [])
+        # Get tags from parsed event
+        tags = parsed_event.get("tags", [])
 
         # Build artists list — merge structured artists with lineup text
         artist_names = parsed_event.get("artists", [])
@@ -1411,9 +1377,6 @@ def create_api_pipeline_from_config(
         event_type_rules=source_config_dict.get("event_type_rules", []),
         defaults=source_config_dict.get("defaults", {}),
         validation=source_config_dict.get("validation", {}),
-        feature_extraction=source_config_dict.get("enrichment", {}).get(
-            "feature_extraction", source_config_dict.get("feature_extraction", {})
-        ),
         html_enrichment=source_config_dict.get("enrichment", {}).get("compressed_html", {}),
         geocoding_enabled=source_config_dict.get("enrichment", {}).get("geocoding", False),
         connection_headers=connection.get("headers", {}),

@@ -46,7 +46,7 @@ class TaxonomyAttributesOutput(BaseModel):
         description="Risk level of the activity. Most events are 'very_low' or 'low'"
     )
     age_accessibility: Literal["all", "teens+", "adults"] = Field(
-        description="Age appropriateness. " "'all' = family-friendly; 'teens+' = 13+; 'adults' = 18+/21+ (clubs, bars)"
+        description="Age appropriateness. 'all' = family-friendly; 'teens+' = 13+; 'adults' = 18+/21+ (clubs, bars)"
     )
     repeatability: Literal["high", "medium", "low"] = Field(
         description="How often people typically repeat this experience. "

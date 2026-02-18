@@ -1,0 +1,163 @@
+# =============================================================================
+# PULSECITY AGENT ENRICHMENT CONFIGURATION
+# =============================================================================
+# Loaded by: src/agents/orchestration/pipeline_triggers.py::load_agents_config()
+# Used by:   BatchEnrichmentRunner to instantiate and configure each agent.
+#
+# Agent chain order: feature_alignment → taxonomy_classifier →
+#                    emotion_mapper → data_quality → deduplication
+#
+# Provider options:
+#   anthropic — Claude via Anthropic SDK (requires ANTHROPIC_API_KEY)
+#   openai    — GPT via OpenAI SDK     (requires OPENAI_API_KEY)
+#   ollama    — Local Llama via Ollama (no API key — DEFAULT)
+#   llama     — Alias for ollama
+#
+# Ollama setup: brew install ollama && ollama pull llama3.2:3b
+# No .env entry needed — Ollama runs locally with no API key.
+# =============================================================================
+
+agents:
+
+  # ---------------------------------------------------------------------------
+  # FEATURE ALIGNMENT — fills event_type, tags, event_format
+  # Prompt: prompts/core_metadata/
+  # ---------------------------------------------------------------------------
+  feature_alignment:
+    enabled: true
+    prompt_name: "core_metadata"
+    prompt_version: "active"
+    provider: "ollama"
+    model: "llama3.2:3b"
+    temperature: 0.1
+    target_fields:
+      - "event_type"
+      - "tags"
+      - "event_format"
+
+  # ---------------------------------------------------------------------------
+  # TAXONOMY CLASSIFIER — primary_category, subcategory, behavioral dimensions
+  # Prompt: prompts/taxonomy_classification/
+  # Taxonomy context is baked into the prompt YAML (no file dependency at runtime).
+  # ---------------------------------------------------------------------------
+  taxonomy_classifier:
+    enabled: true
+    prompt_name: "taxonomy_classification"
+    prompt_version: "active"
+    provider: "ollama"
+    model: "llama3.2:3b"
+    temperature: 0.1
+    target_fields:
+      - "primary_category"
+      - "subcategory"
+      - "activity_id"
+      - "energy_level"
+      - "social_intensity"
+      - "cognitive_load"
+      - "physical_involvement"
+      - "repeatability"
+
+  # ---------------------------------------------------------------------------
+  # EMOTION MAPPER — emotional outputs and practical access dimensions
+  # Prompt: prompts/emotion_vibe/
+  # ---------------------------------------------------------------------------
+  emotion_mapper:
+    enabled: true
+    prompt_name: "emotion_vibe"
+    prompt_version: "active"
+    provider: "ollama"
+    model: "llama3.2:3b"
+    temperature: 0.3
+    target_fields:
+      - "emotional_output"
+      - "cost_level"
+      - "environment"
+      - "risk_level"
+      - "age_accessibility"
+      - "time_scale"
+
+  # ---------------------------------------------------------------------------
+  # DATA QUALITY — audits all fields, writes quality_score + normalization_errors
+  # Prompt: prompts/data_quality/
+  # ---------------------------------------------------------------------------
+  data_quality:
+    enabled: true
+    prompt_name: "data_quality"
+    prompt_version: "active"
+    provider: "ollama"
+    model: "llama3.2:3b"
+    temperature: 0.0    # always deterministic for quality audits
+    target_fields: []   # audits all fields → writes to custom_fields
+
+  # ---------------------------------------------------------------------------
+  # DEDUPLICATION — detects duplicates, groups recurring events, aligns sources
+  # Prompt: prompts/deduplication/
+  # Runs in two passes: rule-based (always) + LLM fuzzy (when Ollama is running)
+  # ---------------------------------------------------------------------------
+  deduplication:
+    enabled: true
+    prompt_name: "deduplication"
+    prompt_version: "active"
+    provider: "ollama"
+    model: "llama3.2:3b"
+    temperature: 0.0    # always deterministic for deduplication
+    min_confidence: 0.7  # minimum confidence to flag a group
+    target_fields:
+      - "duplicate_group_id"
+      - "duplicate_group_type"
+      - "is_primary"
+      - "duplicate_of"
+      - "similarity_score"
+
+  # ---------------------------------------------------------------------------
+  # ARTIST ENRICHER — STUB (requires external artist metadata API)
+  # ---------------------------------------------------------------------------
+  artist_enricher:
+    enabled: false      # TODO: enable when artist metadata API is integrated
+    prompt_name: "artist_enrichment"
+    prompt_version: "active"
+    provider: "ollama"
+    model: "llama3.2:3b"
+    temperature: 0.1
+    target_fields:
+      - "artists"
+
+# =============================================================================
+# GLOBAL SETTINGS
+# =============================================================================
+global:
+  default_provider: "ollama"
+  default_model: "llama3.2:3b"
+
+  # Events with overall confidence below this threshold are flagged for review
+  confidence_threshold: 0.6
+
+  # Log {agent, prompt_version, event_id, tokens, cost} for every enrichment call
+  log_prompt_usage: true
+
+  # ---------------------------------------------------------------------------
+  # MCP MODE
+  #   direct — pure in-memory DirectMCPClient, no FastMCP dependency (legacy)
+  #   local  — FastMCP in-process via in-memory transport (DEFAULT, no network)
+  #   server — FastMCP over HTTP SSE (requires server running at mcp_server_url)
+  # ---------------------------------------------------------------------------
+  mcp_mode: "local"
+
+  # FastMCP server settings (used when mcp_mode = "server")
+  mcp_server:
+    host: "localhost"
+    port: 8001
+    url: "http://localhost:8001"   # full base URL used by ServerMCPClient
+
+  # ---------------------------------------------------------------------------
+  # OLLAMA SETTINGS
+  # No API key needed — Ollama runs locally on Apple M4 (Metal GPU acceleration).
+  # ---------------------------------------------------------------------------
+  ollama:
+    base_url: "http://localhost:11434/v1"
+    default_model: "llama3.2:3b"
+    # Recommended models (pull with: ollama pull <model>):
+    #   llama3.2:1b  — smallest, fastest (CPU-only machines)
+    #   llama3.2:3b  — balanced lightweight (DEFAULT — already installed)
+    #   llama3.1:8b  — best local quality (~8GB VRAM, fits M4 17.8GB)
+    #   qwen2.5:3b   — strong at structured output tasks

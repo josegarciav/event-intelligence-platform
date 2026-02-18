@@ -113,13 +113,13 @@ def load_sources(
             "engine", {}
         ).get("browser"):
             warnings.append(
-                f"{migrated.get('source_id','<no source_id>')}: engine.browser not set (recommended: seleniumbase|playwright)"
+                f"{migrated.get('source_id', '<no source_id>')}: engine.browser not set (recommended: seleniumbase|playwright)"
             )
 
         try:
             sources.append(SourceConfig.model_validate(migrated))
         except ValidationError as ve:
-            errors.append(f"{migrated.get('source_id','<no source_id>')}: {ve}")
+            errors.append(f"{migrated.get('source_id', '<no source_id>')}: {ve}")
 
     # strict mode converts warnings -> errors
     if options.strict and warnings:

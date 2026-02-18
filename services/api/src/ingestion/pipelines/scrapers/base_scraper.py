@@ -292,14 +292,12 @@ class EventScraper:
             page.set_default_timeout(self.config.timeout_s * 1000)
 
             # Add stealth scripts to avoid detection
-            await page.add_init_script(
-                """
+            await page.add_init_script("""
                 Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
                 Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
                 Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en', 'es'] });
                 Object.defineProperty(navigator, 'platform', { get: () => 'MacIntel' });
-            """
-            )
+            """)
 
             response = await page.goto(url, wait_until="networkidle")
             await page.wait_for_timeout(3000)

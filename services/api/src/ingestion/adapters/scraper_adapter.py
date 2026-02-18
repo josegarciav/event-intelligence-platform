@@ -524,7 +524,11 @@ class HtmlEnrichmentScraper:
                             doc = html_to_structured(rendered.text, url=url)
                             if doc.ok and doc.text:
                                 retry_quality = evaluate_quality(
-                                    {"url": url, "title": doc.title or "", "text": doc.text},
+                                    {
+                                        "url": url,
+                                        "title": doc.title or "",
+                                        "text": doc.text,
+                                    },
                                     rules={"min_text_len": self.config.min_text_len},
                                 )
                                 retry_hard = [i for i in retry_quality.errors() if i.code != "short_text"]

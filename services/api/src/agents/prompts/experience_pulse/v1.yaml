@@ -21,6 +21,8 @@ user_prompt: |
   - activity_id: Extract the UUID.
 
   ENRICH DIMENSIONS:
+  - primary_category: Select the most fitting primary category ID (1-10).
+  - subcategory: Select the subcategory ID (e.g., "1.4").
   - energy_level: Physical intensity (low to high).
   - social_intensity: [solo, small_group, large_group].
   - cognitive_load: Mental effort required.
