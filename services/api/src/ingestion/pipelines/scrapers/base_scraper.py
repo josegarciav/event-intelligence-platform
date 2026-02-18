@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 from src.ingestion.adapters import ScraperAdapter, SourceType
 from src.ingestion.adapters.scraper_adapter import ScraperAdapterConfig
-from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
+from src.ingestion.pipelines.base_pipeline import BasePipeline, PipelineConfig
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ def get_config_path(source_name: str) -> Path:
     config_path = SCRAPER_CONFIGS_DIR / f"{source_name}.json"
     if not config_path.exists():
         raise FileNotFoundError(
-            f"Scraper config not found: {config_path}. " f"Available configs: {list_available_configs()}"
+            f"Scraper config not found: {config_path}. Available configs: {list_available_configs()}"
         )
     return config_path
 
@@ -244,7 +244,7 @@ class EventScraper:
             from playwright.async_api import async_playwright
         except ImportError:
             raise ImportError(
-                "playwright is required for scraping. " "Install it with: pip install playwright && playwright install"
+                "playwright is required for scraping. Install it with: pip install playwright && playwright install"
             )
 
         self._playwright = await async_playwright().start()

@@ -13,14 +13,14 @@ from datetime import UTC, datetime
 from typing import Any
 
 from src.ingestion.adapters import SourceType
-from src.ingestion.base_pipeline import (
+from src.ingestion.deduplication import EventDeduplicator, ExactMatchDeduplicator
+from src.ingestion.persist import EventDataWriter
+from src.ingestion.pipelines.base_pipeline import (
     BasePipeline,
     PipelineConfig,
     PipelineExecutionResult,
     PipelineStatus,
 )
-from src.ingestion.deduplication import EventDeduplicator, ExactMatchDeduplicator
-from src.ingestion.persist import EventDataWriter
 from src.ingestion.taxonomy_loader import get_connection
 from src.schemas.event import EventSchema
 

@@ -159,7 +159,7 @@ CREATE TABLE IF NOT EXISTS sources (
     source_url TEXT,
     compressed_html TEXT,
     ingestion_timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
-    source_updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    source_updated_at TIMESTAMP,
     UNIQUE (source_name, source_event_id)
 );
 

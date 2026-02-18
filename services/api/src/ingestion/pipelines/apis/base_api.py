@@ -10,6 +10,7 @@ The pipeline uses:
 - FeatureExtractor for LLM-based field filling
 """
 
+import asyncio
 import logging
 import os
 import uuid
@@ -23,15 +24,15 @@ from src.agents.feature_extractor import (
 )
 from src.ingestion.adapters import FetchResult, SourceType
 from src.ingestion.adapters.api_adapter import APIAdapter, APIAdapterConfig
-from src.ingestion.base_pipeline import (
+from src.ingestion.normalization.currency import CurrencyParser
+from src.ingestion.normalization.field_mapper import FieldMapper
+from src.ingestion.normalization.taxonomy_mapper import TaxonomyMapper
+from src.ingestion.pipelines.base_pipeline import (
     BasePipeline,
     PipelineConfig,
     PipelineExecutionResult,
     PipelineStatus,
 )
-from src.ingestion.normalization.currency import CurrencyParser
-from src.ingestion.normalization.field_mapper import FieldMapper
-from src.ingestion.normalization.taxonomy_mapper import TaxonomyMapper
 from src.schemas.event import (
     ArtistInfo,
     Coordinates,
@@ -116,6 +117,9 @@ class APISourceConfig:
 
     # Location enrichment (geocoding)
     geocoding_enabled: bool = False
+
+    # Connection-level headers (for header-based auth, e.g. X-ACCESS-TOKEN for GetYourGuide)
+    connection_headers: dict[str, str] = field(default_factory=dict)
 
 
 class ConfigDrivenAPIAdapter(APIAdapter):
@@ -427,6 +431,7 @@ class BaseAPIPipeline(BasePipeline):
             rate_limit_per_second=self.source_config.rate_limit_per_second,
             graphql_endpoint=(self.source_config.endpoint if self.source_config.protocol == "graphql" else None),
             base_url=(self.source_config.endpoint if self.source_config.protocol == "rest" else ""),
+            headers=self.source_config.connection_headers,
         )
 
         return ConfigDrivenAPIAdapter(api_config, self.source_config)
@@ -931,6 +936,12 @@ class BaseAPIPipeline(BasePipeline):
             artist_names = merged
         artists = [ArtistInfo(name=name) for name in artist_names if name]
 
+        # For non-music events (exhibitions, museums, sports), TM "attractions" represent
+        # the event brand itself — not performing artists. Use classification_segment.
+        classification_segment = (parsed_event.get("classification_segment") or "").strip().lower()
+        if classification_segment and classification_segment not in ("music",):
+            artists = []
+
         # Build engagement metrics from API fields
         attending = parsed_event.get("attending")
         interested = parsed_event.get("interested_count")
@@ -1284,13 +1295,11 @@ class BaseAPIPipeline(BasePipeline):
             and not event.source.compressed_html
         ):
             try:
-                compressed = self.html_enrichment_scraper.fetch_compressed_html(event.source.source_url)
+                compressed = await self.html_enrichment_scraper.fetch_compressed_html(event.source.source_url)
                 # Retry once on failure — transient blocks/timeouts are common
                 if not compressed:
-                    import time as _time
-
-                    _time.sleep(1.0)
-                    compressed = self.html_enrichment_scraper.fetch_compressed_html(event.source.source_url)
+                    await asyncio.sleep(1.0)
+                    compressed = await self.html_enrichment_scraper.fetch_compressed_html(event.source.source_url)
                 if compressed:
                     event.source.compressed_html = compressed
                 else:
@@ -1403,6 +1412,7 @@ def create_api_pipeline_from_config(
         ),
         html_enrichment=source_config_dict.get("enrichment", {}).get("compressed_html", {}),
         geocoding_enabled=source_config_dict.get("enrichment", {}).get("geocoding", False),
+        connection_headers=connection.get("headers", {}),
     )
 
     # Create pipeline config if not provided

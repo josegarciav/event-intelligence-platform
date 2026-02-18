@@ -23,7 +23,7 @@ from typing import Any
 
 import yaml
 
-from src.ingestion.base_pipeline import BasePipeline
+from src.ingestion.pipelines.base_pipeline import BasePipeline
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +150,7 @@ class PipelineFactory:
         # For now, raise NotImplementedError - scraper pipelines
         # require HTML parser implementations specific to each source
         raise NotImplementedError(
-            f"Scraper pipeline for '{source_name}' not yet implemented. " f"Scrapping config is ready at: {config_path}"
+            f"Scraper pipeline for '{source_name}' not yet implemented. Scrapping config is ready at: {config_path}"
         )
 
     def _collect_scraper_seed_urls(self, source_config: dict[str, Any]) -> list[str]:
@@ -288,7 +288,7 @@ class PipelineFactory:
             load_result = load_sources_fn(config_path=output_path)
         if load_result and load_result.errors:
             raise ValueError(
-                f"Generated scrapping config for '{source_name}' is invalid: " f"{'; '.join(load_result.errors)}"
+                f"Generated scrapping config for '{source_name}' is invalid: {'; '.join(load_result.errors)}"
             )
 
         if load_result and load_result.warnings:
