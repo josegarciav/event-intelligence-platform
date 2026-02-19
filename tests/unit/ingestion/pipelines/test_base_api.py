@@ -9,13 +9,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from src.ingestion.adapters import FetchResult, SourceType
-from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
 from src.ingestion.pipelines.apis.base_api import (
     APISourceConfig,
     BaseAPIPipeline,
     ConfigDrivenAPIAdapter,
     create_api_pipeline_from_config,
 )
+from src.ingestion.pipelines.base_pipeline import BasePipeline, PipelineConfig
 from src.schemas.event import (
     EventType,
     LocationInfo,

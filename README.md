@@ -159,7 +159,8 @@ Running pre-commit:
 uv run pre-commit run --all-files --unsafe-fixes
 ```
 
-Opening Claude
+Opening Claude:
+
 ```bash
 claude --dangerously-skip-permissions
 ```

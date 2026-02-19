@@ -9,11 +9,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from src.ingestion.adapters import SourceType
-from src.ingestion.base_pipeline import (
-    BasePipeline,
-    PipelineExecutionResult,
-    PipelineStatus,
-)
 from src.ingestion.deduplication import ExactMatchDeduplicator
 from src.ingestion.orchestrator import (
     PIPELINE_REGISTRY,
@@ -21,6 +16,11 @@ from src.ingestion.orchestrator import (
     ScheduledPipeline,
     load_orchestrator_from_config,
     register_pipeline,
+)
+from src.ingestion.pipelines.base_pipeline import (
+    BasePipeline,
+    PipelineExecutionResult,
+    PipelineStatus,
 )
 
 # =============================================================================

@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from src.ingestion.adapters import BaseSourceAdapter, FetchResult, SourceType
-from src.ingestion.base_pipeline import (
+from src.ingestion.pipelines.base_pipeline import (
     BasePipeline,
     PipelineConfig,
     PipelineExecutionResult,
@@ -23,7 +23,6 @@ from src.schemas.event import (
     LocationInfo,
     NormalizationError,
     OrganizerInfo,
-    PrimaryCategory,
     SourceInfo,
     TaxonomyDimension,
 )
@@ -71,13 +70,11 @@ def sample_event(create_event, valid_subcategory_id):
     """Create a sample EventSchema for testing."""
     return create_event(
         title="Test Event",
-        taxonomy_dimensions=[
-            TaxonomyDimension(
-                primary_category=PrimaryCategory.PLAY_AND_PURE_FUN,
-                subcategory=valid_subcategory_id,
-                confidence=0.8,
-            )
-        ],
+        taxonomy_dimension=TaxonomyDimension(
+            primary_category="play_and_fun",
+            subcategory=valid_subcategory_id,
+            confidence=0.8,
+        ),
     )
 
 
@@ -111,7 +108,6 @@ class ConcretePipeline(BasePipeline):
             title=parsed_event.get("title", "Test Event"),
             location=LocationInfo(city=parsed_event.get("city", "Test City")),
             start_datetime=datetime.now(UTC) + timedelta(days=1),
-            primary_category=PrimaryCategory.PLAY_AND_PURE_FUN,
             format=EventFormat.IN_PERSON,
             organizer=OrganizerInfo(name="Test Organizer"),
             source=SourceInfo(
@@ -329,13 +325,11 @@ class TestCalculateQualityScore:
         pipeline = ConcretePipeline(sample_pipeline_config, mock_adapter)
         event = create_event(
             title="Test Event",
-            taxonomy_dimensions=[
-                TaxonomyDimension(
-                    primary_category=PrimaryCategory.PLAY_AND_PURE_FUN,
-                    subcategory=valid_subcategory_id,
-                    confidence=0.9,
-                )
-            ],
+            taxonomy_dimension=TaxonomyDimension(
+                primary_category="play_and_fun",
+                subcategory=valid_subcategory_id,
+                confidence=0.9,
+            ),
         )
         score = pipeline._calculate_quality_score(event)
         # Key fields (0.4) + taxonomy confidence (0.9 * 0.2 = 0.18)
