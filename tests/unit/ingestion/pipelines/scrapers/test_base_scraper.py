@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
-from src.ingestion.base_pipeline import PipelineConfig
+from src.ingestion.pipelines.base_pipeline import PipelineConfig
 from src.ingestion.pipelines.scrapers.base_scraper import (
     BaseScraperPipeline,
     EventScraper,

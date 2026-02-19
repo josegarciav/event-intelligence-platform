@@ -9,7 +9,6 @@ from src.ingestion.normalization.taxonomy_mapper import (
     TaxonomyMapper,
     create_taxonomy_mapper_from_config,
 )
-from src.schemas.event import PrimaryCategory
 from src.schemas.taxonomy import get_all_subcategory_ids
 
 
@@ -220,7 +219,7 @@ class TestCreateDimension:
         )
 
         assert dim is not None
-        assert dim.primary_category == PrimaryCategory.PLAY_AND_PURE_FUN
+        assert dim.primary_category == "play_and_fun"
         assert dim.subcategory == valid_subcategory_id
         assert dim.confidence == 0.8
 
@@ -242,7 +241,7 @@ class TestCreateDimension:
         )
 
         assert dim is not None
-        assert dim.primary_category == PrimaryCategory.PLAY_AND_PURE_FUN
+        assert dim.primary_category == "play_and_fun"
 
     def test_create_with_values(self, valid_subcategory_id):
         """Should include provided values."""

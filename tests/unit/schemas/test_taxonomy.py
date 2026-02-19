@@ -36,10 +36,10 @@ class TestLoadTaxonomy:
         assert len(taxonomy["categories"]) > 0
 
     def test_load_taxonomy_has_categories(self):
-        """Taxonomy should have all 10 primary categories."""
+        """Taxonomy should have all primary categories."""
         taxonomy = load_taxonomy()
         categories = taxonomy["categories"]
-        assert len(categories) == 10
+        assert len(categories) == 11
 
     def test_load_taxonomy_cached(self):
         """load_taxonomy should return same instance (cached)."""
@@ -72,18 +72,18 @@ class TestBuildTaxonomyIndex:
 class TestPrimaryCategoryMappings:
     """Tests for primary category ID mapping functions."""
 
-    def test_id_map_has_10_entries(self):
-        """ID map should have exactly 10 entries (1-10)."""
+    def test_id_map_has_11_entries(self):
+        """ID map should have exactly 11 entries (0-10)."""
         id_map = get_primary_category_id_map()
-        assert len(id_map) == 10
-        assert all(str(i) in id_map for i in range(1, 11))
+        assert len(id_map) == 11
+        assert all(str(i) in id_map for i in range(0, 11))
 
     def test_id_map_values(self):
         """ID map should have correct category values."""
         id_map = get_primary_category_id_map()
-        assert id_map["1"] == "play_and_fun"
-        assert id_map["5"] == "social_connection"
-        assert id_map["10"] == "contribution_and_impact"
+        assert id_map["1"] == "play_pure_fun"
+        assert id_map["5"] == "social_connection_belonging"
+        assert id_map["10"] == "contribution_impact"
 
     def test_value_to_id_map_reverse(self):
         """Value-to-ID map should be reverse of ID-to-value."""
@@ -100,8 +100,8 @@ class TestPrimaryCategoryMappings:
 
         assert isinstance(id_to_val, dict)
         assert isinstance(val_to_id, dict)
-        assert len(id_to_val) == 10
-        assert len(val_to_id) == 10
+        assert len(id_to_val) == 11
+        assert len(val_to_id) == 11
 
 
 class TestBuildPrimaryToSubcategoryIndex:
@@ -111,8 +111,8 @@ class TestBuildPrimaryToSubcategoryIndex:
         """Should return dict mapping primary IDs to subcategory sets."""
         index = build_primary_to_subcategory_index()
         assert isinstance(index, dict)
-        # Should have 10 primary categories
-        assert len(index) == 10
+        # Should have 11 primary categories (0-10)
+        assert len(index) == 11
 
     def test_subcategories_match_primary(self):
         """Subcategory IDs should start with their primary category ID."""
@@ -135,8 +135,8 @@ class TestValidateSubcategoryForPrimary:
 
     def test_valid_subcategory_with_value(self):
         """Should accept primary category value as well as ID."""
-        assert validate_subcategory_for_primary("1.4", "play_and_fun") is True
-        assert validate_subcategory_for_primary("5.1", "social_connection") is True
+        assert validate_subcategory_for_primary("1.4", "play_pure_fun") is True
+        assert validate_subcategory_for_primary("5.1", "social_connection_belonging") is True
 
     def test_invalid_subcategory(self):
         """Invalid subcategory should return False."""
