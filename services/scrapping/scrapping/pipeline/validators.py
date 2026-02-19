@@ -44,7 +44,9 @@ class ValidationResult:
         return [i for i in self.issues if i.level == "error"]
 
 
-def validate_item(item: dict[str, Any], *, rules: dict[str, Any] | None = None) -> ValidationResult:
+def validate_item(
+    item: dict[str, Any], *, rules: dict[str, Any] | None = None
+) -> ValidationResult:
     """Validate an item against configurable rules.
 
     Default expectations (light):
@@ -67,29 +69,41 @@ def validate_item(item: dict[str, Any], *, rules: dict[str, Any] | None = None) 
     # URL presence & sanity
     url = item.get(url_field)
     if not url:
-        issues.append(ValidationIssue("error", "missing_url", "Item missing url", field=url_field))
+        issues.append(
+            ValidationIssue("error", "missing_url", "Item missing url", field=url_field)
+        )
     elif not _looks_like_url(str(url)):
-        issues.append(ValidationIssue("error", "bad_url", "URL is not valid", field=url_field))
+        issues.append(
+            ValidationIssue("error", "bad_url", "URL is not valid", field=url_field)
+        )
 
     # title/text checks
     title = item.get(title_field)
     if require_title and not title:
         issues.append(
-            ValidationIssue("error", "missing_title", "Item missing title", field=title_field)
+            ValidationIssue(
+                "error", "missing_title", "Item missing title", field=title_field
+            )
         )
     elif not title:
         issues.append(
-            ValidationIssue("warning", "missing_title", "Title is missing", field=title_field)
+            ValidationIssue(
+                "warning", "missing_title", "Title is missing", field=title_field
+            )
         )
 
     text = item.get(text_field)
     if require_text and not text:
         issues.append(
-            ValidationIssue("error", "missing_text", "Item missing text", field=text_field)
+            ValidationIssue(
+                "error", "missing_text", "Item missing text", field=text_field
+            )
         )
     elif not text:
         issues.append(
-            ValidationIssue("warning", "missing_text", "Text is missing", field=text_field)
+            ValidationIssue(
+                "warning", "missing_text", "Text is missing", field=text_field
+            )
         )
     else:
         txt = normalize_ws(str(text))

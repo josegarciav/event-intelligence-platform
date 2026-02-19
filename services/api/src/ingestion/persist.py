@@ -80,9 +80,13 @@ class EventDataWriter:
             cur.execute("SELECT 1 FROM events WHERE event_id = %s", (event.event_id,))
             existing = cur.fetchone()
             if existing:
-                event_date = event.start_datetime.date() if event.start_datetime else None
+                event_date = (
+                    event.start_datetime.date() if event.start_datetime else None
+                )
                 if event_date and event_date < date.today():
-                    logger.debug(f"Skipping update for past event '{event.title}' ({event_date})")
+                    logger.debug(
+                        f"Skipping update for past event '{event.title}' ({event_date})"
+                    )
                     return
 
             # 1. Location
@@ -95,7 +99,9 @@ class EventDataWriter:
             organizer_id = self._persist_organizer(cur, event)
 
             # 4. Event (central spine)
-            event_id = self._persist_event(cur, event, location_id, source_id, organizer_id)
+            event_id = self._persist_event(
+                cur, event, location_id, source_id, organizer_id
+            )
 
             # 5. Price snapshot
             self._persist_price_snapshot(cur, event, event_id)
@@ -286,10 +292,18 @@ class EventDataWriter:
     # 4. Event (central spine)
     # ------------------------------------------------------------------
 
-    def _persist_event(self, cur, event: EventSchema, location_id, source_id, organizer_id):
+    def _persist_event(
+        self, cur, event: EventSchema, location_id, source_id, organizer_id
+    ):
         # Convert primary category value to taxonomy ID
-        primary_cat_value = event.taxonomy_dimension.primary_category if event.taxonomy_dimension else None
-        primary_cat_id = primary_category_to_id(primary_cat_value) if primary_cat_value else None
+        primary_cat_value = (
+            event.taxonomy_dimension.primary_category
+            if event.taxonomy_dimension
+            else None
+        )
+        primary_cat_id = (
+            primary_category_to_id(primary_cat_value) if primary_cat_value else None
+        )
 
         # Issue #8: Verify primary_category_id exists
         if primary_cat_id and primary_cat_id not in self._valid_primary_categories:
@@ -388,7 +402,7 @@ class EventDataWriter:
         cur.execute(
             """
             INSERT INTO price_snapshots (
-                event_id, currency, is_free,
+                event_id, currency_code, is_free,
                 minimum_price, maximum_price,
                 early_bird_price, standard_price, vip_price,
                 price_raw_text
@@ -396,7 +410,7 @@ class EventDataWriter:
             """,
             (
                 event_id,
-                p.currency,
+                p.currency_code,
                 p.is_free,
                 p.minimum_price,
                 p.maximum_price,
@@ -413,7 +427,9 @@ class EventDataWriter:
 
     def _persist_taxonomy_mappings(self, cur, event: EventSchema, event_id):
         # 1. Cleanup existing mappings (cascades to event_emotional_outputs)
-        cur.execute("DELETE FROM event_taxonomy_mappings WHERE event_id = %s", (event_id,))
+        cur.execute(
+            "DELETE FROM event_taxonomy_mappings WHERE event_id = %s", (event_id,)
+        )
 
         if not event.taxonomy_dimension:
             return
@@ -432,7 +448,9 @@ class EventDataWriter:
 
             act_id = dim.activity_id
             if act_id and str(act_id) not in self._valid_activities:
-                logger.warning(f"Event '{event.title}': activity_id '{act_id}' not found in metadata. Setting to NULL.")
+                logger.warning(
+                    f"Event '{event.title}': activity_id '{act_id}' not found in metadata. Setting to NULL."
+                )
                 act_id = None
 
             valid_dims_with_act.append((dim, act_id))
@@ -598,7 +616,10 @@ class EventDataWriter:
             return
 
         # 2. Bulk insert
-        asset_data = [(event_id, a.type, a.url, a.title, a.description, a.width, a.height) for a in event.media_assets]
+        asset_data = [
+            (event_id, a.type, a.url, a.title, a.description, a.width, a.height)
+            for a in event.media_assets
+        ]
         execute_values(
             cur,
             """
@@ -664,7 +685,10 @@ class EventDataWriter:
                 unique_artists.append(a)
                 seen_names.add(a.name)
 
-        artist_data = [(a.name, a.soundcloud_url, a.spotify_url, a.instagram_url, a.genre) for a in unique_artists]
+        artist_data = [
+            (a.name, a.soundcloud_url, a.spotify_url, a.instagram_url, a.genre)
+            for a in unique_artists
+        ]
 
         execute_values(
             cur,
@@ -702,7 +726,9 @@ class EventDataWriter:
             return
 
         # 2. Bulk insert
-        error_data = [(event_id, err.severity, err.message) for err in event.normalization_errors]
+        error_data = [
+            (event_id, err.severity, err.message) for err in event.normalization_errors
+        ]
         execute_values(
             cur,
             "INSERT INTO normalization_errors (event_id, severity, error_message) VALUES %s;",

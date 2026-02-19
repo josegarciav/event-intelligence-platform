@@ -154,7 +154,9 @@ class TestScraperAdapterGetScraper:
         adapter = ScraperAdapter(scraper_config)
 
         # Mock the scraper inside _get_scraper
-        with patch("src.ingestion.pipelines.scrapers.base_scraper.EventScraper") as mock_scraper_class:
+        with patch(
+            "src.ingestion.pipelines.scrapers.base_scraper.EventScraper"
+        ) as mock_scraper_class:
             mock_scraper = MagicMock()
             mock_scraper_class.return_value = mock_scraper
 
@@ -196,7 +198,9 @@ class TestScraperAdapterFetch:
         assert result.total_fetched >= 0
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_with_html_parser(self, mock_get_scraper, scraper_config, mock_fetch_result):
+    def test_fetch_with_html_parser(
+        self, mock_get_scraper, scraper_config, mock_fetch_result
+    ):
         """Should use custom HTML parser."""
         mock_scraper = MagicMock()
         mock_scraper.fetch_listing_pages.return_value = [mock_fetch_result]
@@ -212,7 +216,9 @@ class TestScraperAdapterFetch:
         parser.assert_called()
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_tracks_metadata(self, mock_get_scraper, scraper_config, mock_fetch_result):
+    def test_fetch_tracks_metadata(
+        self, mock_get_scraper, scraper_config, mock_fetch_result
+    ):
         """Should track metadata."""
         mock_scraper = MagicMock()
         mock_scraper.fetch_listing_pages.return_value = [
@@ -247,7 +253,9 @@ class TestScraperAdapterFetch:
         assert "Scraper failed" in result.errors
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_with_kwargs(self, mock_get_scraper, scraper_config, mock_fetch_result):
+    def test_fetch_with_kwargs(
+        self, mock_get_scraper, scraper_config, mock_fetch_result
+    ):
         """Should pass kwargs to scraper."""
         mock_scraper = MagicMock()
         mock_scraper.fetch_listing_pages.return_value = [mock_fetch_result]
@@ -264,7 +272,9 @@ class TestScraperAdapterFetch:
         )
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_dedupes_urls(self, mock_get_scraper, scraper_config, mock_fetch_result):
+    def test_fetch_dedupes_urls(
+        self, mock_get_scraper, scraper_config, mock_fetch_result
+    ):
         """Should deduplicate event URLs."""
         mock_scraper = MagicMock()
         mock_scraper.fetch_listing_pages.return_value = [
@@ -286,7 +296,9 @@ class TestScraperAdapterFetch:
         mock_scraper.fetch_event_pages.assert_called_once()
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_tracks_parse_failures(self, mock_get_scraper, scraper_config, mock_fetch_result):
+    def test_fetch_tracks_parse_failures(
+        self, mock_get_scraper, scraper_config, mock_fetch_result
+    ):
         """Should track parse failures in metadata."""
         mock_scraper = MagicMock()
         mock_scraper.fetch_listing_pages.return_value = [mock_fetch_result]
@@ -322,7 +334,9 @@ class TestScraperAdapterFetch:
         assert result.metadata["pages_fetched"] == 0
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_timestamps(self, mock_get_scraper, scraper_config, mock_fetch_result):
+    def test_fetch_timestamps(
+        self, mock_get_scraper, scraper_config, mock_fetch_result
+    ):
         """Should track fetch timestamps."""
         mock_scraper = MagicMock()
         mock_scraper.fetch_listing_pages.return_value = [mock_fetch_result]
@@ -421,7 +435,9 @@ class TestHtmlEnrichmentScraper:
         mock_result.ok = True
         mock_result.status_code = 200
         mock_result.block_signals = []
-        mock_result.text = "<html><body><main>" + ("content " * 50) + "</main></body></html>"
+        mock_result.text = (
+            "<html><body><main>" + ("content " * 50) + "</main></body></html>"
+        )
         mock_engine.get_rendered.return_value = mock_result
         scraper._get_engine = MagicMock(return_value=mock_engine)
 
@@ -429,4 +445,6 @@ class TestHtmlEnrichmentScraper:
 
         assert text is not None
         assert mock_engine.get_rendered.call_count >= 1
-        assert mock_engine.get_rendered.call_args_list[-1].args[0] == ("https://example.com/event/1")
+        assert mock_engine.get_rendered.call_args_list[-1].args[0] == (
+            "https://example.com/event/1"
+        )

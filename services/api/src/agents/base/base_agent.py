@@ -71,6 +71,10 @@ class BaseAgent(ABC):
         if event.tags:
             ctx["existing_tags"] = event.tags[:10]
         if event.event_type:
-            ctx["event_type"] = event.event_type.value if hasattr(event.event_type, "value") else str(event.event_type)
+            ctx["event_type"] = (
+                event.event_type.value
+                if hasattr(event.event_type, "value")
+                else str(event.event_type)
+            )
 
         return ctx

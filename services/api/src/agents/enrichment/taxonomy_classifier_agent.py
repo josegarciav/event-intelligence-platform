@@ -83,11 +83,13 @@ class TaxonomyClassifierAgent(BaseAgent):
                     agent_name=self.name,
                     event_id=str(event.source_event_id),
                 )
-                result: TaxonomyAttributesExtraction = await self._llm.complete_structured(
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                    output_schema=TaxonomyAttributesExtraction,
-                    temperature=self._config.get("temperature", 0.1),
+                result: TaxonomyAttributesExtraction = (
+                    await self._llm.complete_structured(
+                        system_prompt=system_prompt,
+                        user_prompt=user_prompt,
+                        output_schema=TaxonomyAttributesExtraction,
+                        temperature=self._config.get("temperature", 0.1),
+                    )
                 )
                 # Apply to taxonomy dimension
                 if event.taxonomy:

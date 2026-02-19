@@ -81,7 +81,11 @@ def diagnose_http_response(
     # 5. Missing content / JS required
     # Heuristic: very short body or common JS-only indicators
     if status_code == 200:
-        if len(text) < 500 or "javascript is required" in text or "enable javascript" in text:
+        if (
+            len(text) < 500
+            or "javascript is required" in text
+            or "enable javascript" in text
+        ):
             return Diagnosis(
                 label=DiagnosisLabel.JS_REQUIRED_OR_MISSING_CONTENT,
                 reason="Response too short or contains JS-requirement message",

@@ -326,7 +326,9 @@ class TestBaseAPIPipelineParseRawEvent:
     """Tests for parse_raw_event method."""
 
     @patch.object(ConfigDrivenAPIAdapter, "__init__", return_value=None)
-    def test_parse_uses_field_mapper(self, mock_adapter_init, sample_pipeline_config, sample_source_config):
+    def test_parse_uses_field_mapper(
+        self, mock_adapter_init, sample_pipeline_config, sample_source_config
+    ):
         """Should use field mapper for parsing."""
         sample_source_config.field_mappings = {
             "title": "name",
@@ -563,7 +565,9 @@ class TestBaseAPIPipelineEnrichEvent:
 
         assert result.location.timezone == "Europe/Madrid"
 
-    def test_enrich_records_error_when_compressed_html_unavailable(self, sample_source_config, create_event):
+    def test_enrich_records_error_when_compressed_html_unavailable(
+        self, sample_source_config, create_event
+    ):
         """Should not synthesize compressed_html when scraper returns None."""
         pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
         pipeline.source_config = sample_source_config
@@ -580,13 +584,18 @@ class TestBaseAPIPipelineEnrichEvent:
         result = pipeline.enrich_event(event)
 
         assert result.source.compressed_html is None
-        assert any("HTML enrichment returned no content" in e.message for e in result.normalization_errors)
+        assert any(
+            "HTML enrichment returned no content" in e.message
+            for e in result.normalization_errors
+        )
 
 
 class TestBaseAPIPipelineNormalizeToSchema:
     """Tests for normalize_to_schema mapping behavior."""
 
-    def test_maps_age_restriction_from_minimum_age(self, sample_source_config, sample_pipeline_config):
+    def test_maps_age_restriction_from_minimum_age(
+        self, sample_source_config, sample_pipeline_config
+    ):
         """Should map minimum_age from main query into age_restriction."""
         pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
         pipeline.source_config = sample_source_config
@@ -610,7 +619,9 @@ class TestBaseAPIPipelineNormalizeToSchema:
 
         assert event.age_restriction == "21"
 
-    def test_maps_coordinates_from_main_query_fields(self, sample_source_config, sample_pipeline_config):
+    def test_maps_coordinates_from_main_query_fields(
+        self, sample_source_config, sample_pipeline_config
+    ):
         """Should map venue_latitude/venue_longitude from main query."""
         pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
         pipeline.source_config = sample_source_config
@@ -663,7 +674,10 @@ class TestBaseAPIPipelineExecuteNormalizationNoise:
 
         assert result.events
         # Verify no spurious normalization errors added by pipeline infrastructure
-        assert not any("api_ingestion" in err.message.lower() for err in result.events[0].normalization_errors)
+        assert not any(
+            "api_ingestion" in err.message.lower()
+            for err in result.events[0].normalization_errors
+        )
 
 
 class TestCreateAPIPipelineFromConfig:
@@ -880,7 +894,11 @@ class TestFetchWithDateSplitting:
         # Saturated window data (50) + two non-saturated windows (10 + 10)
         assert len(events) == 50 + 10 + 10
         # Verify warning was logged for the saturated-at-min case
-        warning_calls = [c for c in pipeline.logger.warning.call_args_list if "SATURATED at min window" in str(c)]
+        warning_calls = [
+            c
+            for c in pipeline.logger.warning.call_args_list
+            if "SATURATED at min window" in str(c)
+        ]
         assert len(warning_calls) >= 1
 
     def test_window_restores_after_non_saturated(self):
@@ -923,7 +941,10 @@ class TestFetchWithDateSplitting:
             seen_max_pages.append(mp)
 
             # If relaxed to defaults, pretend saturation is solved.
-            if ps == pipeline.source_config.default_page_size and mp == pipeline.source_config.max_pages:
+            if (
+                ps == pipeline.source_config.default_page_size
+                and mp == pipeline.source_config.max_pages
+            ):
                 return _make_fetch_result(20, total_available=20)
             return _make_fetch_result(5, total_available=53)
 
@@ -1134,7 +1155,9 @@ class TestMultiCityExecution:
     @patch.object(BaseAPIPipeline, "_process_events_batch", return_value=[])
     @patch.object(BaseAPIPipeline, "_fetch_with_date_splitting")
     @patch.object(BaseAPIPipeline, "__init__", return_value=None)
-    def test_execute_continues_on_city_failure(self, mock_init, mock_fetch, mock_process):
+    def test_execute_continues_on_city_failure(
+        self, mock_init, mock_fetch, mock_process
+    ):
         """Should continue with other cities if one fails."""
         pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
         pipeline.source_config = APISourceConfig(
@@ -1182,6 +1205,8 @@ class TestMultiCityExecution:
         pipeline.adapter.source_type = SourceType.API
 
         # Mock the parent execute
-        with patch.object(BasePipeline, "execute", return_value=MagicMock()) as mock_base_exec:
+        with patch.object(
+            BasePipeline, "execute", return_value=MagicMock()
+        ) as mock_base_exec:
             pipeline.execute()
             mock_base_exec.assert_called_once()

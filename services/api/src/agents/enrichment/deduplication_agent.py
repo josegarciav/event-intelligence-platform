@@ -47,7 +47,9 @@ class DuplicateGroup(BaseModel):
     group_type: str = Field(description="duplicate | recurring | near_duplicate")
     primary_event_id: str = Field(description="source_event_id of the canonical event")
     member_event_ids: list[str] = Field(description="All event IDs in this group")
-    confidence: float = Field(ge=0, le=1, description="Confidence this is a valid group")
+    confidence: float = Field(
+        ge=0, le=1, description="Confidence this is a valid group"
+    )
     reason: str = Field(description="Brief explanation")
 
 
@@ -126,12 +128,18 @@ class DeduplicationAgent(BaseAgent):
         # ------------------------------------------------------------------
         # Pass 2: LLM fuzzy analysis on remaining candidates
         # ------------------------------------------------------------------
-        remaining = [e for e in enriched_events if str(e.source_event_id) not in already_grouped]
+        remaining = [
+            e for e in enriched_events if str(e.source_event_id) not in already_grouped
+        ]
 
         if len(remaining) >= 2 and self._llm.is_available:
             try:
-                llm_groups, usage = await self._llm_deduplication(remaining, task.prompt_version)
-                all_groups.extend([g for g in llm_groups if g.confidence >= self._min_confidence])
+                llm_groups, usage = await self._llm_deduplication(
+                    remaining, task.prompt_version
+                )
+                all_groups.extend(
+                    [g for g in llm_groups if g.confidence >= self._min_confidence]
+                )
                 for k in total_tokens:
                     total_tokens[k] += usage.get(k, 0)
             except Exception as e:
@@ -144,7 +152,11 @@ class DeduplicationAgent(BaseAgent):
         # ------------------------------------------------------------------
         enriched_events = self._apply_groups(enriched_events, all_groups)
 
-        prompt_version = self._registry.get_active_version(self.prompt_name) if self._llm.is_available else "rule-based"
+        prompt_version = (
+            self._registry.get_active_version(self.prompt_name)
+            if self._llm.is_available
+            else "rule-based"
+        )
 
         return AgentResult(
             agent_name=self.name,
@@ -246,11 +258,15 @@ class DeduplicationAgent(BaseAgent):
                 {
                     "source_event_id": str(event.source_event_id),
                     "title": event.title or "",
-                    "start_datetime": (str(event.start_datetime)[:16] if event.start_datetime else ""),
+                    "start_datetime": (
+                        str(event.start_datetime)[:16] if event.start_datetime else ""
+                    ),
                     "venue_name": event.venue_name or "",
                     "city": event.city or "",
                     "organizer": event.organizer.name if event.organizer else "",
-                    "source": (str(event.source_info.source_name) if event.source_info else ""),
+                    "source": (
+                        str(event.source_info.source_name) if event.source_info else ""
+                    ),
                 }
             )
 

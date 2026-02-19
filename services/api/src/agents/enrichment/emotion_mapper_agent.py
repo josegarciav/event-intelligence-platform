@@ -104,7 +104,11 @@ class EmotionMapperAgent(BaseAgent):
                 continue
 
             ctx["price_raw_text"] = str(event.price.cost or "") if event.price else ""
-            ctx["artists"] = ", ".join(ctx.get("artists", [])) if isinstance(ctx.get("artists"), list) else ""
+            ctx["artists"] = (
+                ", ".join(ctx.get("artists", []))
+                if isinstance(ctx.get("artists"), list)
+                else ""
+            )
 
             try:
                 system_prompt, user_prompt = self._registry.render(
@@ -130,7 +134,11 @@ class EmotionMapperAgent(BaseAgent):
                     enriched_events[i].taxonomy.risk_level = result.risk_level  # type: ignore[union-attr]
                 if event.taxonomy and result.age_accessibility:
                     enriched_events[i].taxonomy.age_accessibility = result.age_accessibility  # type: ignore[union-attr]
-                if event.taxonomy and result.repeatability if hasattr(result, "repeatability") else False:
+                if (
+                    event.taxonomy and result.repeatability
+                    if hasattr(result, "repeatability")
+                    else False
+                ):
                     pass  # repeatability is on taxonomy; handled by taxonomy agent
 
                 # Apply cost_level and time_scale to taxonomy

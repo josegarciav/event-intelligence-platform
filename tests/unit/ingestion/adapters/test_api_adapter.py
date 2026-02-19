@@ -208,7 +208,9 @@ class TestAPIAdapterFetch:
     def test_fetch_success(self, api_config):
         """Should return successful FetchResult."""
         adapter = APIAdapter(api_config)
-        with patch.object(adapter, "_make_request", new=AsyncMock(return_value=MOCK_API_RESPONSE)):
+        with patch.object(
+            adapter, "_make_request", new=AsyncMock(return_value=MOCK_API_RESPONSE)
+        ):
             result = asyncio.run(adapter.fetch())
 
         assert result.success is True
@@ -221,7 +223,9 @@ class TestAPIAdapterFetch:
         builder = MagicMock(return_value={"custom": "query"})
         adapter = APIAdapter(api_config, query_builder=builder)
 
-        with patch.object(adapter, "_make_request", new=AsyncMock(return_value=MOCK_API_RESPONSE)):
+        with patch.object(
+            adapter, "_make_request", new=AsyncMock(return_value=MOCK_API_RESPONSE)
+        ):
             asyncio.run(adapter.fetch(param1="value1"))
 
         builder.assert_called_once_with(param1="value1")
@@ -231,7 +235,9 @@ class TestAPIAdapterFetch:
         parser = MagicMock(return_value=[{"parsed": "data"}])
         adapter = APIAdapter(api_config, response_parser=parser)
 
-        with patch.object(adapter, "_make_request", new=AsyncMock(return_value={"custom": "response"})):
+        with patch.object(
+            adapter, "_make_request", new=AsyncMock(return_value={"custom": "response"})
+        ):
             result = asyncio.run(adapter.fetch())
 
         parser.assert_called_once_with({"custom": "response"})
@@ -241,7 +247,11 @@ class TestAPIAdapterFetch:
         """Should handle exceptions gracefully."""
         adapter = APIAdapter(api_config)
 
-        with patch.object(adapter, "_make_request", new=AsyncMock(side_effect=Exception("Connection failed"))):
+        with patch.object(
+            adapter,
+            "_make_request",
+            new=AsyncMock(side_effect=Exception("Connection failed")),
+        ):
             result = asyncio.run(adapter.fetch())
 
         assert result.success is False
@@ -261,7 +271,9 @@ class TestAPIAdapterFetch:
         """Should track fetch timestamps."""
         adapter = APIAdapter(api_config)
 
-        with patch.object(adapter, "_make_request", new=AsyncMock(return_value=MOCK_API_RESPONSE)):
+        with patch.object(
+            adapter, "_make_request", new=AsyncMock(return_value=MOCK_API_RESPONSE)
+        ):
             result = asyncio.run(adapter.fetch())
 
         assert result.fetch_started_at is not None

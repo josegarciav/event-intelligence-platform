@@ -91,7 +91,9 @@ def xpath_values(html: str, xpath: str) -> list[str]:
     out: list[str] = []
     for x in res:
         if isinstance(x, str | bytes):
-            out.append(x.decode("utf-8", errors="ignore") if isinstance(x, bytes) else x)
+            out.append(
+                x.decode("utf-8", errors="ignore") if isinstance(x, bytes) else x
+            )
         else:
             try:
                 out.append(str(x))
@@ -105,7 +107,9 @@ def xpath_values(html: str, xpath: str) -> list[str]:
 # ---------------------------------------------------------------------
 
 
-def extract_structured_trafilatura(html: str, *, url: str | None = None) -> TextExtractResult:
+def extract_structured_trafilatura(
+    html: str, *, url: str | None = None
+) -> TextExtractResult:
     """
     If trafilatura is installed, returns structured content.
 
@@ -134,7 +138,9 @@ def extract_structured_trafilatura(html: str, *, url: str | None = None) -> Text
             include_tables=False,
         )
         if not text:
-            return TextExtractResult(ok=False, text="", error="trafilatura returned empty")
+            return TextExtractResult(
+                ok=False, text="", error="trafilatura returned empty"
+            )
 
         meta = trafilatura.metadata.extract_metadata(downloaded, url=url)
         return TextExtractResult(

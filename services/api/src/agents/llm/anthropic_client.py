@@ -40,7 +40,9 @@ class AnthropicLLMClient(BaseLLMClient):
 
         settings = get_settings()
         self._api_key: str | None = api_key or (
-            settings.ANTHROPIC_API_KEY.get_secret_value() if settings.ANTHROPIC_API_KEY else None
+            settings.ANTHROPIC_API_KEY.get_secret_value()
+            if settings.ANTHROPIC_API_KEY
+            else None
         )
         self._client = None
         self._last_usage: dict[str, int] = self._empty_usage()
@@ -116,7 +118,9 @@ class AnthropicLLMClient(BaseLLMClient):
             resp = await client.messages.create(
                 model=self.model_name,
                 max_tokens=max_tokens or self.max_tokens,
-                temperature=(temperature if temperature is not None else self.temperature),
+                temperature=(
+                    temperature if temperature is not None else self.temperature
+                ),
                 system=system_prompt,
                 tools=[tool_def],
                 tool_choice={"type": "tool", "name": "structured_output"},

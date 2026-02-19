@@ -24,7 +24,9 @@ def fingerprint_text(text: str) -> str:
     return h
 
 
-def fingerprint_item(item: dict[str, Any], *, fields: Sequence[str] = ("title", "text")) -> str:
+def fingerprint_item(
+    item: dict[str, Any], *, fields: Sequence[str] = ("title", "text")
+) -> str:
     """Compute a fingerprint from selected item fields."""
     parts: list[str] = []
     for f in fields:

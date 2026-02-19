@@ -58,7 +58,9 @@ class PostIngestionTrigger:
         events = pipeline_result.events if hasattr(pipeline_result, "events") else []
 
         if not events:
-            logger.info("PostIngestionTrigger: no events to enrich (empty pipeline result)")
+            logger.info(
+                "PostIngestionTrigger: no events to enrich (empty pipeline result)"
+            )
             return EnrichmentRunResult(
                 events=[],
                 agent_results=[],
@@ -66,7 +68,9 @@ class PostIngestionTrigger:
             )
 
         source = getattr(pipeline_result, "source_name", "unknown")
-        logger.info(f"PostIngestionTrigger: starting enrichment of {len(events)} events from '{source}'")
+        logger.info(
+            f"PostIngestionTrigger: starting enrichment of {len(events)} events from '{source}'"
+        )
 
         result = await self._runner.run(events=events, prompt_version=prompt_version)
 
@@ -97,7 +101,9 @@ def load_agents_config(config_path: str | None = None) -> dict[str, Any]:
     import yaml
 
     if config_path is None:
-        config_path = str(Path(__file__).parent.parent.parent / "configs" / "agents.yaml")
+        config_path = str(
+            Path(__file__).parent.parent.parent / "configs" / "agents.yaml"
+        )
 
     try:
         with open(config_path) as f:

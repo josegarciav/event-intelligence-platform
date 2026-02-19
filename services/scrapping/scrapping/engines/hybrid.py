@@ -89,4 +89,6 @@ class HybridEngine(BaseEngine):
     ) -> FetchResult:
         """Render a URL using the browser engine."""
         # get_rendered always goes to browser
-        return self.browser.get_rendered(url, ctx=ctx, actions=actions, wait_for=wait_for)
+        return self.browser.get_rendered(
+            url, ctx=ctx, actions=actions, wait_for=wait_for
+        )

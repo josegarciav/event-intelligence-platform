@@ -77,7 +77,9 @@ class LocalMCPClient(MCPClient):
             error=data.get("error"),
         )
 
-    async def _call_tool(self, tool_name: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def _call_tool(
+        self, tool_name: str, params: dict[str, Any]
+    ) -> dict[str, Any]:
         """Open an in-process client session and call a tool."""
         try:
             from fastmcp import Client
@@ -154,9 +156,13 @@ class ServerMCPClient(MCPClient):
             elif isinstance(event, dict):
                 events_data.append(event)
 
-        result = await self._call_tool("load_events_tool", {"events_json": json.dumps(events_data, default=str)})
+        result = await self._call_tool(
+            "load_events_tool", {"events_json": json.dumps(events_data, default=str)}
+        )
         loaded = result.get("loaded", 0)
-        logger.info(f"ServerMCPClient: loaded {loaded} events on remote server ({self._server_url})")
+        logger.info(
+            f"ServerMCPClient: loaded {loaded} events on remote server ({self._server_url})"
+        )
         return loaded
 
     async def read(self, operation: str, params: dict[str, Any]) -> dict[str, Any]:
@@ -174,7 +180,9 @@ class ServerMCPClient(MCPClient):
             error=data.get("error"),
         )
 
-    async def _call_tool(self, tool_name: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def _call_tool(
+        self, tool_name: str, params: dict[str, Any]
+    ) -> dict[str, Any]:
         """Open an HTTP client session and call a tool on the remote server."""
         try:
             from fastmcp import Client

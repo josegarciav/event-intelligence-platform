@@ -30,7 +30,9 @@ logger = logging.getLogger(__name__)
 # Default config path
 DEFAULT_CONFIG_PATH = Path(__file__).parent.parent / "configs" / "ingestion.yaml"
 SCRAPPING_SERVICE_DIR = Path(__file__).resolve().parents[3] / "scrapping"
-DEFAULT_GENERATED_SCRAPER_CONFIG_DIR = SCRAPPING_SERVICE_DIR / "generated_configs" / "sources"
+DEFAULT_GENERATED_SCRAPER_CONFIG_DIR = (
+    SCRAPPING_SERVICE_DIR / "generated_configs" / "sources"
+)
 
 
 class PipelineFactory:
@@ -119,7 +121,9 @@ class PipelineFactory:
         if not source_config.get("enabled", True):
             raise ValueError(f"Source '{source_name}' is not enabled")
 
-        pipeline_type = source_config.get("pipeline_type", source_config.get("type", "api"))
+        pipeline_type = source_config.get(
+            "pipeline_type", source_config.get("type", "api")
+        )
 
         if pipeline_type == "api":
             return self._create_api_pipeline(source_name, source_config)
@@ -199,7 +203,9 @@ class PipelineFactory:
         """
         scraper_cfg = source_config.get("scraper", {}) or {}
         auto_generate = scraper_cfg.get("auto_generate_config", True)
-        output_path = self._resolve_scraper_config_output_path(source_name, source_config)
+        output_path = self._resolve_scraper_config_output_path(
+            source_name, source_config
+        )
         overwrite = scraper_cfg.get("overwrite_generated_config", False)
 
         if output_path.exists() and not auto_generate:
@@ -225,7 +231,9 @@ class PipelineFactory:
             generated_config = proposal.source_config
             generated_config["enabled"] = bool(source_config.get("enabled", True))
             # scrapping schema expects string config_version.
-            generated_config["config_version"] = str(generated_config.get("config_version", "1.0"))
+            generated_config["config_version"] = str(
+                generated_config.get("config_version", "1.0")
+            )
             load_sources_fn = load_sources
         except ImportError:
             # Fallback template keeps onboarding unblocked even when scrapping is
@@ -316,7 +324,9 @@ class PipelineFactory:
         for source_name in self.list_enabled_sources():
             try:
                 source_config = self.get_source_config(source_name) or {}
-                pipeline_type = source_config.get("pipeline_type", source_config.get("type", "api"))
+                pipeline_type = source_config.get(
+                    "pipeline_type", source_config.get("type", "api")
+                )
                 if pipeline_type == "scraper":
                     self.bootstrap_scraper_source_config(source_name, source_config)
                     logger.info(

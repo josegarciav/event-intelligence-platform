@@ -86,7 +86,9 @@ class APISourceConfig:
     pagination_type: str = "page_number"  # "page_number" | "cursor" | "offset"
     max_pages: int = 10
     default_page_size: int = 50
-    pagination_start_page: int = 1  # 0 for REST APIs like Ticketmaster, 1 for GraphQL like Ra.co
+    pagination_start_page: int = (
+        1  # 0 for REST APIs like Ticketmaster, 1 for GraphQL like Ra.co
+    )
 
     # Field mapping
     field_mappings: dict[str, str] = field(default_factory=dict)
@@ -157,7 +159,9 @@ class ConfigDrivenAPIAdapter(APIAdapter):
             params["date_from"] = datetime.now(UTC).strftime("%Y-%m-%d")
         if "date_to" not in params:
             days_ahead = params.get("days_ahead", 30)
-            params["date_to"] = (datetime.now(UTC) + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
+            params["date_to"] = (
+                datetime.now(UTC) + timedelta(days=days_ahead)
+            ).strftime("%Y-%m-%d")
 
         if self.source_config.protocol == "graphql":
             # Build GraphQL query
@@ -226,7 +230,9 @@ class ConfigDrivenAPIAdapter(APIAdapter):
             return result
 
         elif isinstance(template, dict):
-            return {k: self._substitute_variables(v, params) for k, v in template.items()}
+            return {
+                k: self._substitute_variables(v, params) for k, v in template.items()
+            }
 
         elif isinstance(template, list):
             return [self._substitute_variables(item, params) for item in template]
@@ -317,7 +323,9 @@ class ConfigDrivenAPIAdapter(APIAdapter):
 
             # Check if we've fetched all available events
             if len(result.raw_data) < page_size:
-                logger.info(f"Received {len(result.raw_data)} events (less than page_size), stopping pagination")
+                logger.info(
+                    f"Received {len(result.raw_data)} events (less than page_size), stopping pagination"
+                )
                 break
 
             # Check if we've reached total available
@@ -328,7 +336,9 @@ class ConfigDrivenAPIAdapter(APIAdapter):
             page += 1
 
         pages_fetched = page - self.source_config.pagination_start_page + 1
-        logger.info(f"Pagination complete: fetched {len(all_data)} total events across {pages_fetched} pages")
+        logger.info(
+            f"Pagination complete: fetched {len(all_data)} total events across {pages_fetched} pages"
+        )
 
         return FetchResult(
             success=len(all_data) > 0,
@@ -388,18 +398,28 @@ class BaseAPIPipeline(BasePipeline):
 
                 enrichment_cfg = HtmlEnrichmentConfig(
                     enabled=True,
-                    engine_type=source_config.html_enrichment.get("engine_type", "hybrid"),
-                    rate_limit_per_second=source_config.html_enrichment.get("rate_limit_per_second", 2.0),
+                    engine_type=source_config.html_enrichment.get(
+                        "engine_type", "hybrid"
+                    ),
+                    rate_limit_per_second=source_config.html_enrichment.get(
+                        "rate_limit_per_second", 2.0
+                    ),
                     timeout_s=source_config.html_enrichment.get("timeout_s", 15.0),
                     source_name=source_config.source_name,
-                    generated_config_path=source_config.html_enrichment.get("generated_config_path"),
-                    generated_config_dir=source_config.html_enrichment.get("generated_config_dir"),
+                    generated_config_path=source_config.html_enrichment.get(
+                        "generated_config_path"
+                    ),
+                    generated_config_dir=source_config.html_enrichment.get(
+                        "generated_config_dir"
+                    ),
                     wait_for=source_config.html_enrichment.get("wait_for"),
                     actions=source_config.html_enrichment.get("actions", []),
                 )
                 self.html_enrichment_scraper = HtmlEnrichmentScraper(enrichment_cfg)
             except ImportError:
-                logger.warning("Scrapping service not available; HTML enrichment disabled")
+                logger.warning(
+                    "Scrapping service not available; HTML enrichment disabled"
+                )
 
         # Location parser (lazy-initialized in enrich_event)
         self._location_parser = None
@@ -416,8 +436,16 @@ class BaseAPIPipeline(BasePipeline):
             request_timeout=self.source_config.timeout_seconds,
             max_retries=self.source_config.max_retries,
             rate_limit_per_second=self.source_config.rate_limit_per_second,
-            graphql_endpoint=(self.source_config.endpoint if self.source_config.protocol == "graphql" else None),
-            base_url=(self.source_config.endpoint if self.source_config.protocol == "rest" else ""),
+            graphql_endpoint=(
+                self.source_config.endpoint
+                if self.source_config.protocol == "graphql"
+                else None
+            ),
+            base_url=(
+                self.source_config.endpoint
+                if self.source_config.protocol == "rest"
+                else ""
+            ),
             headers=self.source_config.connection_headers,
         )
 
@@ -444,7 +472,9 @@ class BaseAPIPipeline(BasePipeline):
         self.execution_id = self._generate_execution_id()
         self.execution_start_time = datetime.now(UTC)
         total_cities = len(areas) + len(cities) if not areas else len(areas)
-        self.logger.info(f"Starting multi-city execution: {self.execution_id} ({total_cities} cities)")
+        self.logger.info(
+            f"Starting multi-city execution: {self.execution_id} ({total_cities} cities)"
+        )
 
         all_raw_events = []
         fetch_errors = []
@@ -453,7 +483,9 @@ class BaseAPIPipeline(BasePipeline):
         for city_name, area_id in areas.items():
             self.logger.info(f"Fetching events for {city_name} (area_id={area_id})...")
             try:
-                raw_events = await self._fetch_with_date_splitting(city_name=city_name, area_id=area_id, **kwargs)
+                raw_events = await self._fetch_with_date_splitting(
+                    city_name=city_name, area_id=area_id, **kwargs
+                )
                 self.logger.info(f"  {city_name}: {len(raw_events)} raw events fetched")
                 all_raw_events.extend(raw_events)
             except Exception as e:
@@ -465,8 +497,12 @@ class BaseAPIPipeline(BasePipeline):
             for city_name in cities:
                 self.logger.info(f"Fetching events for {city_name}...")
                 try:
-                    raw_events = await self._fetch_with_date_splitting(city_name=city_name, city=city_name, **kwargs)
-                    self.logger.info(f"  {city_name}: {len(raw_events)} raw events fetched")
+                    raw_events = await self._fetch_with_date_splitting(
+                        city_name=city_name, city=city_name, **kwargs
+                    )
+                    self.logger.info(
+                        f"  {city_name}: {len(raw_events)} raw events fetched"
+                    )
                     all_raw_events.extend(raw_events)
                 except Exception as e:
                     self.logger.error(f"  {city_name}: fetch failed: {e}")
@@ -484,10 +520,14 @@ class BaseAPIPipeline(BasePipeline):
                 get_deduplicator,
             )
 
-            deduplicator = get_deduplicator(DeduplicationStrategy(self.config.deduplication_strategy))
+            deduplicator = get_deduplicator(
+                DeduplicationStrategy(self.config.deduplication_strategy)
+            )
             before_count = len(normalized_events)
             normalized_events = deduplicator.deduplicate(normalized_events)
-            self.logger.info(f"Deduplication: {before_count} -> {len(normalized_events)} events")
+            self.logger.info(
+                f"Deduplication: {before_count} -> {len(normalized_events)} events"
+            )
 
         status = PipelineStatus.SUCCESS if normalized_events else PipelineStatus.FAILED
         if normalized_events and len(normalized_events) < len(all_raw_events):
@@ -553,7 +593,8 @@ class BaseAPIPipeline(BasePipeline):
             "%Y-%m-%d",
         )
         range_end = datetime.strptime(
-            kwargs.pop("date_to", None) or (datetime.now(UTC) + timedelta(days=days_ahead)).strftime("%Y-%m-%d"),
+            kwargs.pop("date_to", None)
+            or (datetime.now(UTC) + timedelta(days=days_ahead)).strftime("%Y-%m-%d"),
             "%Y-%m-%d",
         )
 
@@ -566,7 +607,9 @@ class BaseAPIPipeline(BasePipeline):
         # they are stricter than source defaults and the window saturates.
         requested_page_size = int(kwargs.pop("page_size", page_size))
         requested_max_pages = int(kwargs.pop("max_pages", max_pages))
-        can_relax_pagination = requested_page_size < page_size or requested_max_pages < max_pages
+        can_relax_pagination = (
+            requested_page_size < page_size or requested_max_pages < max_pages
+        )
 
         # Window sizing (in hours for sub-day granularity)
         initial_window_hours = 7 * 24  # 7 days
@@ -595,7 +638,9 @@ class BaseAPIPipeline(BasePipeline):
             #   window N+1: [date_from_iso .. date_to_iso]       = [next dayT00:00:00Z ..]
             # This prevents boundary-day events from appearing in two consecutive windows.
             date_from_iso = cursor.strftime("%Y-%m-%dT%H:%M:%SZ")
-            date_to_iso = (window_end - timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            date_to_iso = (window_end - timedelta(seconds=1)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
 
             # Avoid zero-width windows when sub-day and dates collapse
             if date_from_str == date_to_str and window_hours < 24:
@@ -621,12 +666,16 @@ class BaseAPIPipeline(BasePipeline):
                 # Dynamic URL path substitution for sources with {{area_id}} in the endpoint path
                 # (e.g. Eventbrite: /v3/organizers/{{area_id}}/events/)
                 if area_id is not None and "{{area_id}}" in self.source_config.endpoint:
-                    self.adapter.api_config.base_url = self.source_config.endpoint.replace("{{area_id}}", str(area_id))
+                    self.adapter.api_config.base_url = (
+                        self.source_config.endpoint.replace("{{area_id}}", str(area_id))
+                    )
                 fetch_result = await self.adapter.fetch(**fetch_kwargs)
 
                 if fetch_result.success and fetch_result.raw_data:
                     fetched = len(fetch_result.raw_data)
-                    total_available = fetch_result.metadata.get("total_available", fetched)
+                    total_available = fetch_result.metadata.get(
+                        "total_available", fetched
+                    )
                     saturated = total_available > fetched
 
                     if saturated and window_hours > min_window_hours:
@@ -689,7 +738,9 @@ class BaseAPIPipeline(BasePipeline):
                     cursor = window_end
                     break
 
-        self.logger.info(f"  {city_name}: sliding window complete — {len(all_events)} total raw events")
+        self.logger.info(
+            f"  {city_name}: sliding window complete — {len(all_events)} total raw events"
+        )
         return all_events
 
     # ========================================================================
@@ -747,7 +798,9 @@ class BaseAPIPipeline(BasePipeline):
         Uses configuration for defaults and FeatureExtractor for missing fields.
         """
         source_event_id = str(parsed_event.get("source_event_id", ""))
-        start_dt = self._parse_datetime(parsed_event.get("start_time") or parsed_event.get("date"))
+        start_dt = self._parse_datetime(
+            parsed_event.get("start_time") or parsed_event.get("date")
+        )
         end_dt = self._parse_datetime(parsed_event.get("end_time"))
 
         # Get location defaults
@@ -767,7 +820,10 @@ class BaseAPIPipeline(BasePipeline):
             city=parsed_event.get("city") or loc_defaults.get("city", "Unknown"),
             state_or_region=parsed_event.get("state_or_region") or None,
             postal_code=parsed_event.get("postal_code") or None,
-            country_code=(parsed_event.get("country_code") or loc_defaults.get("country_code", "US")).upper(),
+            country_code=(
+                parsed_event.get("country_code")
+                or loc_defaults.get("country_code", "US")
+            ).upper(),
             timezone=parsed_event.get("timezone") or loc_defaults.get("timezone"),
         )
         # Coordinates are optional and should come from the same source query.
@@ -805,15 +861,21 @@ class BaseAPIPipeline(BasePipeline):
             max_price = Decimal(str(cost_max)) if cost_max is not None else None
             if cost_currency:
                 currency = str(cost_currency)
-            price_raw = f"{min_price}-{max_price} {currency}" if max_price else str(min_price)
+            price_raw = (
+                f"{min_price}-{max_price} {currency}" if max_price else str(min_price)
+            )
             is_free = min_price == 0 and (max_price is None or max_price == 0)
         else:
             # String price (e.g. "10€", "Free")
             price_str = parsed_event.get("cost") or ""
-            parsed_min, parsed_max, parsed_currency = CurrencyParser.parse_price_string(str(price_str))
+            parsed_min, parsed_max, parsed_currency = CurrencyParser.parse_price_string(
+                str(price_str)
+            )
             min_price = Decimal(str(parsed_min)) if parsed_min is not None else None
             max_price = Decimal(str(parsed_max)) if parsed_max is not None else None
-            is_free = (min_price is None and max_price is None) or str(price_str).lower() in ["free", "0", "gratis"]
+            is_free = (min_price is None and max_price is None) or str(
+                price_str
+            ).lower() in ["free", "0", "gratis"]
             if parsed_currency:
                 currency = str(parsed_currency)
             price_raw = str(price_str) if price_str else None
@@ -837,7 +899,9 @@ class BaseAPIPipeline(BasePipeline):
                 pass
 
         organizer = OrganizerInfo(
-            name=parsed_event.get("organizer_name") or parsed_event.get("promoter_name") or "Unknown",
+            name=parsed_event.get("organizer_name")
+            or parsed_event.get("promoter_name")
+            or "Unknown",
             url=parsed_event.get("organizer_url") or venue_website or None,
             phone=parsed_event.get("venue_phone") or None,
             follower_count=venue_follower_count,
@@ -878,7 +942,9 @@ class BaseAPIPipeline(BasePipeline):
         if taxonomy_dims:
             first_dim = taxonomy_dims[0]
             taxonomy_obj = TaxonomyDimension(
-                primary_category=resolve_primary_category(first_dim["primary_category"]),
+                primary_category=resolve_primary_category(
+                    first_dim["primary_category"]
+                ),
                 subcategory=first_dim.get("subcategory"),
                 subcategory_name=first_dim.get("subcategory_name"),
                 values=first_dim.get("values", []),
@@ -908,7 +974,9 @@ class BaseAPIPipeline(BasePipeline):
 
         # For non-music events (exhibitions, museums, sports), TM "attractions" represent
         # the event brand itself — not performing artists. Use classification_segment.
-        classification_segment = (parsed_event.get("classification_segment") or "").strip().lower()
+        classification_segment = (
+            (parsed_event.get("classification_segment") or "").strip().lower()
+        )
         if classification_segment and classification_segment not in ("music",):
             artists = []
 
@@ -920,7 +988,9 @@ class BaseAPIPipeline(BasePipeline):
             try:
                 engagement = EngagementMetrics(
                     going_count=int(attending) if attending is not None else None,
-                    interested_count=(int(interested) if interested is not None else None),
+                    interested_count=(
+                        int(interested) if interested is not None else None
+                    ),
                 )
             except (ValueError, TypeError):
                 pass
@@ -1071,16 +1141,22 @@ class BaseAPIPipeline(BasePipeline):
         logger.warning(f"Could not parse datetime: {dt_value}")
         return datetime.now(UTC)
 
-    def validate_event(self, event: EventSchema) -> tuple[bool, list[NormalizationError]]:
+    def validate_event(
+        self, event: EventSchema
+    ) -> tuple[bool, list[NormalizationError]]:
         """Validate event using configured rules."""
         errors: list[NormalizationError] = []
         validation_config = self.source_config.validation
 
         # Required fields
-        required_fields = validation_config.get("required_fields", ["title", "source_event_id"])
+        required_fields = validation_config.get(
+            "required_fields", ["title", "source_event_id"]
+        )
         missing_required = False
         for field_name in required_fields:
-            if field_name == "title" and (not event.title or event.title == "Untitled Event"):
+            if field_name == "title" and (
+                not event.title or event.title == "Untitled Event"
+            ):
                 errors.append(NormalizationError(message="Title is required"))
                 missing_required = True
             elif field_name == "source_event_id" and not event.source.source_event_id:
@@ -1104,7 +1180,9 @@ class BaseAPIPipeline(BasePipeline):
 
         # Price validation
         if event.price.minimum_price and event.price.minimum_price < 0:
-            errors.append(NormalizationError(message="Minimum price cannot be negative"))
+            errors.append(
+                NormalizationError(message="Minimum price cannot be negative")
+            )
 
         is_valid = not missing_required
         return is_valid, errors
@@ -1147,7 +1225,9 @@ class BaseAPIPipeline(BasePipeline):
                 street_address = ", ".join(parts[street_idx:]).strip()
                 # Remove trailing city name if it matches a known pattern
                 # (the city is already captured in location.city)
-                street_address = re.sub(r",\s*[A-Z][a-z]+\s*$", "", street_address).strip()
+                street_address = re.sub(
+                    r",\s*[A-Z][a-z]+\s*$", "", street_address
+                ).strip()
                 return venue_name or raw.strip(), street_address or None
 
         return venue.strip(), None
@@ -1249,7 +1329,9 @@ class BaseAPIPipeline(BasePipeline):
         )
         if abs_match:
             try:
-                parsed = datetime.strptime(abs_match.group(1).replace(",", ""), "%b %d %Y")
+                parsed = datetime.strptime(
+                    abs_match.group(1).replace(",", ""), "%b %d %Y"
+                )
                 return parsed.replace(tzinfo=UTC)
             except ValueError:
                 pass
@@ -1265,15 +1347,23 @@ class BaseAPIPipeline(BasePipeline):
             and not event.source.compressed_html
         ):
             try:
-                compressed = await self.html_enrichment_scraper.fetch_compressed_html(event.source.source_url)
+                compressed = await self.html_enrichment_scraper.fetch_compressed_html(
+                    event.source.source_url
+                )
                 # Retry once on failure — transient blocks/timeouts are common
                 if not compressed:
                     await asyncio.sleep(1.0)
-                    compressed = await self.html_enrichment_scraper.fetch_compressed_html(event.source.source_url)
+                    compressed = (
+                        await self.html_enrichment_scraper.fetch_compressed_html(
+                            event.source.source_url
+                        )
+                    )
                 if compressed:
                     event.source.compressed_html = compressed
                 else:
-                    logger.warning(f"HTML enrichment returned None for {event.source.source_url}")
+                    logger.warning(
+                        f"HTML enrichment returned None for {event.source.source_url}"
+                    )
                     event.normalization_errors.append(
                         NormalizationError(
                             message=f"HTML enrichment returned no content for {event.source.source_url}",
@@ -1281,7 +1371,9 @@ class BaseAPIPipeline(BasePipeline):
                         )
                     )
             except Exception as e:
-                logger.warning(f"HTML enrichment failed for {event.source.source_url}: {e}")
+                logger.warning(
+                    f"HTML enrichment failed for {event.source.source_url}: {e}"
+                )
                 event.normalization_errors.append(
                     NormalizationError(
                         message=f"HTML enrichment error: {e}",
@@ -1357,9 +1449,12 @@ def create_api_pipeline_from_config(
     source_config = APISourceConfig(
         source_name=source_name,
         enabled=source_config_dict.get("enabled", True),
-        endpoint=connection.get("endpoint") or source_config_dict.get("graphql_endpoint", ""),
+        endpoint=connection.get("endpoint")
+        or source_config_dict.get("graphql_endpoint", ""),
         protocol=connection.get("protocol", "graphql"),
-        timeout_seconds=connection.get("timeout_seconds", source_config_dict.get("request_timeout", 30)),
+        timeout_seconds=connection.get(
+            "timeout_seconds", source_config_dict.get("request_timeout", 30)
+        ),
         max_retries=source_config_dict.get("max_retries", 3),
         rate_limit_per_second=source_config_dict.get("rate_limit_per_second", 1.0),
         query_template=query_config.get("template"),
@@ -1369,7 +1464,9 @@ def create_api_pipeline_from_config(
         total_results_path=query_config.get("total_results_path"),
         pagination_type=pagination.get("type", "page_number"),
         max_pages=pagination.get("max_pages", 10),
-        default_page_size=pagination.get("default_page_size", source_config_dict.get("batch_size", 50)),
+        default_page_size=pagination.get(
+            "default_page_size", source_config_dict.get("batch_size", 50)
+        ),
         pagination_start_page=pagination.get("start_page", 1),
         field_mappings=source_config_dict.get("field_mappings", {}),
         transformations=source_config_dict.get("transformations", {}),
@@ -1377,8 +1474,12 @@ def create_api_pipeline_from_config(
         event_type_rules=source_config_dict.get("event_type_rules", []),
         defaults=source_config_dict.get("defaults", {}),
         validation=source_config_dict.get("validation", {}),
-        html_enrichment=source_config_dict.get("enrichment", {}).get("compressed_html", {}),
-        geocoding_enabled=source_config_dict.get("enrichment", {}).get("geocoding", False),
+        html_enrichment=source_config_dict.get("enrichment", {}).get(
+            "compressed_html", {}
+        ),
+        geocoding_enabled=source_config_dict.get("enrichment", {}).get(
+            "geocoding", False
+        ),
         connection_headers=connection.get("headers", {}),
     )
 

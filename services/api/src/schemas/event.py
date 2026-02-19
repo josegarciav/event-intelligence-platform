@@ -291,7 +291,9 @@ class Coordinates(BaseModel):
             raise ValueError("Latitude must be between -90 and 90")
         decimal_str = str(v).split(".")[-1] if "." in str(v) else ""
         if len(decimal_str) < 4:
-            raise ValueError(f"Latitude {v} has insufficient precision (min 4 decimals, ~11m accuracy)")
+            raise ValueError(
+                f"Latitude {v} has insufficient precision (min 4 decimals, ~11m accuracy)"
+            )
         return v
 
     @field_validator("longitude")
@@ -301,7 +303,9 @@ class Coordinates(BaseModel):
             raise ValueError("Longitude must be between -180 and 180")
         decimal_str = str(v).split(".")[-1] if "." in str(v) else ""
         if len(decimal_str) < 4:
-            raise ValueError(f"Longitude {v} has insufficient precision (min 4 decimals, ~11m accuracy)")
+            raise ValueError(
+                f"Longitude {v} has insufficient precision (min 4 decimals, ~11m accuracy)"
+            )
         return v
 
 
@@ -328,7 +332,9 @@ class LocationInfo(BaseModel):
     city: str
     state_or_region: str | None = None
     postal_code: str | None = None
-    country_code: str = Field(default="US", description="ISO 3166-1 alpha-2 country code")
+    country_code: str = Field(
+        default="US", description="ISO 3166-1 alpha-2 country code"
+    )
     coordinates: Coordinates | None = None
     timezone: str | None = None  # e.g., 'America/New_York'
 
@@ -341,7 +347,7 @@ class LocationInfo(BaseModel):
 class PriceInfo(BaseModel):
     """Pricing details for the event."""
 
-    currency: str = Field(default="USD", description="ISO 4217 currency code")
+    currency_code: str = Field(default="USD", description="ISO 4217 currency code")
     is_free: bool = False
 
     minimum_price: Decimal | None = Field(default=None, ge=0)
@@ -426,7 +432,9 @@ class OrganizerInfo(BaseModel):
 class SourceInfo(BaseModel):
     """Metadata about where the event came from."""
 
-    source_name: str = Field(description="Name of the source (e.g., 'fever', 'meetup', 'ticketmaster')")
+    source_name: str = Field(
+        description="Name of the source (e.g., 'fever', 'meetup', 'ticketmaster')"
+    )
     source_event_id: str = Field(description="Event ID from the original source")
     source_url: str = Field(description="Direct URL to event on source platform")
     compressed_html: str | None = Field(
@@ -437,7 +445,9 @@ class SourceInfo(BaseModel):
         default=None,
         description="Timestamp of last update at the source platform (None = unknown)",
     )
-    ingestion_timestamp: datetime = Field(default_factory=_utc_now, description="When we ingested this event")
+    ingestion_timestamp: datetime = Field(
+        default_factory=_utc_now, description="When we ingested this event"
+    )
 
 
 # ============================================================================
@@ -545,7 +555,9 @@ class EventSchema(BaseModel):
     )
 
     # ---- CORE EVENT INFORMATION ----
-    event_id: str = Field(description="Platform-wide unique event identifier (generated from source_event_id)")
+    event_id: str = Field(
+        description="Platform-wide unique event identifier (generated from source_event_id)"
+    )
     title: str
     description: str | None = None
 

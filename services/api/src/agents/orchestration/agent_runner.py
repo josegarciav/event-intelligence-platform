@@ -83,14 +83,18 @@ class BatchEnrichmentRunner:
         for agent_name in chain_order:
             agent_config = agents_section.get(agent_name, {})
             if not agent_config.get("enabled", True):
-                logger.info(f"BatchEnrichmentRunner: skipping disabled agent '{agent_name}'")
+                logger.info(
+                    f"BatchEnrichmentRunner: skipping disabled agent '{agent_name}'"
+                )
                 continue
             try:
                 agent = registry.get(agent_name, agent_config)
                 chain.append(agent)
                 logger.debug(f"BatchEnrichmentRunner: registered agent '{agent_name}'")
             except Exception as e:
-                logger.warning(f"BatchEnrichmentRunner: failed to load agent '{agent_name}': {e}")
+                logger.warning(
+                    f"BatchEnrichmentRunner: failed to load agent '{agent_name}': {e}"
+                )
 
         return chain
 
@@ -135,7 +139,9 @@ class BatchEnrichmentRunner:
                 prompt_version=prompt_version,
             )
             try:
-                logger.info(f"BatchEnrichmentRunner: running {agent.name} on {len(current_events)} events")
+                logger.info(
+                    f"BatchEnrichmentRunner: running {agent.name} on {len(current_events)} events"
+                )
                 result = await agent.run(task)
                 agent_results.append(result)
 
