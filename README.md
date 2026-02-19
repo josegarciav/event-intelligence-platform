@@ -11,117 +11,92 @@ At its core, events are treated as data products, not just listings.
 
 ## Repo Structure
 
-A modular event intelligence platform that separates data ingestion, core intelligence, and application logic, with experimentation treated as a first-class, admin-driven system.
-
+Turbo monorepo — apps, backend services, and shared packages are developed independently and composed at the CI/CD layer.
 
 ```text
 event-intelligence-platform/
+├── apps/
+│   ├── landing/          Next.js 15 static site — live on GitHub Pages
+│   ├── web/              (stub)
+│   └── mobile/           (stub)
 │
-├── ingestion/
-│   ├── sources/
-│   └── pipelines.py
+├── services/
+│   ├── api/              FastAPI backend + MCP agent enrichment system
+│   │   └── src/
+│   │       ├── agents/   LLM enrichment agents + MCP layer
+│   │       ├── ingestion/ Config-driven pipeline system
+│   │       ├── schemas/  Canonical EventSchema (Pydantic)
+│   │       ├── configs/  ingestion.yaml, agents.yaml
+│   │       └── main.py   FastAPI entrypoint
+│   └── scrapping/        Config-driven web scraping service
 │
-├── normalization/
-│   ├── schema.py
-│   └── enrich.py
+├── packages/
+│   └── ui/               Shared UI components
 │
-├── storage/
-│   ├── raw/
-│   ├── clean/
-│   └── features/
-│
-├── intelligence/
-│   ├── metrics/
-│   ├── allocation/
-│   └── models/
-│
-├── app/
-│   ├── api/
-│   ├── admin/
-│   │   ├── experiments/
-│   │   ├── metrics/
-│   │   └── dashboards/
-│   └── public/
-│
-├── configs/
-│   └── settings.yaml
-│
-├── scripts/
+├── infra/
+│   ├── postgres/         PostgreSQL 16 via Docker Compose (port 5433)
+│   └── api/              API Dockerfile
 │
 ├── tests/
-│   ├── integration/
 │   ├── unit/
+│   └── integration/
 │
-├── docs/
-│
-├── pyproject.toml
-├── uv.lock
-└── README.md
+├── notebooks/            Jupyter exploration notebooks
+├── docs/                 Architecture documentation
+└── data/raw/
 ```
 
 
 ## High-Level Architecture
 
-
-```code
-
-┌───────────────────┐
-│  External Sources │
-│───────────────────│
-│ Meetup            │
-│ Facebook / Ads    │
-│ Ticketing APIs    │
-│ Cultural Feeds    │
-│ Scraped Sources   │
-└─────────┬─────────┘
-          │
-          ▼
-┌──────────────────────────┐
-│ Ingestion Layer          │
-│──────────────────────────│
-│ - API collectors         │
-│ - Scrapers               │
-│ - Scheduled jobs         │
-│ - Webhooks (future)      │
-└─────────┬────────────────┘
-          │
-          ▼
-┌───────────────────────────┐
-│ Normalization & Enrichment│
-│───────────────────────────│
-│ - Canonical event schema  │
-│ - City & geo resolution   │
-│ - Category taxonomy       │
-│ - Price & time parsing    │
-└─────────┬─────────────────┘
-          │
-          ▼
-┌──────────────────────────┐
-│ Storage & Feature Layer  │
-│──────────────────────────│
-│ - Raw data lake          │
-│ - Clean event tables     │
-│ - Feature-ready datasets │
-└─────────┬────────────────┘
-          │
-          ▼
-┌───────────────────────────┐
-│ Analytics & ML Layer      │
-│───────────────────────────│
-│ - Dashboards & metrics    │
-│ - Experimentation platform│
-│ - Recommender systems     │
-│ - Pricing models          │
-└─────────┬─────────────────┘
-          │
-          ▼
-┌──────────────────────────┐
-│ Application Layer        │
-│──────────────────────────│
-│ - Event discovery app    │
-│ - Filters & preferences  │
-│ - User feedback signals  │
-└──────────────────────────┘
+```
+┌──────────────────────────────────────────────────────────┐
+│                     External Sources                      │
+│   GetYourGuide · RA.co · Ticketmaster · Eventbrite       │
+│   Civitatis · TripAdvisor  (+ scraped sources)           │
+└───────────────────────────┬──────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────┐
+│             PHASE 1 — Ingestion Pipeline                  │
+│                                                          │
+│  ingestion.yaml  →  PipelineFactory                      │
+│       ↓                                                  │
+│  APIAdapter / ScraperAdapter                             │
+│       ↓                                                  │
+│  Normalization (field_mapper · location · currency · tax)│
+│       ↓                                                  │
+│  Deduplication (exact match by source_event_id)          │
+│       ↓                                                  │
+│  PostgreSQL 16 (port 5433)                               │
+└───────────────────────────┬──────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────┐
+│             PHASE 2 — Agent Enrichment Chain              │
+│                                                          │
+│  MCP Layer  (local mode — in-process FastMCP)            │
+│       ↓                                                  │
+│  [1] FeatureAlignmentAgent   → event_type, tags          │
+│  [2] TaxonomyClassifierAgent → category, dimensions      │
+│  [3] EmotionMapperAgent      → vibe, energy, cost        │
+│  [4] DataQualityAgent        → quality_score             │
+│  [5] DeduplicationAgent      → fuzzy dedup               │
+│                                                          │
+│  LLM: Ollama llama3.2:3b (default) · Claude · GPT       │
+└───────────────────────────┬──────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────┐
+│                   Enriched Event Store                    │
+│             PostgreSQL  ·  FastAPI REST layer             │
+└───────────────────────────┬──────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────┐
+│                    Application Layer                      │
+│     Landing (live)  ·  Web app (planned)  ·  Mobile      │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ## Roadmap (Initial Phases)
@@ -182,6 +157,11 @@ Running pre-commit:
 
 ```bash
 uv run pre-commit run --all-files --unsafe-fixes
+```
+
+Opening Claude
+```bash
+claude --dangerously-skip-permissions
 ```
 
 ## Contribution Guidelines

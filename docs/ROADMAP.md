@@ -187,7 +187,7 @@ src/agents/
 │   ├── anthropic_client.py               (Claude via Anthropic SDK + tool_use)
 │   └── provider_router.py                (get_llm_client factory)
 │
-├── mcp/                                  (STUB — in-memory; FastMCP server future)
+├── mcp/                                  (local — in-process FastMCP, default; server — production path; direct — legacy)
 │   ├── __init__.py
 │   ├── mcp_client.py                     (MCPClient abstract + DirectMCPClient)
 │   ├── readers.py                        (fetch_event_row, fetch_missing_features)
@@ -235,6 +235,7 @@ src/agents/
 | TaxonomyClassifierAgent | `enrichment/taxonomy_classifier_agent.py` | **Live** | `taxonomy_classification` | primary_category, subcategory, behavioral dims |
 | EmotionMapperAgent | `enrichment/emotion_mapper_agent.py` | **Live** | `emotion_vibe` | emotional_output, cost_level, environment, etc. |
 | DataQualityAgent | `enrichment/data_quality_agent.py` | **Live** | `data_quality` | quality_score, normalization_errors |
+| DeduplicationAgent | `enrichment/deduplication_agent.py` | **Live** | `deduplication` | duplicate_group_id, duplicate_group_type, is_primary, duplicate_of, similarity_score |
 | ArtistEnricherAgent | `enrichment/artist_enricher_agent.py` | **Stub** | — | artists (requires external API) |
 | MCP layer | `mcp/mcp_client.py` | **Stub** (in-memory) | — | All fields via DirectMCPClient |
 | FastMCP server | — | **Future** | — | Replace DirectMCPClient when deployed |

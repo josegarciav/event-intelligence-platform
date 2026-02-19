@@ -1,245 +1,150 @@
-# 🎉 Pipeline Design - Implementation Complete
-
-## What You Have
-
-A **complete, production-ready event ingestion pipeline architecture** consisting of:
-
-### Core Components (4 files)
-1. **Canonical EventSchema** - Fully normalized event data model with taxonomy integration
-2. **BasePipeline** - Abstract framework for standardized pipeline implementation
-3. **RaCoEventPipeline** - Complete working example for ra.co GraphQL API
-4. **PipelineOrchestrator** - Coordinates and schedules all pipelines
-
-### Supporting Files (5 files)
-5. **Configuration System** - YAML-based settings for all sources
-6. **Module Exports** - Clean package interfaces
-7. Plus comprehensive documentation
-
-### Documentation
-- README_DESIGN.md - Start here! High-level overview
-- PIPELINE_QUICK_START.md - Step-by-step implementation guide
-- PIPELINE_ARCHITECTURE.md - Detailed UML diagrams and design
-- VISUAL_REFERENCE.md - ASCII diagrams and flowcharts
-- IMPLEMENTATION_SUMMARY.md - What was created and why
+# Start Here — Pulsecity Developer Orientation
 
 ---
 
-## The Design
+## What Is Pulsecity
 
-### Workflow (6 Steps)
+Pulsecity is an event intelligence platform that treats events as data products, not listings.
+Raw event signals are ingested from APIs and scrapers, normalized into a canonical schema, and then processed by a chain of LLM agents that add taxonomy, emotional context, quality scores, and deduplication intelligence.
+The result is a rich, structured event dataset designed for discovery, analytics, and machine-learning applications.
+
+---
+
+## Repo Layout
+
+```text
+event-intelligence-platform/
+├── apps/
+│   ├── landing/          Next.js 15 static site — live on GitHub Pages
+│   ├── web/              (stub)
+│   └── mobile/           (stub)
+│
+├── services/
+│   ├── api/              FastAPI backend + MCP agent enrichment system
+│   │   └── src/
+│   │       ├── agents/   LLM enrichment agents + MCP layer
+│   │       ├── ingestion/ Config-driven pipeline system
+│   │       ├── schemas/  Canonical EventSchema (Pydantic)
+│   │       ├── configs/  ingestion.yaml, agents.yaml
+│   │       └── main.py   FastAPI entrypoint
+│   └── scrapping/        Config-driven web scraping service
+│
+├── packages/
+│   └── ui/               Shared UI components
+│
+├── infra/
+│   ├── postgres/         PostgreSQL 16 via Docker Compose (port 5433)
+│   └── api/              API Dockerfile
+│
+├── tests/
+│   ├── unit/
+│   └── integration/
+│
+├── notebooks/            Jupyter exploration notebooks
+├── docs/                 Architecture documentation
+└── data/raw/
 ```
-Raw Data → Parse → Classify to Taxonomy → Normalize → Validate → Enrich
+
+---
+
+## The Two-Phase Data Flow
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                     External Sources                      │
+│   GetYourGuide · RA.co · Ticketmaster · Eventbrite       │
+│   Civitatis · TripAdvisor  (+ scraped sources)           │
+└───────────────────────────┬──────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────┐
+│             PHASE 1 — Ingestion Pipeline                  │
+│                                                          │
+│  ingestion.yaml  →  PipelineFactory                      │
+│       ↓                                                  │
+│  APIAdapter / ScraperAdapter                             │
+│       ↓                                                  │
+│  Normalization (field_mapper · location · currency · tax)│
+│       ↓                                                  │
+│  Deduplication (exact match by source_event_id)          │
+│       ↓                                                  │
+│  PostgreSQL 16 (port 5433)                               │
+└───────────────────────────┬──────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────┐
+│             PHASE 2 — Agent Enrichment Chain              │
+│                                                          │
+│  MCP Layer  (local mode — in-process FastMCP)            │
+│       ↓                                                  │
+│  [1] FeatureAlignmentAgent   → event_type, tags          │
+│  [2] TaxonomyClassifierAgent → category, dimensions      │
+│  [3] EmotionMapperAgent      → vibe, energy, cost        │
+│  [4] DataQualityAgent        → quality_score             │
+│  [5] DeduplicationAgent      → fuzzy dedup               │
+│                                                          │
+│  LLM: Ollama llama3.2:3b (default) · Claude · GPT       │
+└───────────────────────────┬──────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────┐
+│                   Enriched Event Store                    │
+│             PostgreSQL  ·  FastAPI REST layer             │
+└──────────────────────────────────────────────────────────┘
 ```
 
-Each step is isolated, testable, and can fail independently.
+---
 
-### Taxonomy Integration
-Every event is classified against your **Human Experience Taxonomy**:
-- 10 primary categories (play, exploration, creation, learning, etc.)
-- 50+ subcategories for granular classification
-- Multi-dimensional (events can have multiple classifications)
-- Confidence scores for ML-ready data
+## Running Locally
 
-### Quality Scoring
-Each event gets a quality score (0.0-1.0) based on:
-- Key field presence (40%)
-- Enrichment fields (30%)
-- Taxonomy confidence (20%)
-- Validation errors (-10%)
+**1. Start PostgreSQL**
+```bash
+cd infra/postgres
+docker compose up -d
+# Runs on port 5433
+```
 
-### Error Resilience
-- Individual events can fail without crashing pipeline
-- All errors logged and reported
-- Partial success tracking
-- Clear visibility into what worked/didn't
+**2. Set up the Python environment**
+```bash
+cd services/api
+uv venv
+uv sync
+source .venv/bin/activate
+```
+
+**3. Install Ollama (default LLM provider)**
+```bash
+brew install ollama && ollama pull llama3.2:3b
+# Ollama starts automatically on port 11434 — no API key needed
+```
+
+**4. Run ingestion**
+```python
+from src.ingestion.factory import PipelineFactory
+
+factory = PipelineFactory("src/configs/ingestion.yaml")
+pipeline = factory.create("getyourguide")
+result = await pipeline.execute()
+```
+
+**5. Run agent enrichment**
+```python
+from src.agents.orchestration.pipeline_triggers import load_agents_config, PostIngestionTrigger
+
+agents_config = load_agents_config()
+trigger = PostIngestionTrigger(agents_config)
+enrichment_result = await trigger.on_pipeline_complete(result)
+```
 
 ---
 
-## What's Ready Now
+## Where to Go Next
 
-✅ **Fully Implemented:**
-- Ra.co pipeline (ready to test with API key)
-- Complete event schema with taxonomy
-- Pipeline orchestration and scheduling
-- Configuration management
-- Error handling and logging
-- Quality scoring
-
-✅ **Extensible Design:**
-- Add new sources by implementing 6 methods
-- No changes to framework needed
-- Clear patterns to follow (copy ra.co.py)
-
-✅ **Well Documented:**
-- 2,000+ lines of documentation
-- 10+ diagrams (UML, data flow, sequences)
-- 50+ code examples
-- Step-by-step guides
-
----
-
-## Next Steps (Recommended Order)
-
-### Today (30 minutes)
-1. Read: `docs/README_DESIGN.md`
-2. Skim: `docs/PIPELINE_QUICK_START.md`
-3. Review: `normalization/event_schema.py` (the data model)
-
-### This Week
-1. Test ra.co pipeline with real API
-2. Review taxonomy mappings
-3. Validate schema captures what you need
-
-### Next Week
-1. Build database models for storage
-2. Implement Meetup pipeline (follow ra.co pattern)
-3. Write unit tests
-
-### Next Month
-1. Add enrichment services (geocoding, image validation)
-2. Set up APScheduler for scheduling
-3. Build monitoring dashboard
-
----
-
-## File Quick Links
-
-| Need | File |
-|------|------|
-| Overview | `docs/README_DESIGN.md` |
-| Get Started | `docs/PIPELINE_QUICK_START.md` |
-| Data Model | `normalization/event_schema.py` |
-| Framework | `ingestion/base_pipeline.py` |
-| Example | `ingestion/sources/ra_co.py` |
-| Orchestration | `ingestion/orchestrator.py` |
-| Config | `configs/ingestion.yaml` |
-| Architecture | `docs/PIPELINE_ARCHITECTURE.md` |
-| Diagrams | `docs/VISUAL_REFERENCE.md` |
-
----
-
-## Key Files by Use Case
-
-**I want to understand the design:**
-→ `docs/README_DESIGN.md` + `docs/PIPELINE_ARCHITECTURE.md`
-
-**I want to add a new source:**
-→ `docs/PIPELINE_QUICK_START.md` + `ingestion/sources/ra_co.py` (copy this)
-
-**I want to understand the data model:**
-→ `normalization/event_schema.py` + examples in docstrings
-
-**I want to see how to run it:**
-→ `docs/PIPELINE_QUICK_START.md` (code examples section)
-
-**I want diagrams:**
-→ `docs/VISUAL_REFERENCE.md` + `docs/PIPELINE_ARCHITECTURE.md`
-
----
-
-## What Makes This Design Special
-
-1. **Taxonomy-First**
-   Every event is classified to your Human Experience Taxonomy, not just tagged with generic categories.
-
-2. **Quality-Aware**
-   Built-in quality scoring means you can accept data that isn't perfect while still knowing its quality.
-
-3. **Error-Resilient**
-   One bad event doesn't crash the pipeline - all errors are logged and reported.
-
-4. **Extensible**
-   New sources are added by implementing 6 methods in ~500 lines - no framework changes.
-
-5. **Production-Ready**
-   Includes configuration management, logging, rate limiting, retry logic, and execution tracking.
-
-6. **Well-Documented**
-   2,000+ lines of documentation with diagrams, examples, and step-by-step guides.
-
----
-
-## You Can Now
-
-✅ Ingest from ra.co immediately (with API key)
-✅ Add new sources quickly (Meetup, Ticketmaster, etc.)
-✅ Validate event data automatically (Pydantic)
-✅ Classify events to your taxonomy
-✅ Score data quality (0.0-1.0)
-✅ Track all errors and metrics
-✅ Configure everything via YAML
-✅ Monitor pipeline execution
-
----
-
-## Questions Answered
-
-**Q: How do I add a new source?**
-A: Copy `ra_co.py`, implement 6 methods, update config. See QUICK_START.md for step-by-step.
-
-**Q: What if an event has bad data?**
-A: It still gets stored with errors logged in `normalization_errors` and quality_score reflects the data issues.
-
-**Q: How do I handle different event types?**
-A: The taxonomy classification handles this - each event maps to relevant categories with confidence scores.
-
-**Q: Can I customize the schema?**
-A: Yes - `event_schema.py` has custom_fields dict for source-specific data.
-
-**Q: How do I deploy this?**
-A: See database setup docs (to be created) - the pipeline is ready, just needs database layer.
-
----
-
-## The Big Picture
-
-You now have a system that:
-
-1. **Ingests** events from multiple sources
-2. **Parses** raw data into structured format
-3. **Classifies** events against your Human Experience Taxonomy
-4. **Normalizes** to canonical schema with validation
-5. **Validates** data quality with detailed error tracking
-6. **Enriches** with additional data (timezone, duration, etc.)
-7. **Scores** quality (0.0-1.0) for informed filtering
-8. **Tracks** execution metrics and success rates
-
-All with clean code, comprehensive documentation, and extensible design.
-
----
-
-## Start Here
-
-**New to the system?**
-→ Open `docs/README_DESIGN.md` (5 minute read)
-
-**Want to implement something?**
-→ Open `docs/PIPELINE_QUICK_START.md`
-
-**Need architecture details?**
-→ Open `docs/PIPELINE_ARCHITECTURE.md`
-
-**Want a quick visual?**
-→ Open `docs/VISUAL_REFERENCE.md`
-
----
-
-## Summary
-
-| Aspect | Status |
-|--------|--------|
-| Architecture | ✅ Complete |
-| Data Model | ✅ Complete |
-| Framework | ✅ Complete |
-| Example (Ra.co) | ✅ Complete |
-| Documentation | ✅ Complete |
-| Configuration | ✅ Complete |
-| Testing | 🔧 Needs implementation |
-| Database | 🔧 Needs implementation |
-| Enrichment | 🔧 Needs implementation |
-| Monitoring | 🔧 Needs implementation |
-
-
----
-
-*For detailed information, start with `docs/README_DESIGN.md` or jump straight to the file you need from the Quick Links above.*
+| I want to...                            | Go to                  |
+|-----------------------------------------|------------------------|
+| Add or configure an ingestion source    | `INGESTION_GUIDE.md`   |
+| Understand the agent enrichment system  | `AGENT_ARCHITECTURE.md`|
+| See the full doc index                  | `DESIGN_INDEX.md`      |
+| Read the strategic roadmap              | `ROADMAP.md`           |
+| Browse ingestion config                 | `services/api/src/configs/ingestion.yaml` |
+| Browse agent config                     | `services/api/src/configs/agents.yaml`    |
