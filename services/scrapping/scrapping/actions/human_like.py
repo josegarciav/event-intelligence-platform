@@ -87,7 +87,9 @@ class HumanLike:
         """Generate a random scroll delta within configured range."""
         return self._rnd.randint(self.opts.scroll_min_px, self.opts.scroll_max_px)
 
-    def scroll_wheel(self, page: Any, *, repeats: int = 5, direction: str = "down") -> None:
+    def scroll_wheel(
+        self, page: Any, *, repeats: int = 5, direction: str = "down"
+    ) -> None:
         """Scroll using mouse wheel events.
 
         Uses Playwright page.mouse.wheel(0, delta).
@@ -147,7 +149,9 @@ class HumanLike:
     # Typing
     # -------------------------
 
-    def type_text(self, page: Any, selector: str, text: str, *, clear: bool = True) -> None:
+    def type_text(
+        self, page: Any, selector: str, text: str, *, clear: bool = True
+    ) -> None:
         """
         Types text with per-character delays.
 

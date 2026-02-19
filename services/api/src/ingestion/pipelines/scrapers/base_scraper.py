@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 from src.ingestion.adapters import ScraperAdapter, SourceType
 from src.ingestion.adapters.scraper_adapter import ScraperAdapterConfig
-from src.ingestion.base_pipeline import BasePipeline, PipelineConfig
+from src.ingestion.pipelines.base_pipeline import BasePipeline, PipelineConfig
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ def get_config_path(source_name: str) -> Path:
     config_path = SCRAPER_CONFIGS_DIR / f"{source_name}.json"
     if not config_path.exists():
         raise FileNotFoundError(
-            f"Scraper config not found: {config_path}. " f"Available configs: {list_available_configs()}"
+            f"Scraper config not found: {config_path}. Available configs: {list_available_configs()}"
         )
     return config_path
 
@@ -244,11 +244,13 @@ class EventScraper:
             from playwright.async_api import async_playwright
         except ImportError:
             raise ImportError(
-                "playwright is required for scraping. " "Install it with: pip install playwright && playwright install"
+                "playwright is required for scraping. Install it with: pip install playwright && playwright install"
             )
 
         self._playwright = await async_playwright().start()
-        self._browser = await self._playwright.chromium.launch(headless=self.config.headless)
+        self._browser = await self._playwright.chromium.launch(
+            headless=self.config.headless
+        )
         logger.info("Browser started")
 
     async def close(self) -> None:
@@ -292,14 +294,12 @@ class EventScraper:
             page.set_default_timeout(self.config.timeout_s * 1000)
 
             # Add stealth scripts to avoid detection
-            await page.add_init_script(
-                """
+            await page.add_init_script("""
                 Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
                 Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
                 Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en', 'es'] });
                 Object.defineProperty(navigator, 'platform', { get: () => 'MacIntel' });
-            """
-            )
+            """)
 
             response = await page.goto(url, wait_until="networkidle")
             await page.wait_for_timeout(3000)
@@ -325,7 +325,8 @@ class EventScraper:
             is_blocked = "captcha" in html.lower() or status_code == 403
 
             return PageFetchResult(
-                ok=not is_blocked and (status_code is None or (200 <= status_code < 400)),
+                ok=not is_blocked
+                and (status_code is None or (200 <= status_code < 400)),
                 url=url,
                 final_url=final_url,
                 status_code=status_code,
@@ -382,7 +383,9 @@ class EventScraper:
             results.append(result)
 
             if result.ok:
-                logger.info(f"Successfully fetched: {url} ({len(result.html or '')} chars)")
+                logger.info(
+                    f"Successfully fetched: {url} ({len(result.html or '')} chars)"
+                )
             else:
                 logger.warning(f"Failed to fetch: {url} - {result.error}")
 
@@ -452,9 +455,13 @@ class EventScraper:
         # Process in batches of `concurrency`
         for i in range(0, len(urls), concurrency):
             batch = urls[i : i + concurrency]
-            logger.info(f"Fetching event batch {i // concurrency + 1} ({len(batch)} URLs)")
+            logger.info(
+                f"Fetching event batch {i // concurrency + 1} ({len(batch)} URLs)"
+            )
 
-            batch_results = await asyncio.gather(*[self._fetch_page(url) for url in batch])
+            batch_results = await asyncio.gather(
+                *[self._fetch_page(url) for url in batch]
+            )
             results.extend(batch_results)
 
             ok_count = sum(1 for r in batch_results if r.ok)
@@ -464,7 +471,9 @@ class EventScraper:
             if i + concurrency < len(urls):
                 await asyncio.sleep(self.config.min_delay_s)
 
-        logger.info(f"Fetched {len(results)} event pages, {sum(1 for r in results if r.ok)} successful")
+        logger.info(
+            f"Fetched {len(results)} event pages, {sum(1 for r in results if r.ok)} successful"
+        )
         return results
 
     async def __aenter__(self) -> EventScraper:

@@ -191,7 +191,9 @@ def build_scrap_flow(
 
         sources = cfg.get("sources") or []
         source_ids = [
-            s.get("source_id") for s in sources if isinstance(s, dict) and s.get("source_id")
+            s.get("source_id")
+            for s in sources
+            if isinstance(s, dict) and s.get("source_id")
         ]
 
         if options.only_sources:

@@ -4,10 +4,11 @@ Unit tests for the api_adapter module.
 Tests for APIAdapterConfig and APIAdapter classes.
 """
 
-from unittest.mock import MagicMock, patch
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
-import requests
 from src.ingestion.adapters.api_adapter import (
     APIAdapter,
     APIAdapterConfig,
@@ -51,14 +52,6 @@ def graphql_config():
         source_type=SourceType.API,
         graphql_endpoint="https://api.example.com/graphql",
     )
-
-
-@pytest.fixture
-def mock_session():
-    """Create a mock requests session."""
-    session = MagicMock(spec=requests.Session)
-    session.headers = {}
-    return session
 
 
 # =============================================================================
@@ -128,7 +121,7 @@ class TestAPIAdapterInit:
         """Should initialize with base_url config."""
         adapter = APIAdapter(api_config)
         assert adapter.api_config.base_url == "https://api.example.com/events"
-        assert adapter._session is None
+        assert adapter._client is None
 
     def test_init_with_graphql_endpoint(self, graphql_config):
         """Should initialize with graphql_endpoint config."""
@@ -154,33 +147,33 @@ class TestAPIAdapterInit:
             APIAdapter(config)
 
 
-class TestAPIAdapterGetSession:
-    """Tests for APIAdapter._get_session method."""
+class TestAPIAdapterGetClient:
+    """Tests for APIAdapter._get_client method."""
 
-    def test_creates_session_on_first_call(self, api_config):
-        """Should create session on first call."""
+    def test_creates_client_on_first_call(self, api_config):
+        """Should create async HTTP client on first call."""
         adapter = APIAdapter(api_config)
-        session = adapter._get_session()
+        client = adapter._get_client()
 
-        assert session is not None
-        assert isinstance(session, requests.Session)
+        assert client is not None
+        assert isinstance(client, httpx.AsyncClient)
 
-    def test_returns_same_session(self, api_config):
-        """Should return the same session on subsequent calls."""
+    def test_returns_same_client(self, api_config):
+        """Should return the same client on subsequent calls."""
         adapter = APIAdapter(api_config)
-        session1 = adapter._get_session()
-        session2 = adapter._get_session()
+        client1 = adapter._get_client()
+        client2 = adapter._get_client()
 
-        assert session1 is session2
+        assert client1 is client2
 
     def test_sets_default_headers(self, api_config):
-        """Should set default headers."""
+        """Should set default headers on the client."""
         adapter = APIAdapter(api_config)
-        session = adapter._get_session()
+        client = adapter._get_client()
 
-        assert "User-Agent" in session.headers
-        assert "Accept" in session.headers
-        assert session.headers["Accept"] == "application/json"
+        # httpx Headers is case-insensitive
+        assert "user-agent" in client.headers
+        assert client.headers["accept"] == "application/json"
 
     def test_includes_custom_headers(self):
         """Should include custom headers from config."""
@@ -191,9 +184,9 @@ class TestAPIAdapterGetSession:
             headers={"X-Custom": "value"},
         )
         adapter = APIAdapter(config)
-        session = adapter._get_session()
+        client = adapter._get_client()
 
-        assert session.headers.get("X-Custom") == "value"
+        assert client.headers["x-custom"] == "value"
 
     def test_sets_authorization_with_api_key(self):
         """Should set Authorization header when API key provided."""
@@ -204,97 +197,84 @@ class TestAPIAdapterGetSession:
             api_key="test-key",
         )
         adapter = APIAdapter(config)
-        session = adapter._get_session()
+        client = adapter._get_client()
 
-        assert session.headers.get("Authorization") == "Bearer test-key"
+        assert client.headers["authorization"] == "Bearer test-key"
 
 
 class TestAPIAdapterFetch:
     """Tests for APIAdapter.fetch method."""
 
-    @patch.object(APIAdapter, "_get_session")
-    @patch.object(APIAdapter, "_make_request")
-    def test_fetch_success(self, mock_request, mock_get_session, api_config):
+    def test_fetch_success(self, api_config):
         """Should return successful FetchResult."""
-        mock_session = MagicMock()
-        mock_get_session.return_value = mock_session
-        mock_request.return_value = MOCK_API_RESPONSE
-
         adapter = APIAdapter(api_config)
-        result = adapter.fetch()
+        with patch.object(
+            adapter, "_make_request", new=AsyncMock(return_value=MOCK_API_RESPONSE)
+        ):
+            result = asyncio.run(adapter.fetch())
 
         assert result.success is True
         assert result.source_type == SourceType.API
         assert len(result.raw_data) == 2
         assert result.total_fetched == 2
 
-    @patch.object(APIAdapter, "_get_session")
-    @patch.object(APIAdapter, "_make_request")
-    def test_fetch_with_custom_query_builder(self, mock_request, mock_get_session, api_config):
+    def test_fetch_with_custom_query_builder(self, api_config):
         """Should use custom query builder."""
-        mock_session = MagicMock()
-        mock_get_session.return_value = mock_session
-        mock_request.return_value = MOCK_API_RESPONSE
-
         builder = MagicMock(return_value={"custom": "query"})
         adapter = APIAdapter(api_config, query_builder=builder)
-        adapter.fetch(param1="value1")
+
+        with patch.object(
+            adapter, "_make_request", new=AsyncMock(return_value=MOCK_API_RESPONSE)
+        ):
+            asyncio.run(adapter.fetch(param1="value1"))
 
         builder.assert_called_once_with(param1="value1")
 
-    @patch.object(APIAdapter, "_get_session")
-    @patch.object(APIAdapter, "_make_request")
-    def test_fetch_with_custom_response_parser(self, mock_request, mock_get_session, api_config):
+    def test_fetch_with_custom_response_parser(self, api_config):
         """Should use custom response parser."""
-        mock_session = MagicMock()
-        mock_get_session.return_value = mock_session
-        mock_request.return_value = {"custom": "response"}
-
         parser = MagicMock(return_value=[{"parsed": "data"}])
         adapter = APIAdapter(api_config, response_parser=parser)
-        result = adapter.fetch()
+
+        with patch.object(
+            adapter, "_make_request", new=AsyncMock(return_value={"custom": "response"})
+        ):
+            result = asyncio.run(adapter.fetch())
 
         parser.assert_called_once_with({"custom": "response"})
         assert result.raw_data == [{"parsed": "data"}]
 
-    @patch.object(APIAdapter, "_get_session")
-    @patch.object(APIAdapter, "_make_request")
-    def test_fetch_handles_exception(self, mock_request, mock_get_session, api_config):
+    def test_fetch_handles_exception(self, api_config):
         """Should handle exceptions gracefully."""
-        mock_session = MagicMock()
-        mock_get_session.return_value = mock_session
-        mock_request.side_effect = Exception("Connection failed")
-
         adapter = APIAdapter(api_config)
-        result = adapter.fetch()
+
+        with patch.object(
+            adapter,
+            "_make_request",
+            new=AsyncMock(side_effect=Exception("Connection failed")),
+        ):
+            result = asyncio.run(adapter.fetch())
 
         assert result.success is False
         assert "Connection failed" in result.errors
 
-    @patch.object(APIAdapter, "_get_session")
-    @patch.object(APIAdapter, "_make_request")
-    def test_fetch_empty_response(self, mock_request, mock_get_session, api_config):
+    def test_fetch_empty_response(self, api_config):
         """Should handle empty response."""
-        mock_session = MagicMock()
-        mock_get_session.return_value = mock_session
-        mock_request.return_value = None
-
         adapter = APIAdapter(api_config)
-        result = adapter.fetch()
+
+        with patch.object(adapter, "_make_request", new=AsyncMock(return_value=None)):
+            result = asyncio.run(adapter.fetch())
 
         assert result.success is False
         assert result.total_fetched == 0
 
-    @patch.object(APIAdapter, "_get_session")
-    @patch.object(APIAdapter, "_make_request")
-    def test_fetch_tracks_timestamps(self, mock_request, mock_get_session, api_config):
+    def test_fetch_tracks_timestamps(self, api_config):
         """Should track fetch timestamps."""
-        mock_session = MagicMock()
-        mock_get_session.return_value = mock_session
-        mock_request.return_value = MOCK_API_RESPONSE
-
         adapter = APIAdapter(api_config)
-        result = adapter.fetch()
+
+        with patch.object(
+            adapter, "_make_request", new=AsyncMock(return_value=MOCK_API_RESPONSE)
+        ):
+            result = asyncio.run(adapter.fetch())
 
         assert result.fetch_started_at is not None
         assert result.fetch_ended_at is not None
@@ -304,51 +284,57 @@ class TestAPIAdapterFetch:
 class TestAPIAdapterMakeRequest:
     """Tests for APIAdapter._make_request method."""
 
-    @patch("time.sleep")
-    def test_make_get_request(self, mock_sleep, api_config):
+    def test_make_get_request(self, api_config):
         """Should make GET request for REST API."""
         adapter = APIAdapter(api_config)
-        session = MagicMock()
         response = MagicMock()
         response.json.return_value = {"data": "test"}
-        session.get.return_value = response
+        response.raise_for_status = MagicMock()
+        client = AsyncMock()
+        client.get = AsyncMock(return_value=response)
 
-        result = adapter._make_request(session, {"param": "value"})
+        with patch("asyncio.sleep", new=AsyncMock()):
+            result = asyncio.run(adapter._make_request(client, {"param": "value"}))
 
-        session.get.assert_called_once()
+        client.get.assert_called_once()
         assert result == {"data": "test"}
 
-    @patch("time.sleep")
-    def test_make_post_request_for_graphql(self, mock_sleep, graphql_config):
+    def test_make_post_request_for_graphql(self, graphql_config):
         """Should make POST request for GraphQL API."""
         adapter = APIAdapter(graphql_config)
-        session = MagicMock()
         response = MagicMock()
         response.json.return_value = {"data": "test"}
-        session.post.return_value = response
+        response.raise_for_status = MagicMock()
+        client = AsyncMock()
+        client.post = AsyncMock(return_value=response)
 
-        result = adapter._make_request(session, {"query": "..."})
+        with patch("asyncio.sleep", new=AsyncMock()):
+            result = asyncio.run(adapter._make_request(client, {"query": "..."}))
 
-        session.post.assert_called_once()
+        client.post.assert_called_once()
         assert result == {"data": "test"}
 
-    @patch("time.sleep")
-    def test_retry_on_failure(self, mock_sleep, api_config):
+    def test_retry_on_failure(self, api_config):
         """Should retry on request failure."""
         adapter = APIAdapter(api_config)
-        session = MagicMock()
-        session.get.side_effect = [
-            requests.RequestException("Failed"),
-            MagicMock(json=MagicMock(return_value={"data": "success"})),
-        ]
+        success_response = MagicMock()
+        success_response.json.return_value = {"data": "success"}
+        success_response.raise_for_status = MagicMock()
+        client = AsyncMock()
+        client.get = AsyncMock(
+            side_effect=[
+                httpx.HTTPError("Failed"),
+                success_response,
+            ]
+        )
 
-        result = adapter._make_request(session, {})
+        with patch("asyncio.sleep", new=AsyncMock()):
+            result = asyncio.run(adapter._make_request(client, {}))
 
-        assert session.get.call_count == 2
+        assert client.get.call_count == 2
         assert result == {"data": "success"}
 
-    @patch("time.sleep")
-    def test_max_retries_exceeded(self, mock_sleep, api_config):
+    def test_max_retries_exceeded(self, api_config):
         """Should return None after max retries."""
         config = APIAdapterConfig(
             source_id="test",
@@ -357,24 +343,26 @@ class TestAPIAdapterMakeRequest:
             max_retries=2,
         )
         adapter = APIAdapter(config)
-        session = MagicMock()
-        session.get.side_effect = requests.RequestException("Failed")
+        client = AsyncMock()
+        client.get = AsyncMock(side_effect=httpx.HTTPError("Failed"))
 
-        result = adapter._make_request(session, {})
+        with patch("asyncio.sleep", new=AsyncMock()):
+            result = asyncio.run(adapter._make_request(client, {}))
 
         assert result is None
-        assert session.get.call_count == 3  # Initial + 2 retries
+        assert client.get.call_count == 3  # Initial + 2 retries
 
-    @patch("time.sleep")
-    def test_rate_limiting(self, mock_sleep, api_config):
-        """Should respect rate limit."""
+    def test_rate_limiting(self, api_config):
+        """Should respect rate limit via asyncio.sleep."""
         adapter = APIAdapter(api_config)
-        session = MagicMock()
         response = MagicMock()
         response.json.return_value = {"data": "test"}
-        session.get.return_value = response
+        response.raise_for_status = MagicMock()
+        client = AsyncMock()
+        client.get = AsyncMock(return_value=response)
 
-        adapter._make_request(session, {})
+        with patch("asyncio.sleep", new=AsyncMock()) as mock_sleep:
+            asyncio.run(adapter._make_request(client, {}))
 
         mock_sleep.assert_called()
 
@@ -414,34 +402,37 @@ class TestAPIAdapterDefaultParsers:
 class TestAPIAdapterClose:
     """Tests for APIAdapter.close method."""
 
-    def test_close_session(self, api_config):
-        """Should close the HTTP session."""
+    def test_close_client(self, api_config):
+        """Should close the async HTTP client."""
         adapter = APIAdapter(api_config)
-        mock_session = MagicMock()
-        adapter._session = mock_session
+        mock_client = AsyncMock()
+        adapter._client = mock_client
 
-        adapter.close()
+        asyncio.run(adapter.close())
 
-        mock_session.close.assert_called_once()
-        assert adapter._session is None
+        mock_client.aclose.assert_called_once()
+        assert adapter._client is None
 
-    def test_close_without_session(self, api_config):
-        """Should handle close when no session exists."""
+    def test_close_without_client(self, api_config):
+        """Should handle close when no client exists."""
         adapter = APIAdapter(api_config)
 
         # Should not raise
-        adapter.close()
-        assert adapter._session is None
+        asyncio.run(adapter.close())
+        assert adapter._client is None
 
 
 class TestAPIAdapterContextManager:
-    """Tests for APIAdapter context manager usage."""
+    """Tests for APIAdapter async context manager usage."""
 
     def test_context_manager(self, api_config):
-        """Should work as context manager."""
+        """Should work as async context manager."""
         adapter = APIAdapter(api_config)
 
-        with patch.object(adapter, "close") as mock_close:
-            with adapter as ctx:
-                assert ctx is adapter
+        async def run():
+            with patch.object(adapter, "close", new=AsyncMock()) as mock_close:
+                async with adapter as ctx:
+                    assert ctx is adapter
             mock_close.assert_called_once()
+
+        asyncio.run(run())

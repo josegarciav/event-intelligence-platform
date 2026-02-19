@@ -159,7 +159,7 @@ CREATE TABLE IF NOT EXISTS sources (
     source_url TEXT,
     compressed_html TEXT,
     ingestion_timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
-    source_updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    source_updated_at TIMESTAMP,
     UNIQUE (source_name, source_event_id)
 );
 
@@ -203,7 +203,7 @@ CREATE TABLE IF NOT EXISTS events (
     title TEXT NOT NULL,
     description TEXT,
 
-    primary_category_id TEXT
+    primary_category_id TEXT NOT NULL
         REFERENCES primary_categories(primary_category_id),
 
     event_type TEXT,
@@ -228,8 +228,6 @@ CREATE TABLE IF NOT EXISTS events (
         REFERENCES sources(source_id),
 
     data_quality_score FLOAT,
-
-
 
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -286,7 +284,7 @@ CREATE TABLE IF NOT EXISTS price_snapshots (
         REFERENCES events(event_id)
         ON DELETE CASCADE,
 
-    currency CHAR(3) REFERENCES currency_codes(currency_code),
+    currency_code CHAR(3) REFERENCES currency_codes(currency_code),
     is_free BOOLEAN,
 
     -- Using NUMERIC for exact decimal precision

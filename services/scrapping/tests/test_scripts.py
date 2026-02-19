@@ -8,14 +8,18 @@ def test_golden_run_offline_smoke():
     script_path = repo_root / "scripts" / "golden_run_offline.py"
 
     # Run the script
-    res = subprocess.run([sys.executable, str(script_path)], capture_output=True, text=True)
+    res = subprocess.run(
+        [sys.executable, str(script_path)], capture_output=True, text=True
+    )
     assert res.returncode == 0
     assert "Golden run successful!" in res.stdout
 
     # Check artifacts
     results_dir = repo_root / "results_golden_offline" / "run_golden_offline_001"
     assert (results_dir / "run_report.json").exists()
-    assert (results_dir / "sources" / "naukrigulf" / "items" / "items_valid.jsonl").exists()
+    assert (
+        results_dir / "sources" / "naukrigulf" / "items" / "items_valid.jsonl"
+    ).exists()
 
 
 def test_inspect_run_smoke(tmp_path):

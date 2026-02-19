@@ -1,0 +1,7 @@
+prompt_name: "deduplication"
+active_version: "v1"
+versions:
+  v1:
+    description: "Event deduplication, grouping and alignment analysis"
+    created_at: "2026-02-18"
+    notes: "Detects duplicate events across sources, groups recurring events, and aligns events that represent the same real-world occurrence. Used by DeduplicationAgent."

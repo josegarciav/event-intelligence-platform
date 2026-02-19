@@ -13,7 +13,6 @@ from src.schemas.event import (
     EventSchema,
     LocationInfo,
     OrganizerInfo,
-    PrimaryCategory,
     SourceInfo,
 )
 
@@ -42,7 +41,6 @@ def create_event():
         defaults = {
             "event_id": str(uuid.uuid4()),
             "title": title,
-            "primary_category": PrimaryCategory.PLAY_AND_PURE_FUN,
             "start_datetime": start_datetime,
             "location": LocationInfo(
                 venue_name=venue_name,

@@ -92,7 +92,9 @@ class TestLoadIngestionConfig:
         # Mock Settings in config.py
         import src.configs.config
 
-        monkeypatch.setattr(src.configs.config, "settings", Settings(DATABASE_URL=test_db_url))
+        monkeypatch.setattr(
+            src.configs.config, "settings", Settings(DATABASE_URL=test_db_url)
+        )
 
         # Clear cache to ensure re-load
         Config.load_ingestion_config.cache_clear()
@@ -126,4 +128,6 @@ class TestLoadIngestionConfig:
         config = Config.load_ingestion_config()
 
         # Check if TICKETMASTER_API_KEY was substituted
-        assert config["sources"]["ticketmaster"]["query"]["params"]["apikey"] == test_key
+        assert (
+            config["sources"]["ticketmaster"]["query"]["params"]["apikey"] == test_key
+        )

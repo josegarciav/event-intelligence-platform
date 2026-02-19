@@ -195,7 +195,12 @@ class LocationParser:
 
         # --- State/region heuristic ---
         # For ES: province from postal code prefix
-        if country_code and country_code.upper() == "ES" and postal_code and len(postal_code) == 5:
+        if (
+            country_code
+            and country_code.upper() == "ES"
+            and postal_code
+            and len(postal_code) == 5
+        ):
             result.state_or_region = self._spanish_province_from_postal(postal_code)
 
         return result
@@ -313,7 +318,9 @@ class LocationParser:
             try:
                 from geopy.geocoders import Nominatim
 
-                user_agent = os.environ.get("GEOCODING_API_KEY") or "pulsecity-event-platform"
+                user_agent = (
+                    os.environ.get("GEOCODING_API_KEY") or "pulsecity-event-platform"
+                )
                 self._geocoder = Nominatim(user_agent=user_agent, timeout=10)
             except ImportError:
                 logger.warning("geopy not installed; geocoding disabled")
@@ -380,7 +387,9 @@ class LocationParser:
         """Detect ISO country code from text (country name or code)."""
         cleaned = text.strip().lower()
         # Direct code match (2-letter)
-        if len(cleaned) == 2 and cleaned.upper() in {v for v in COUNTRY_NAME_TO_CODE.values()}:
+        if len(cleaned) == 2 and cleaned.upper() in {
+            v for v in COUNTRY_NAME_TO_CODE.values()
+        }:
             return cleaned.upper()
         return COUNTRY_NAME_TO_CODE.get(cleaned)
 

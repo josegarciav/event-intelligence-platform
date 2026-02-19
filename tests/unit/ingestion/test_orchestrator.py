@@ -9,11 +9,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from src.ingestion.adapters import SourceType
-from src.ingestion.base_pipeline import (
-    BasePipeline,
-    PipelineExecutionResult,
-    PipelineStatus,
-)
 from src.ingestion.deduplication import ExactMatchDeduplicator
 from src.ingestion.orchestrator import (
     PIPELINE_REGISTRY,
@@ -21,6 +16,11 @@ from src.ingestion.orchestrator import (
     ScheduledPipeline,
     load_orchestrator_from_config,
     register_pipeline,
+)
+from src.ingestion.pipelines.base_pipeline import (
+    BasePipeline,
+    PipelineExecutionResult,
+    PipelineStatus,
 )
 
 # =============================================================================
@@ -740,7 +740,9 @@ class TestRunFullIngestion:
         assert stats["total_saved_to_db"] == 5
         assert "test" in stats["pipelines_executed"]
 
-    def test_run_full_ingestion_deduplicates_across_sources(self, orchestrator, create_event):
+    def test_run_full_ingestion_deduplicates_across_sources(
+        self, orchestrator, create_event
+    ):
         """Should deduplicate events across multiple sources."""
         base_time = datetime.utcnow() + timedelta(days=1)
         shared_event = create_event(
@@ -799,7 +801,9 @@ class TestRunFullIngestion:
         assert stats["total_saved_to_db"] == 2
         assert len(stats["pipelines_executed"]) == 2
 
-    def test_run_full_ingestion_handles_persistence_error(self, orchestrator, create_event):
+    def test_run_full_ingestion_handles_persistence_error(
+        self, orchestrator, create_event
+    ):
         """Should handle persistence errors gracefully."""
         events = [create_event(title="Test Event")]
 

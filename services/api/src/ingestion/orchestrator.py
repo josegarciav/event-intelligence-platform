@@ -13,14 +13,14 @@ from datetime import UTC, datetime
 from typing import Any
 
 from src.ingestion.adapters import SourceType
-from src.ingestion.base_pipeline import (
+from src.ingestion.deduplication import EventDeduplicator, ExactMatchDeduplicator
+from src.ingestion.persist import EventDataWriter
+from src.ingestion.pipelines.base_pipeline import (
     BasePipeline,
     PipelineConfig,
     PipelineExecutionResult,
     PipelineStatus,
 )
-from src.ingestion.deduplication import EventDeduplicator, ExactMatchDeduplicator
-from src.ingestion.persist import EventDataWriter
 from src.ingestion.taxonomy_loader import get_connection
 from src.schemas.event import EventSchema
 
@@ -99,7 +99,9 @@ class PipelineOrchestrator:
             pipeline: Configured BasePipeline instance
         """
         self.pipelines[source_name] = pipeline
-        self.logger.info(f"Registered pipeline: {source_name} (type: {pipeline.source_type.value})")
+        self.logger.info(
+            f"Registered pipeline: {source_name} (type: {pipeline.source_type.value})"
+        )
 
     def get_pipeline(self, source_name: str) -> BasePipeline | None:
         """Get a registered pipeline by name."""
@@ -107,9 +109,14 @@ class PipelineOrchestrator:
 
     def list_pipelines(self) -> list[dict[str, str]]:
         """List all registered pipelines with their types."""
-        return [{"name": name, "type": p.source_type.value} for name, p in self.pipelines.items()]
+        return [
+            {"name": name, "type": p.source_type.value}
+            for name, p in self.pipelines.items()
+        ]
 
-    def deduplicate_results(self, results: dict[str, PipelineExecutionResult]) -> list[EventSchema]:
+    def deduplicate_results(
+        self, results: dict[str, PipelineExecutionResult]
+    ) -> list[EventSchema]:
         """Deduplicate events from multiple pipeline results."""
         all_events = []
         for result in results.values():
@@ -120,7 +127,9 @@ class PipelineOrchestrator:
     # EXECUTION
     # ========================================================================
 
-    async def execute_pipeline(self, source_name: str, **kwargs) -> PipelineExecutionResult:
+    async def execute_pipeline(
+        self, source_name: str, **kwargs
+    ) -> PipelineExecutionResult:
         """
         Execute a single pipeline.
 
@@ -144,10 +153,14 @@ class PipelineOrchestrator:
             return result
 
         except Exception:
-            self.logger.error(f"Pipeline execution failed: {source_name}", exc_info=True)
+            self.logger.error(
+                f"Pipeline execution failed: {source_name}", exc_info=True
+            )
             raise
 
-    async def execute_all_pipelines(self, **kwargs) -> dict[str, PipelineExecutionResult]:
+    async def execute_all_pipelines(
+        self, **kwargs
+    ) -> dict[str, PipelineExecutionResult]:
         """
         Execute all registered pipelines sequentially.
 
@@ -165,7 +178,9 @@ class PipelineOrchestrator:
 
         return results
 
-    async def execute_by_type(self, source_type: SourceType, **kwargs) -> dict[str, PipelineExecutionResult]:
+    async def execute_by_type(
+        self, source_type: SourceType, **kwargs
+    ) -> dict[str, PipelineExecutionResult]:
         """
         Execute all pipelines of a specific type (API or scraper).
 
@@ -192,7 +207,9 @@ class PipelineOrchestrator:
     # SCHEDULING
     # ========================================================================
 
-    def schedule_pipeline(self, source_name: str, schedule_config: dict) -> ScheduledPipeline:
+    def schedule_pipeline(
+        self, source_name: str, schedule_config: dict
+    ) -> ScheduledPipeline:
         """
         Schedule a pipeline for recurring execution.
 
@@ -222,7 +239,9 @@ class PipelineOrchestrator:
     # HISTORY & STATS
     # ========================================================================
 
-    def get_execution_history(self, source_name: str | None = None, limit: int = 10) -> list[PipelineExecutionResult]:
+    def get_execution_history(
+        self, source_name: str | None = None, limit: int = 10
+    ) -> list[PipelineExecutionResult]:
         """Get execution history, optionally filtered by source."""
         results = self.execution_history
 
@@ -255,7 +274,9 @@ class PipelineOrchestrator:
 
     def _store_execution_result(self, result: PipelineExecutionResult) -> None:
         """Store execution result (placeholder for database storage)."""
-        self.logger.info(f"Storing {result.successful_events} events from {result.source_name}")
+        self.logger.info(
+            f"Storing {result.successful_events} events from {result.source_name}"
+        )
 
     # ========================================================================
     # END-TO-END EXECUTION & PERSISTENCE
@@ -275,7 +296,9 @@ class PipelineOrchestrator:
 
         # 2. Extract and Deduplicate
         unique_events = self.deduplicate_results(pipeline_results)
-        total_raw_events = sum(r.total_events_processed for r in pipeline_results.values())
+        total_raw_events = sum(
+            r.total_events_processed for r in pipeline_results.values()
+        )
 
         self.logger.info(
             f"Deduplication complete: {len(unique_events)} unique events found from {total_raw_events} raw results."
@@ -293,7 +316,9 @@ class PipelineOrchestrator:
                     conn.close()
                     return count
 
-                self.logger.info(f"Persisting {len(unique_events)} events to Postgres...")
+                self.logger.info(
+                    f"Persisting {len(unique_events)} events to Postgres..."
+                )
                 saved_count = await asyncio.to_thread(_persist)
                 self.logger.info(f"Successfully saved {saved_count} events.")
             except Exception as e:

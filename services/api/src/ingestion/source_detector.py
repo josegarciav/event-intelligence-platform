@@ -162,9 +162,13 @@ class SourceDetector:
 
                 req = urllib.request.Request(
                     url,
-                    headers={"User-Agent": "Mozilla/5.0 (compatible; PulsecityBot/1.0)"},
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (compatible; PulsecityBot/1.0)"
+                    },
                 )
-                with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:  # noqa: S310
+                with urllib.request.urlopen(
+                    req, timeout=self.timeout_s
+                ) as resp:  # noqa: S310
                     return resp.read().decode("utf-8", errors="replace")
             except Exception as exc:
                 logger.debug("HTTP probe (urllib) failed for %s: %s", url, exc)
@@ -182,7 +186,11 @@ class SourceDetector:
 
     def _extract_meta_title(self, html: str) -> str | None:
         # Try og:title first, then <title>
-        og = re.search(r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)', html, re.I)
+        og = re.search(
+            r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)',
+            html,
+            re.I,
+        )
         if og:
             return og.group(1).strip()
         title = re.search(r"<title[^>]*>([^<]+)</title>", html, re.I)
@@ -194,7 +202,9 @@ class SourceDetector:
         detected: str | None = None
         for pattern, framework in _SPA_MARKERS:
             if re.search(pattern, html, re.I):
-                detection.detection_notes.append(f"SPA marker matched: {pattern} -> {framework}")
+                detection.detection_notes.append(
+                    f"SPA marker matched: {pattern} -> {framework}"
+                )
                 detected = framework
                 break  # first match wins (ordered by specificity)
         return detected
@@ -251,16 +261,26 @@ class SourceDetector:
         except Exception:
             return "unknown"
 
-    def _recommend_engine(self, detection: SourceDetection, extracted_text: str) -> None:
+    def _recommend_engine(
+        self, detection: SourceDetection, extracted_text: str
+    ) -> None:
         """Decide on engine recommendation based on all signals."""
         has_framework = detection.detected_framework is not None
 
         # Text-to-HTML ratio as SPA signal
-        ratio = len(extracted_text) / detection.raw_html_length if detection.raw_html_length > 0 else 0.0
+        ratio = (
+            len(extracted_text) / detection.raw_html_length
+            if detection.raw_html_length > 0
+            else 0.0
+        )
         short_text = len(extracted_text) < self.min_text_len
-        poor_ratio = ratio < self.spa_text_ratio_threshold and detection.raw_html_length > 1000
+        poor_ratio = (
+            ratio < self.spa_text_ratio_threshold and detection.raw_html_length > 1000
+        )
 
-        detection.needs_javascript = has_framework or short_text or poor_ratio or detection.has_anti_bot
+        detection.needs_javascript = (
+            has_framework or short_text or poor_ratio or detection.has_anti_bot
+        )
 
         if detection.has_anti_bot:
             detection.recommended_engine = "browser"
@@ -283,8 +303,12 @@ class SourceDetector:
         else:
             detection.recommended_engine = "http"
             detection.needs_javascript = False
-            detection.detection_notes.append("Static content with good extraction -> http")
+            detection.detection_notes.append(
+                "Static content with good extraction -> http"
+            )
 
         # Wait-for selector
         if detection.needs_javascript and detection.detected_framework:
-            detection.wait_for_selector = _DEFAULT_WAIT_SELECTORS.get(detection.detected_framework)
+            detection.wait_for_selector = _DEFAULT_WAIT_SELECTORS.get(
+                detection.detected_framework
+            )

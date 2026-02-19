@@ -15,7 +15,9 @@ def test_settings_parsing():
 def test_settings_encoded_password():
     """Test DATABASE_URL parsing with encoded special characters in password."""
     # p@ss!word encoded
-    settings = Settings(DATABASE_URL="postgresql://user:p%40ss%21word@localhost:5432/db")
+    settings = Settings(
+        DATABASE_URL="postgresql://user:p%40ss%21word@localhost:5432/db"
+    )
     params = settings.get_psycopg2_params()
     assert params["password"] == "p@ss!word"
     assert params["host"] == "localhost"

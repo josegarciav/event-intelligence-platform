@@ -119,7 +119,9 @@ class TestsAgent:
         # If config provides known detail sample URLs, include them.
         detail_samples = source_cfg.get("test_samples") or {}
         detail_urls = (
-            detail_samples.get("detail_urls") if isinstance(detail_samples, dict) else None
+            detail_samples.get("detail_urls")
+            if isinstance(detail_samples, dict)
+            else None
         )
         if isinstance(detail_urls, list):
             for i, u in enumerate(detail_urls[:5]):
@@ -131,7 +133,9 @@ class TestsAgent:
                         expectations={
                             "min_text_len": 250,
                             "max_boilerplate_ratio": float(
-                                (source_cfg.get("quality") or {}).get("max_boilerplate_ratio", 0.85)
+                                (source_cfg.get("quality") or {}).get(
+                                    "max_boilerplate_ratio", 0.85
+                                )
                             ),
                             "keep": True,
                         },
@@ -190,7 +194,9 @@ class TestsAgent:
         try:
             for t in plan.tests:
                 try:
-                    r = self._run_one_test(source_cfg, engine, t, max_detail_fetch=max_detail_fetch)
+                    r = self._run_one_test(
+                        source_cfg, engine, t, max_detail_fetch=max_detail_fetch
+                    )
                     results.append(r)
                     if not r.get("ok", False):
                         failures.append(r)
@@ -228,11 +234,17 @@ class TestsAgent:
         url = test.target_url
 
         # fetch listing (rendered if browser/hybrid)
-        rendered = str((source_cfg.get("engine") or {}).get("type", "http")).lower() in (
+        rendered = str(
+            (source_cfg.get("engine") or {}).get("type", "http")
+        ).lower() in (
             "browser",
             "hybrid",
         )
-        fr = engine.get_rendered(url, ctx=None) if rendered else engine.get(url, ctx=None)
+        fr = (
+            engine.get_rendered(url, ctx=None)
+            if rendered
+            else engine.get(url, ctx=None)
+        )
 
         if kind == "listing_links":
             if not fr.ok or not fr.text:
@@ -276,7 +288,9 @@ class TestsAgent:
             item = {"url": url, "title": None, "text": fr.text}
             q = evaluate_quality(item, rules={"min_text_len": 50})
             blocked_expected = bool(test.expectations.get("blocked", False))
-            blocked_detected = not q.keep and any(i.code == "blocked_page" for i in q.issues)
+            blocked_detected = not q.keep and any(
+                i.code == "blocked_page" for i in q.issues
+            )
 
             ok = blocked_detected == blocked_expected
             return {
@@ -285,7 +299,8 @@ class TestsAgent:
                 "blocked_detected": blocked_detected,
                 "expected_blocked": blocked_expected,
                 "issues": [
-                    {"level": i.level, "code": i.code, "message": i.message} for i in q.issues
+                    {"level": i.level, "code": i.code, "message": i.message}
+                    for i in q.issues
                 ],
             }
 
@@ -326,7 +341,8 @@ class TestsAgent:
                 "expected_keep": expected_keep,
                 "text_len": len(item.get("text") or ""),
                 "issues": [
-                    {"level": i.level, "code": i.code, "message": i.message} for i in q.issues
+                    {"level": i.level, "code": i.code, "message": i.message}
+                    for i in q.issues
                 ],
             }
 
@@ -396,7 +412,8 @@ class TestsAgent:
                 "min_items_saved": mn_items,
                 "detail_url": detail_url,
                 "issues": [
-                    {"level": i.level, "code": i.code, "message": i.message} for i in q.issues
+                    {"level": i.level, "code": i.code, "message": i.message}
+                    for i in q.issues
                 ],
             }
 
@@ -452,7 +469,9 @@ def _build_engine(source_cfg: dict[str, Any]):
     if et == "browser":
         return BrowserEngine(options=browser_opts)
     if et == "hybrid":
-        return HybridEngine(options=HybridEngineOptions(http=http_opts, browser=browser_opts))
+        return HybridEngine(
+            options=HybridEngineOptions(http=http_opts, browser=browser_opts)
+        )
     return HttpEngine(options=http_opts)
 
 
