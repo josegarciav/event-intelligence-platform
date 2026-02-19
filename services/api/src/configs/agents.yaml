@@ -110,15 +110,16 @@ agents:
       - "similarity_score"
 
   # ---------------------------------------------------------------------------
-  # ARTIST ENRICHER — STUB (requires external artist metadata API)
+  # ARTIST ENRICHER — enriches artist genre via MusicBrainz API (no auth required)
   # ---------------------------------------------------------------------------
   artist_enricher:
-    enabled: false      # TODO: enable when artist metadata API is integrated
+    enabled: true
     prompt_name: "artist_enrichment"
     prompt_version: "active"
     provider: "ollama"
     model: "llama3.2:3b"
     temperature: 0.1
+    timeout_seconds: 5.0
     target_fields:
       - "artists"
 

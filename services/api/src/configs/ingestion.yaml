@@ -908,7 +908,7 @@ sources:
       cron_expression: "0 */12 * * *"   # Every 12 hours (same cadence as Ra.co)
       enabled: false
 
-  # FEVER has no API. TODO: test scraping adapter for custom pipeline.
+  # FEVER has no public API — use scraper_adapter with a custom pipeline config when adding.
 
 # =========================================================================
 # GLOBAL SETTINGS

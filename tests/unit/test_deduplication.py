@@ -3,8 +3,8 @@ Unit tests for the deduplication module.
 
 Tests all deduplication strategies:
 - ExactMatchDeduplicator
-- FuzzyMatchDeduplicator (stub)
-- MetadataDeduplicator (stub)
+- FuzzyMatchDeduplicator (difflib-based fuzzy title matching)
+- MetadataDeduplicator (weighted multi-field similarity scoring)
 - CompositeDeduplicator
 - get_deduplicator factory function
 """
@@ -193,7 +193,7 @@ class TestExactMatchDeduplicator:
 
 
 class TestFuzzyMatchDeduplicator:
-    """Tests for FuzzyMatchDeduplicator (currently a stub)."""
+    """Tests for FuzzyMatchDeduplicator (difflib-based fuzzy title matching)."""
 
     def test_init_default_threshold(self):
         """Default threshold should be 0.85."""
@@ -205,26 +205,26 @@ class TestFuzzyMatchDeduplicator:
         deduplicator = FuzzyMatchDeduplicator(threshold=0.9)
         assert deduplicator.threshold == 0.9
 
-    def test_deduplicate_falls_back_to_exact(self, duplicate_events):
-        """Currently falls back to exact match behavior."""
+    def test_deduplicate_exact_duplicates(self, duplicate_events):
+        """Exact duplicates should be caught by fuzzy matching at any threshold."""
         fuzzy = FuzzyMatchDeduplicator()
         exact = ExactMatchDeduplicator()
 
         fuzzy_result = fuzzy.deduplicate(duplicate_events)
         exact_result = exact.deduplicate(duplicate_events)
 
-        # Should produce same results as exact match (fallback)
+        # Exact duplicates have title similarity = 1.0, so both strategies agree
         assert len(fuzzy_result) == len(exact_result)
 
     def test_threshold_stored(self):
-        """Threshold should be stored for future use."""
+        """Threshold should be stored on the instance."""
         threshold = 0.75
         deduplicator = FuzzyMatchDeduplicator(threshold=threshold)
         assert deduplicator.threshold == threshold
 
 
 class TestMetadataDeduplicator:
-    """Tests for MetadataDeduplicator (currently a stub)."""
+    """Tests for MetadataDeduplicator (weighted multi-field similarity scoring)."""
 
     def test_init_default_weights(self):
         """Default weights should be set."""
@@ -243,19 +243,19 @@ class TestMetadataDeduplicator:
         deduplicator = MetadataDeduplicator(weights=custom_weights)
         assert deduplicator.weights == custom_weights
 
-    def test_deduplicate_falls_back_to_exact(self, duplicate_events):
-        """Currently falls back to exact match behavior."""
+    def test_deduplicate_exact_duplicates(self, duplicate_events):
+        """Exact duplicates should score 1.0 and be removed."""
         metadata = MetadataDeduplicator()
         exact = ExactMatchDeduplicator()
 
         metadata_result = metadata.deduplicate(duplicate_events)
         exact_result = exact.deduplicate(duplicate_events)
 
-        # Should produce same results as exact match (fallback)
+        # Exact duplicates have perfect similarity, so both strategies agree
         assert len(metadata_result) == len(exact_result)
 
     def test_weights_stored(self):
-        """Weights should be stored for future use."""
+        """Weights should be stored on the instance."""
         weights = {"title": 0.6, "venue": 0.4}
         deduplicator = MetadataDeduplicator(weights=weights)
         assert deduplicator.weights == weights

@@ -1,10 +1,9 @@
 """
-MCP Write Operations — stub implementations.
+MCP Write Operations.
 
 These functions wrap the MCPClient.write() interface for common write patterns.
-They will route to a FastMCP server when mcp_mode = "server".
-
-# TODO: Replace in-memory logic with FastMCP server calls when deployed.
+They route to DirectMCPClient (in-memory) for mcp_mode = "direct"/"local",
+or to a FastMCP HTTP server when mcp_mode = "server".
 """
 
 from typing import TYPE_CHECKING, Any

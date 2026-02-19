@@ -447,11 +447,11 @@ class SourceInfo(BaseModel):
 
 class MediaAsset(BaseModel):
     """
-    Media asset associated with the event.
+    Media asset associated with the event (image, video, flyer, etc.).
 
-    TODO: Implement multimodal media handling in the future
-    to capture features/insights from various media types.
-    Like the image, video, flyer, of last year's event, etc.
+    The description field is intentionally open-ended to support future
+    multimodal analysis (e.g., extracting features from event flyers or
+    recap videos via a vision model).
     """
 
     type: str = Field(description="Type of media (image, video, flyer, etc.)")

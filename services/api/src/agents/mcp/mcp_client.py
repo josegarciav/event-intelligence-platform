@@ -38,8 +38,9 @@ class MCPClient(ABC):
     """
     Abstract MCP interface.
 
-    Stub — real implementation targets a FastMCP server (future).
     All enrichment agents interact with events exclusively through this interface.
+    Concrete implementations: DirectMCPClient (in-memory), LocalMCPClient (FastMCP
+    in-process), ServerMCPClient (FastMCP over HTTP SSE).
     """
 
     @abstractmethod
@@ -73,12 +74,11 @@ class MCPClient(ABC):
 
 class DirectMCPClient(MCPClient):
     """
-    In-memory MCP client for the current pre-FastMCP phase.
+    In-memory MCP client (mcp_mode: "direct").
 
     Operations act directly on EventSchema objects held in memory.
-    No network calls, no database writes.
-
-    # TODO: Replace with FastMCP server client when mcp_mode = "server"
+    No network calls, no database writes. Use LocalMCPClient or ServerMCPClient
+    for FastMCP-backed modes.
     """
 
     def __init__(self, events: list["EventSchema"] | None = None):
