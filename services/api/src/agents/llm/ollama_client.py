@@ -96,7 +96,9 @@ class OllamaLLMClient(BaseLLMClient):
                 return True
             return False
         except Exception:
-            logger.warning("OllamaLLMClient: Ollama not reachable at localhost:11434. Start Ollama: https://ollama.com")
+            logger.warning(
+                "OllamaLLMClient: Ollama not reachable at localhost:11434. Start Ollama: https://ollama.com"
+            )
             return False
 
     def _get_instructor_client(self):
@@ -111,7 +113,9 @@ class OllamaLLMClient(BaseLLMClient):
                 api_key=_OLLAMA_API_KEY,
             )
             # JSON mode is more reliable than TOOLS for local models
-            self._instructor_client = instructor.from_openai(raw, mode=instructor.Mode.JSON)
+            self._instructor_client = instructor.from_openai(
+                raw, mode=instructor.Mode.JSON
+            )
             self._raw_client = raw
             return self._instructor_client
         except ImportError:
@@ -138,7 +142,9 @@ class OllamaLLMClient(BaseLLMClient):
         try:
             resp = await client.chat.completions.create(
                 model=self.model_name,
-                temperature=(temperature if temperature is not None else self.temperature),
+                temperature=(
+                    temperature if temperature is not None else self.temperature
+                ),
                 max_tokens=max_tokens or self.max_tokens,
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -182,7 +188,9 @@ class OllamaLLMClient(BaseLLMClient):
             result, completion = await client.chat.completions.create_with_completion(
                 model=self.model_name,
                 response_model=output_schema,
-                temperature=(temperature if temperature is not None else self.temperature),
+                temperature=(
+                    temperature if temperature is not None else self.temperature
+                ),
                 max_tokens=max_tokens or self.max_tokens,
                 messages=[
                     {"role": "system", "content": enriched_system},
@@ -219,7 +227,9 @@ def _build_schema_hint(schema: type[BaseModel]) -> str:
         for field_name, field_info in props.items():
             field_type = field_info.get("type", "any")
             description = field_info.get("description", "")
-            enum_vals = field_info.get("enum") or field_info.get("allOf", [{}])[0].get("enum")
+            enum_vals = field_info.get("enum") or field_info.get("allOf", [{}])[0].get(
+                "enum"
+            )
             req = "required" if field_name in required else "optional"
 
             if enum_vals:

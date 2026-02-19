@@ -50,7 +50,9 @@ class DataQualityAgent(BaseAgent):
             )
 
         if not self._llm.is_available:
-            logger.warning(f"{self.name}: LLM unavailable, using rule-based quality scoring")
+            logger.warning(
+                f"{self.name}: LLM unavailable, using rule-based quality scoring"
+            )
             return self._rule_based_quality(task)
 
         prompt_version = self._registry.get_active_version(self.prompt_name)
@@ -68,7 +70,9 @@ class DataQualityAgent(BaseAgent):
             try:
                 # Serialize event for prompt
                 event_dict = event.model_dump()
-                event_json = json.dumps(event_dict, default=str, indent=2)[:3000]  # cap for token budget
+                event_json = json.dumps(event_dict, default=str, indent=2)[
+                    :3000
+                ]  # cap for token budget
 
                 system_prompt, user_prompt = self._registry.render(
                     self.prompt_name,
@@ -88,8 +92,12 @@ class DataQualityAgent(BaseAgent):
                 if not enriched_events[i].custom_fields:
                     enriched_events[i].custom_fields = {}
                 enriched_events[i].custom_fields["quality_score"] = result.quality_score
-                enriched_events[i].custom_fields["normalization_errors"] = result.normalization_errors
-                enriched_events[i].custom_fields["missing_fields_audit"] = result.missing_fields
+                enriched_events[i].custom_fields[
+                    "normalization_errors"
+                ] = result.normalization_errors
+                enriched_events[i].custom_fields[
+                    "missing_fields_audit"
+                ] = result.missing_fields
 
                 # Track per-field confidence
                 event_id = str(event.source_event_id)

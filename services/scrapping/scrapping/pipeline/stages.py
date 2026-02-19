@@ -239,7 +239,9 @@ def run_pipeline_v1(
 
     # 3) extract links
     discovery = source_cfg.get("discovery") or {}
-    link_cfg = (discovery.get("link_extract") or {}) if isinstance(discovery, dict) else {}
+    link_cfg = (
+        (discovery.get("link_extract") or {}) if isinstance(discovery, dict) else {}
+    )
 
     base_url = _guess_base_url(listing_urls[0]) if listing_urls else None
     all_links: list[str] = []
@@ -276,7 +278,9 @@ def run_pipeline_v1(
         engine=engine,
         ctx=ctx,
         parallelism=max(1, parallelism),
-        rendered=(engine_type in ("browser", "hybrid")),  # for hybrid, get_rendered => browser
+        rendered=(
+            engine_type in ("browser", "hybrid")
+        ),  # for hybrid, get_rendered => browser
         actions=actions if engine_type in ("browser", "hybrid") else None,
         wait_for=None,
     )
@@ -292,7 +296,11 @@ def run_pipeline_v1(
 
     # 5) parse + normalize items
     items: list[dict[str, Any]] = []
-    parse_cfg = (source_cfg.get("parse") or {}) if isinstance(source_cfg.get("parse"), dict) else {}
+    parse_cfg = (
+        (source_cfg.get("parse") or {})
+        if isinstance(source_cfg.get("parse"), dict)
+        else {}
+    )
     title_selector = parse_cfg.get("title_selector")  # optional
     text_selector = parse_cfg.get("text_selector")  # optional
 
@@ -310,7 +318,11 @@ def run_pipeline_v1(
             text = structured.text
         else:
             title = select_text_bs4(html, title_selector) if title_selector else None
-            text = select_text_bs4(html, text_selector) if text_selector else get_text_bs4(html)
+            text = (
+                select_text_bs4(html, text_selector)
+                if text_selector
+                else get_text_bs4(html)
+            )
 
         item = {
             "url": url,

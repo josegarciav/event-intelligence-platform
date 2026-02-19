@@ -119,7 +119,9 @@ class DirectMCPClient(MCPClient):
         if handler:
             return await handler(payload)
         logger.warning(f"DirectMCPClient: unknown write operation '{operation}'")
-        return WriteResult(success=False, operation=operation, error=f"Unknown operation: {operation}")
+        return WriteResult(
+            success=False, operation=operation, error=f"Unknown operation: {operation}"
+        )
 
     # -------------------------------------------------------------------------
     # Read handlers

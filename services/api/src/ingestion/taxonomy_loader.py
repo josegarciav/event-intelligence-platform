@@ -52,7 +52,9 @@ def load_taxonomy() -> dict:
 # ---------------------------------------------------------------------------
 
 
-def insert_primary_category(cur: psycopg2.extensions.cursor, category: dict, meta: dict) -> None:
+def insert_primary_category(
+    cur: psycopg2.extensions.cursor, category: dict, meta: dict
+) -> None:
     """Insert top-level experience category."""
     cur.execute(
         """
@@ -71,7 +73,9 @@ def insert_primary_category(cur: psycopg2.extensions.cursor, category: dict, met
     )
 
 
-def insert_subcategory(cur: psycopg2.extensions.cursor, sub: dict, category_id: str) -> None:
+def insert_subcategory(
+    cur: psycopg2.extensions.cursor, sub: dict, category_id: str
+) -> None:
     """Insert subcategory metadata."""
     cur.execute(
         """
@@ -137,7 +141,9 @@ def insert_activity_metadata(
     )
 
 
-def insert_subcategory_value(cur: psycopg2.extensions.cursor, subcategory_id: str, value: str) -> None:
+def insert_subcategory_value(
+    cur: psycopg2.extensions.cursor, subcategory_id: str, value: str
+) -> None:
     """Insert subcategory psychological value."""
     cur.execute(
         """
@@ -155,7 +161,9 @@ def insert_subcategory_value(cur: psycopg2.extensions.cursor, subcategory_id: st
     )
 
 
-def insert_activity_emotion(cur: psycopg2.extensions.cursor, activity_id: str, emotion: str) -> None:
+def insert_activity_emotion(
+    cur: psycopg2.extensions.cursor, activity_id: str, emotion: str
+) -> None:
     """Insert emotional output associated with an activity."""
     cur.execute(
         """

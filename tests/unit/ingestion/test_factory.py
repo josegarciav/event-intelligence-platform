@@ -530,7 +530,9 @@ class TestRESTAPIPipelineConfig:
 
         assert config is not None
         assert config["connection"]["protocol"] == "rest"
-        assert config["connection"]["endpoint"] == ("https://app.ticketmaster.com/discovery/v2/events.json")
+        assert config["connection"]["endpoint"] == (
+            "https://app.ticketmaster.com/discovery/v2/events.json"
+        )
 
     def test_ticketmaster_pipeline_creation(self):
         """Should create pipeline from Ticketmaster config (even if disabled)."""

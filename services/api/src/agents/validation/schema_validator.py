@@ -45,7 +45,9 @@ class SchemaValidator:
 
         if event.taxonomy:
             tax = event.taxonomy
-            self._check_enum("taxonomy.energy_level", tax.energy_level, _VALID_ENERGY_LEVELS, errors)
+            self._check_enum(
+                "taxonomy.energy_level", tax.energy_level, _VALID_ENERGY_LEVELS, errors
+            )
             self._check_enum(
                 "taxonomy.social_intensity",
                 tax.social_intensity,
@@ -64,8 +66,12 @@ class SchemaValidator:
                 _VALID_PHYSICAL_INVOLVEMENTS,
                 errors,
             )
-            self._check_enum("taxonomy.environment", tax.environment, _VALID_ENVIRONMENTS, errors)
-            self._check_enum("taxonomy.risk_level", tax.risk_level, _VALID_RISK_LEVELS, errors)
+            self._check_enum(
+                "taxonomy.environment", tax.environment, _VALID_ENVIRONMENTS, errors
+            )
+            self._check_enum(
+                "taxonomy.risk_level", tax.risk_level, _VALID_RISK_LEVELS, errors
+            )
             self._check_enum(
                 "taxonomy.age_accessibility",
                 tax.age_accessibility,
@@ -78,18 +84,27 @@ class SchemaValidator:
                 _VALID_REPEATABILITIES,
                 errors,
             )
-            self._check_enum("taxonomy.cost_level", tax.cost_level, _VALID_COST_LEVELS, errors)
-            self._check_enum("taxonomy.time_scale", tax.time_scale, _VALID_TIME_SCALES, errors)
+            self._check_enum(
+                "taxonomy.cost_level", tax.cost_level, _VALID_COST_LEVELS, errors
+            )
+            self._check_enum(
+                "taxonomy.time_scale", tax.time_scale, _VALID_TIME_SCALES, errors
+            )
 
             # Validate emotional_output is a list of non-empty strings
             if tax.emotional_output is not None:
                 if not isinstance(tax.emotional_output, list):
                     errors.append("taxonomy.emotional_output must be a list")
-                elif any(not isinstance(e, str) or not e.strip() for e in tax.emotional_output):
+                elif any(
+                    not isinstance(e, str) or not e.strip()
+                    for e in tax.emotional_output
+                ):
                     errors.append("taxonomy.emotional_output contains invalid entries")
 
         if errors:
-            logger.debug(f"Validation errors for event {event.source_event_id}: {errors}")
+            logger.debug(
+                f"Validation errors for event {event.source_event_id}: {errors}"
+            )
 
         return errors
 

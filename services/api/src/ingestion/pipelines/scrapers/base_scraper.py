@@ -248,7 +248,9 @@ class EventScraper:
             )
 
         self._playwright = await async_playwright().start()
-        self._browser = await self._playwright.chromium.launch(headless=self.config.headless)
+        self._browser = await self._playwright.chromium.launch(
+            headless=self.config.headless
+        )
         logger.info("Browser started")
 
     async def close(self) -> None:
@@ -323,7 +325,8 @@ class EventScraper:
             is_blocked = "captcha" in html.lower() or status_code == 403
 
             return PageFetchResult(
-                ok=not is_blocked and (status_code is None or (200 <= status_code < 400)),
+                ok=not is_blocked
+                and (status_code is None or (200 <= status_code < 400)),
                 url=url,
                 final_url=final_url,
                 status_code=status_code,
@@ -380,7 +383,9 @@ class EventScraper:
             results.append(result)
 
             if result.ok:
-                logger.info(f"Successfully fetched: {url} ({len(result.html or '')} chars)")
+                logger.info(
+                    f"Successfully fetched: {url} ({len(result.html or '')} chars)"
+                )
             else:
                 logger.warning(f"Failed to fetch: {url} - {result.error}")
 
@@ -450,9 +455,13 @@ class EventScraper:
         # Process in batches of `concurrency`
         for i in range(0, len(urls), concurrency):
             batch = urls[i : i + concurrency]
-            logger.info(f"Fetching event batch {i // concurrency + 1} ({len(batch)} URLs)")
+            logger.info(
+                f"Fetching event batch {i // concurrency + 1} ({len(batch)} URLs)"
+            )
 
-            batch_results = await asyncio.gather(*[self._fetch_page(url) for url in batch])
+            batch_results = await asyncio.gather(
+                *[self._fetch_page(url) for url in batch]
+            )
             results.extend(batch_results)
 
             ok_count = sum(1 for r in batch_results if r.ok)
@@ -462,7 +471,9 @@ class EventScraper:
             if i + concurrency < len(urls):
                 await asyncio.sleep(self.config.min_delay_s)
 
-        logger.info(f"Fetched {len(results)} event pages, {sum(1 for r in results if r.ok)} successful")
+        logger.info(
+            f"Fetched {len(results)} event pages, {sum(1 for r in results if r.ok)} successful"
+        )
         return results
 
     async def __aenter__(self) -> EventScraper:

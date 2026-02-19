@@ -61,7 +61,9 @@ class FieldMapper:
                 value = self._extract_field(raw_event, source_path)
                 result[target_field] = value
             except Exception as e:
-                logger.debug(f"Failed to extract {target_field} from {source_path}: {e}")
+                logger.debug(
+                    f"Failed to extract {target_field} from {source_path}: {e}"
+                )
                 result[target_field] = None
 
         # Apply transformations
@@ -108,7 +110,11 @@ class FieldMapper:
                 return []
 
             if remaining_path:
-                return [self._extract_field(item, remaining_path) for item in items if item is not None]
+                return [
+                    self._extract_field(item, remaining_path)
+                    for item in items
+                    if item is not None
+                ]
             return items
 
         # Handle array index: items[0].name or items[0]
@@ -257,7 +263,9 @@ class FieldMapper:
                         result[field_name] = cleaned
 
             except Exception as e:
-                logger.warning(f"Failed to apply transformation {transform_type} to {field_name}: {e}")
+                logger.warning(
+                    f"Failed to apply transformation {transform_type} to {field_name}: {e}"
+                )
 
         return result
 

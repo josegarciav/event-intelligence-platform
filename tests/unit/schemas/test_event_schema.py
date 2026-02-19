@@ -198,7 +198,9 @@ class TestPriceInfo:
 
     def test_price_range_invalid(self):
         """max < min should raise ValidationError."""
-        with pytest.raises(ValidationError, match="maximum_price cannot be less than minimum_price"):
+        with pytest.raises(
+            ValidationError, match="maximum_price cannot be less than minimum_price"
+        ):
             PriceInfo(minimum_price=50, maximum_price=10)
 
     def test_negative_price_rejected(self):
@@ -223,7 +225,11 @@ class TestTicketInfo:
 
     def test_sold_out_flag(self):
         """is_sold_out flag should be stored."""
-        ticket = TicketInfo(url="https://tickets.example.com", is_sold_out=True, ticket_count_available=0)
+        ticket = TicketInfo(
+            url="https://tickets.example.com",
+            is_sold_out=True,
+            ticket_count_available=0,
+        )
         assert ticket.is_sold_out is True
 
 
@@ -287,7 +293,11 @@ class TestMediaAsset:
     def test_full_asset(self):
         """Media asset with all fields."""
         asset = MediaAsset(
-            type="video", url="https://example.com/clip.mp4", title="Event Recap", width=1920, height=1080
+            type="video",
+            url="https://example.com/clip.mp4",
+            title="Event Recap",
+            width=1920,
+            height=1080,
         )
         assert asset.width == 1920
         assert asset.height == 1080
@@ -304,7 +314,9 @@ class TestEngagementMetrics:
 
     def test_with_values(self):
         """Set engagement values."""
-        metrics = EngagementMetrics(going_count=100, interested_count=500, views_count=1000)
+        metrics = EngagementMetrics(
+            going_count=100, interested_count=500, views_count=1000
+        )
         assert metrics.going_count == 100
         assert metrics.views_count == 1000
 
@@ -323,7 +335,9 @@ class TestTaxonomyDimension:
         all_ids = Subcategory.all_ids()
         valid_sub = next((s for s in all_ids if s.startswith("1.")), None)
         if valid_sub:
-            dim = TaxonomyDimension(primary_category="play_pure_fun", subcategory=valid_sub)
+            dim = TaxonomyDimension(
+                primary_category="play_pure_fun", subcategory=valid_sub
+            )
             assert dim.subcategory == valid_sub
 
     def test_invalid_subcategory_rejected(self):
@@ -337,7 +351,9 @@ class TestTaxonomyDimension:
         cat2_sub = next((s for s in all_ids if s.startswith("2.")), None)
         if cat2_sub:
             with pytest.raises(ValidationError, match="does not belong to"):
-                TaxonomyDimension(primary_category="play_pure_fun", subcategory=cat2_sub)
+                TaxonomyDimension(
+                    primary_category="play_pure_fun", subcategory=cat2_sub
+                )
 
     def test_empty_subcategory_coerced_to_none(self):
         """Empty string subcategory should be treated as None."""
@@ -428,7 +444,12 @@ class TestEventBatch:
     def test_batch_creation(self, create_event):
         """Basic batch creation with events."""
         events = [create_event(title=f"Event {i}") for i in range(3)]
-        batch = EventBatch(source_name="test_source", batch_id="batch-001", events=events, total_count=3)
+        batch = EventBatch(
+            source_name="test_source",
+            batch_id="batch-001",
+            events=events,
+            total_count=3,
+        )
         assert batch.source_name == "test_source"
         assert len(batch.events) == 3
         assert batch.total_count == 3
@@ -452,5 +473,7 @@ class TestEventBatch:
     def test_batch_ingestion_timestamp(self, create_event):
         """Batch should auto-set ingestion_timestamp."""
         events = [create_event()]
-        batch = EventBatch(source_name="test", batch_id="batch-003", events=events, total_count=1)
+        batch = EventBatch(
+            source_name="test", batch_id="batch-003", events=events, total_count=1
+        )
         assert batch.ingestion_timestamp is not None

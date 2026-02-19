@@ -185,7 +185,9 @@ class TestEmotionalOutputExtraction:
 
     def test_valid_emotions(self):
         """Valid emotional output."""
-        output = EmotionalOutputExtraction(emotions=["joy", "excitement", "connection", "energy"])
+        output = EmotionalOutputExtraction(
+            emotions=["joy", "excitement", "connection", "energy"]
+        )
         assert len(output.emotions) == 4
         assert "joy" in output.emotions
 

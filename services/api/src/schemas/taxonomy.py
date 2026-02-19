@@ -20,7 +20,13 @@ TAXONOMY_PATH = Config.get_taxonomy_path()
 
 def _normalize_primary_key(label: str) -> str:
     """Normalize category label to index key (lowercase, symbols removed, spaces -> '_')."""
-    return label.lower().replace(" & ", "_").replace(",", "").replace("-", "_").replace(" ", "_")
+    return (
+        label.lower()
+        .replace(" & ", "_")
+        .replace(",", "")
+        .replace("-", "_")
+        .replace(" ", "_")
+    )
 
 
 @lru_cache

@@ -49,7 +49,9 @@ class AgentRegistry:
 
         class_path = _AGENT_MAP.get(agent_name)
         if not class_path:
-            raise ValueError(f"Unknown agent: '{agent_name}'. Add it to AgentRegistry._AGENT_MAP")
+            raise ValueError(
+                f"Unknown agent: '{agent_name}'. Add it to AgentRegistry._AGENT_MAP"
+            )
 
         module_path, class_name = class_path.rsplit(".", 1)
         import importlib

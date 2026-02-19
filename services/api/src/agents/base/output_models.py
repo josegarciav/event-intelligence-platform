@@ -126,7 +126,9 @@ class MissingFieldsExtraction(BaseModel):
     event_format: Literal["in_person", "virtual", "hybrid", "streamed"] | None = Field(
         default=None, description="Event delivery format"
     )
-    tags: list[str] = Field(default_factory=list, description="5-8 relevant search/filter tags")
+    tags: list[str] = Field(
+        default_factory=list, description="5-8 relevant search/filter tags"
+    )
 
 
 # =============================================================================

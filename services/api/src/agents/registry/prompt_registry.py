@@ -111,8 +111,12 @@ class PromptRegistry:
         user_raw = template_data.get("user_prompt", "")
 
         if Template is not None:
-            system_rendered = Template(system_raw, undefined=SilentUndefined).render(**variables)
-            user_rendered = Template(user_raw, undefined=SilentUndefined).render(**variables)
+            system_rendered = Template(system_raw, undefined=SilentUndefined).render(
+                **variables
+            )
+            user_rendered = Template(user_raw, undefined=SilentUndefined).render(
+                **variables
+            )
         else:
             # Simple substitution fallback
             system_rendered = system_raw
@@ -142,7 +146,11 @@ class PromptRegistry:
         """Return all prompt names found in the prompts directory."""
         if not self._dir.exists():
             return []
-        return [p.name for p in self._dir.iterdir() if p.is_dir() and (p / "manifest.yaml").exists()]
+        return [
+            p.name
+            for p in self._dir.iterdir()
+            if p.is_dir() and (p / "manifest.yaml").exists()
+        ]
 
 
 # Singleton

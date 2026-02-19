@@ -39,7 +39,9 @@ class OpenAILLMClient(BaseLLMClient):
 
         settings = get_settings()
         self._api_key: str | None = api_key or (
-            settings.OPENAI_API_KEY.get_secret_value() if settings.OPENAI_API_KEY else None
+            settings.OPENAI_API_KEY.get_secret_value()
+            if settings.OPENAI_API_KEY
+            else None
         )
         self._client = None
         self._last_usage: dict[str, int] = self._empty_usage()
@@ -112,7 +114,9 @@ class OpenAILLMClient(BaseLLMClient):
             result, completion = await client.chat.completions.create_with_completion(
                 model=self.model_name,
                 response_model=output_schema,
-                temperature=(temperature if temperature is not None else self.temperature),
+                temperature=(
+                    temperature if temperature is not None else self.temperature
+                ),
                 max_tokens=max_tokens or self.max_tokens,
                 messages=[
                     {"role": "system", "content": system_prompt},

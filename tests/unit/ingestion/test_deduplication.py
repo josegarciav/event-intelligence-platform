@@ -290,7 +290,9 @@ class TestCompositeDeduplicator:
         """Each strategy operates on the output of the previous one."""
         # Use two exact match deduplicators - second should have no effect
         # since first already removed duplicates
-        deduplicator = CompositeDeduplicator(strategies=[ExactMatchDeduplicator(), ExactMatchDeduplicator()])
+        deduplicator = CompositeDeduplicator(
+            strategies=[ExactMatchDeduplicator(), ExactMatchDeduplicator()]
+        )
         result = deduplicator.deduplicate(duplicate_events)
 
         # Should still be 3 - second strategy has nothing to remove

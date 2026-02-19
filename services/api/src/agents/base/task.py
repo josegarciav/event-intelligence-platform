@@ -34,6 +34,8 @@ class AgentResult:
     prompt_version: str  # resolved version actually used
     events: list["EventSchema"]  # enriched event list
     confidence_scores: dict[str, float] = field(default_factory=dict)  # field → score
-    token_usage: dict[str, int] = field(default_factory=dict)  # prompt_tokens, completion_tokens, total
+    token_usage: dict[str, int] = field(
+        default_factory=dict
+    )  # prompt_tokens, completion_tokens, total
     errors: list[str] = field(default_factory=list)
     duration_seconds: float = 0.0

@@ -101,7 +101,9 @@ class FeatureAlignmentAgent(BaseAgent):
                     from src.schemas.event import EventFormat
 
                     try:
-                        enriched_events[i].event_format = EventFormat(result.event_format)
+                        enriched_events[i].event_format = EventFormat(
+                            result.event_format
+                        )
                     except ValueError:
                         pass
 

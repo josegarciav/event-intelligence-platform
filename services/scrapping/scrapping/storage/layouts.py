@@ -84,7 +84,9 @@ class Layout:
         """Return the links directory for a source."""
         return self.source_dir(run_id, source_id) / "links"
 
-    def extracted_links_path(self, run_id: str, source_id: str, ext: str = "jsonl") -> Path:
+    def extracted_links_path(
+        self, run_id: str, source_id: str, ext: str = "jsonl"
+    ) -> Path:
         """Return the path for extracted links."""
         return self.links_dir(run_id, source_id) / f"extracted_links.{ext}"
 

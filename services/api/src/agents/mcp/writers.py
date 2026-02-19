@@ -18,7 +18,9 @@ async def write_features(
     fields: dict[str, Any],
 ) -> "WriteResult":
     """Write structured feature fields back to the event."""
-    return await client.write("write_features", {"event_id": event_id, "fields": fields})
+    return await client.write(
+        "write_features", {"event_id": event_id, "fields": fields}
+    )
 
 
 async def write_taxonomy(
@@ -27,7 +29,9 @@ async def write_taxonomy(
     taxonomy: dict[str, Any],
 ) -> "WriteResult":
     """Write taxonomy classification results back to the event."""
-    return await client.write("write_taxonomy", {"event_id": event_id, "taxonomy": taxonomy})
+    return await client.write(
+        "write_taxonomy", {"event_id": event_id, "taxonomy": taxonomy}
+    )
 
 
 async def write_emotions(
@@ -36,7 +40,9 @@ async def write_emotions(
     emotional_output: list[str],
 ) -> "WriteResult":
     """Write emotional output tags back to the event."""
-    return await client.write("write_emotions", {"event_id": event_id, "emotional_output": emotional_output})
+    return await client.write(
+        "write_emotions", {"event_id": event_id, "emotional_output": emotional_output}
+    )
 
 
 async def write_tags(

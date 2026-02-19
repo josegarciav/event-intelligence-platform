@@ -91,7 +91,9 @@ def load_events(events: list[Any]) -> int:
         _event_store[event_id] = data
         loaded += 1
 
-    logger.info(f"FastMCP server: loaded {loaded} events into store (total: {len(_event_store)})")
+    logger.info(
+        f"FastMCP server: loaded {loaded} events into store (total: {len(_event_store)})"
+    )
     return loaded
 
 
@@ -166,7 +168,9 @@ def list_events() -> str:
 
     Returns JSON: {"event_ids": [...], "count": int}
     """
-    return json.dumps({"event_ids": list(_event_store.keys()), "count": len(_event_store)})
+    return json.dumps(
+        {"event_ids": list(_event_store.keys()), "count": len(_event_store)}
+    )
 
 
 @mcp.tool()
@@ -207,10 +211,14 @@ def write_features(event_id: str, fields_json: str) -> str:
     try:
         fields = json.loads(fields_json)
     except json.JSONDecodeError as e:
-        return json.dumps({"success": False, "fields_written": [], "error": f"Invalid JSON: {e}"})
+        return json.dumps(
+            {"success": False, "fields_written": [], "error": f"Invalid JSON: {e}"}
+        )
 
     _event_store[event_id].update(fields)
-    return json.dumps({"success": True, "fields_written": list(fields.keys()), "error": None})
+    return json.dumps(
+        {"success": True, "fields_written": list(fields.keys()), "error": None}
+    )
 
 
 @mcp.tool()
@@ -236,14 +244,18 @@ def write_taxonomy(event_id: str, taxonomy_json: str) -> str:
     try:
         taxonomy_data = json.loads(taxonomy_json)
     except json.JSONDecodeError as e:
-        return json.dumps({"success": False, "fields_written": [], "error": f"Invalid JSON: {e}"})
+        return json.dumps(
+            {"success": False, "fields_written": [], "error": f"Invalid JSON: {e}"}
+        )
 
     event = _event_store[event_id]
     if "taxonomy" not in event or event["taxonomy"] is None:
         event["taxonomy"] = {}
     event["taxonomy"].update(taxonomy_data)
 
-    return json.dumps({"success": True, "fields_written": list(taxonomy_data.keys()), "error": None})
+    return json.dumps(
+        {"success": True, "fields_written": list(taxonomy_data.keys()), "error": None}
+    )
 
 
 @mcp.tool()
@@ -300,7 +312,9 @@ def write_tags(event_id: str, tags_json: str) -> str:
         if not isinstance(new_tags, list):
             raise ValueError("Expected a JSON array")
     except (json.JSONDecodeError, ValueError) as e:
-        return json.dumps({"success": False, "tags_count": 0, "error": f"Invalid input: {e}"})
+        return json.dumps(
+            {"success": False, "tags_count": 0, "error": f"Invalid input: {e}"}
+        )
 
     event = _event_store[event_id]
     existing = set(event.get("tags") or [])
@@ -364,8 +378,12 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Pulsecity FastMCP Enrichment Server")
-    parser.add_argument("--host", default="localhost", help="Bind host (default: localhost)")
-    parser.add_argument("--port", type=int, default=8001, help="Bind port (default: 8001)")
+    parser.add_argument(
+        "--host", default="localhost", help="Bind host (default: localhost)"
+    )
+    parser.add_argument(
+        "--port", type=int, default=8001, help="Bind port (default: 8001)"
+    )
     args = parser.parse_args()
 
     run_server(host=args.host, port=args.port)

@@ -62,7 +62,9 @@ _DEFAULT_BLOCK_PATTERNS = [
 _WS = re.compile(r"\s+")
 
 
-def evaluate_quality(item: dict[str, Any], *, rules: dict[str, Any] | None = None) -> QualityResult:
+def evaluate_quality(
+    item: dict[str, Any], *, rules: dict[str, Any] | None = None
+) -> QualityResult:
     """
     Evaluate item quality and decide keep/drop.
 
@@ -91,7 +93,9 @@ def evaluate_quality(item: dict[str, Any], *, rules: dict[str, Any] | None = Non
         for f in required:
             if not item.get(f):
                 issues.append(
-                    QualityIssue("error", "missing_field", f"Missing required field: {f}")
+                    QualityIssue(
+                        "error", "missing_field", f"Missing required field: {f}"
+                    )
                 )
 
     # min lengths
@@ -100,12 +104,16 @@ def evaluate_quality(item: dict[str, Any], *, rules: dict[str, Any] | None = Non
 
     if len(title) < min_title_len:
         issues.append(
-            QualityIssue("warning", "short_title", f"title length {len(title)} < {min_title_len}")
+            QualityIssue(
+                "warning", "short_title", f"title length {len(title)} < {min_title_len}"
+            )
         )
 
     if len(text) < min_text_len:
         issues.append(
-            QualityIssue("error", "short_text", f"text length {len(text)} < {min_text_len}")
+            QualityIssue(
+                "error", "short_text", f"text length {len(text)} < {min_text_len}"
+            )
         )
 
     # anti-bot / blocked page patterns
@@ -113,7 +121,9 @@ def evaluate_quality(item: dict[str, Any], *, rules: dict[str, Any] | None = Non
     try:
         for p in patterns:
             if re.search(p, text.lower(), flags=re.IGNORECASE):
-                issues.append(QualityIssue("error", "blocked_page", f"Matched block pattern: {p}"))
+                issues.append(
+                    QualityIssue("error", "blocked_page", f"Matched block pattern: {p}")
+                )
                 break
     except Exception:
         # if patterns are malformed, warn but don't kill
@@ -142,7 +152,9 @@ def evaluate_quality(item: dict[str, Any], *, rules: dict[str, Any] | None = Non
                 )
         except Exception:
             issues.append(
-                QualityIssue("warning", "bad_boilerplate_rule", "Invalid max_boilerplate_ratio")
+                QualityIssue(
+                    "warning", "bad_boilerplate_rule", "Invalid max_boilerplate_ratio"
+                )
             )
 
     # language allow/deny (uses extracted language if present)
@@ -151,11 +163,15 @@ def evaluate_quality(item: dict[str, Any], *, rules: dict[str, Any] | None = Non
     deny = rules.get("language_deny")
 
     if lang and isinstance(deny, list | tuple) and lang in deny:
-        issues.append(QualityIssue("error", "lang_denied", f"language '{lang}' is denied"))
+        issues.append(
+            QualityIssue("error", "lang_denied", f"language '{lang}' is denied")
+        )
 
     if lang and isinstance(allow, list | tuple) and allow and (lang not in allow):
         issues.append(
-            QualityIssue("error", "lang_not_allowed", f"language '{lang}' not in allowed list")
+            QualityIssue(
+                "error", "lang_not_allowed", f"language '{lang}' not in allowed list"
+            )
         )
 
     keep = not any(i.level == "error" for i in issues)

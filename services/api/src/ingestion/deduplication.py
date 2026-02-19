@@ -146,7 +146,8 @@ class MetadataDeduplicator(EventDeduplicator):
 
         for event in events:
             is_duplicate = any(
-                self._similarity_score(event, kept) >= self.SIMILARITY_THRESHOLD for kept in unique_events
+                self._similarity_score(event, kept) >= self.SIMILARITY_THRESHOLD
+                for kept in unique_events
             )
             if not is_duplicate:
                 unique_events.append(event)

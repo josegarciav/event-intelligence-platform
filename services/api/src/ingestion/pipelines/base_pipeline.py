@@ -144,7 +144,9 @@ class BasePipeline(ABC):
         pass
 
     @abstractmethod
-    def map_to_taxonomy(self, parsed_event: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
+    def map_to_taxonomy(
+        self, parsed_event: dict[str, Any]
+    ) -> tuple[str, list[dict[str, Any]]]:
         """
         Map parsed event to Human Experience Taxonomy.
 
@@ -235,7 +237,9 @@ class BasePipeline(ABC):
                     execution_id=self.execution_id,
                     started_at=self.execution_start_time,
                     ended_at=datetime.now(UTC),
-                    errors=[{"error": e, "stage": "fetch"} for e in fetch_result.errors],
+                    errors=[
+                        {"error": e, "stage": "fetch"} for e in fetch_result.errors
+                    ],
                     metadata=fetch_result.metadata,
                 )
 
@@ -251,13 +255,21 @@ class BasePipeline(ABC):
                     get_deduplicator,
                 )
 
-                deduplicator = get_deduplicator(DeduplicationStrategy(self.config.deduplication_strategy))
+                deduplicator = get_deduplicator(
+                    DeduplicationStrategy(self.config.deduplication_strategy)
+                )
                 before_count = len(normalized_events)
                 normalized_events = deduplicator.deduplicate(normalized_events)
-                self.logger.info(f"Deduplication: {before_count} -> {len(normalized_events)} events")
+                self.logger.info(
+                    f"Deduplication: {before_count} -> {len(normalized_events)} events"
+                )
 
-            status = PipelineStatus.SUCCESS if normalized_events else PipelineStatus.FAILED
-            if normalized_events and len(normalized_events) < len(fetch_result.raw_data):
+            status = (
+                PipelineStatus.SUCCESS if normalized_events else PipelineStatus.FAILED
+            )
+            if normalized_events and len(normalized_events) < len(
+                fetch_result.raw_data
+            ):
                 status = PipelineStatus.PARTIAL_SUCCESS
 
             result = PipelineExecutionResult(
@@ -294,7 +306,9 @@ class BasePipeline(ABC):
                 errors=[{"error": str(e), "stage": "execution"}],
             )
 
-    async def _process_events_batch(self, raw_events: list[dict[str, Any]]) -> list[EventSchema]:
+    async def _process_events_batch(
+        self, raw_events: list[dict[str, Any]]
+    ) -> list[EventSchema]:
         """Process a batch of raw events through the pipeline."""
         normalized_events = []
 
@@ -307,7 +321,9 @@ class BasePipeline(ABC):
                 primary_cat, taxonomy_dims = self.map_to_taxonomy(parsed_event)
 
                 # Step 4: Normalize
-                event = await self.normalize_to_schema(parsed_event, primary_cat, taxonomy_dims)
+                event = await self.normalize_to_schema(
+                    parsed_event, primary_cat, taxonomy_dims
+                )
 
                 # Step 5: Validate
                 is_valid, validation_messages = self.validate_event(event)
@@ -321,7 +337,9 @@ class BasePipeline(ABC):
                 event.normalization_errors.extend(normalized_messages)
 
                 if not is_valid:
-                    self.logger.warning(f"Validation warnings for event {idx}: {normalized_messages}")
+                    self.logger.warning(
+                        f"Validation warnings for event {idx}: {normalized_messages}"
+                    )
 
                 # Step 6: Enrich
                 event = await self.enrich_event(event)
@@ -362,7 +380,11 @@ class BasePipeline(ABC):
         score += min(enrichment_bonus, 0.3)
 
         # Penalize validation errors (up to -10%), excluding INFO severity
-        real_errors = [e for e in event.normalization_errors if e.severity != NormalizationSeverity.INFO]
+        real_errors = [
+            e
+            for e in event.normalization_errors
+            if e.severity != NormalizationSeverity.INFO
+        ]
         error_penalty = min(len(real_errors) * 0.02, 0.1)
         score -= error_penalty
 
@@ -496,17 +518,39 @@ class BasePipeline(ABC):
                 # ==== PRICE (flattened) ====
                 "price_currency": price.currency if price else None,
                 "price_is_free": price.is_free if price else None,
-                "price_minimum": (float(price.minimum_price) if price and price.minimum_price else None),
-                "price_maximum": (float(price.maximum_price) if price and price.maximum_price else None),
-                "price_early_bird": (float(price.early_bird_price) if price and price.early_bird_price else None),
-                "price_standard": (float(price.standard_price) if price and price.standard_price else None),
-                "price_vip": (float(price.vip_price) if price and price.vip_price else None),
+                "price_minimum": (
+                    float(price.minimum_price)
+                    if price and price.minimum_price
+                    else None
+                ),
+                "price_maximum": (
+                    float(price.maximum_price)
+                    if price and price.maximum_price
+                    else None
+                ),
+                "price_early_bird": (
+                    float(price.early_bird_price)
+                    if price and price.early_bird_price
+                    else None
+                ),
+                "price_standard": (
+                    float(price.standard_price)
+                    if price and price.standard_price
+                    else None
+                ),
+                "price_vip": (
+                    float(price.vip_price) if price and price.vip_price else None
+                ),
                 "price_raw_text": price.price_raw_text if price else None,
                 # ==== TICKET INFO (flattened) ====
                 "ticket_url": ticket.url if ticket else None,
                 "ticket_is_sold_out": ticket.is_sold_out if ticket else None,
-                "ticket_count_available": (ticket.ticket_count_available if ticket else None),
-                "ticket_early_bird_deadline": (ticket.early_bird_deadline if ticket else None),
+                "ticket_count_available": (
+                    ticket.ticket_count_available if ticket else None
+                ),
+                "ticket_early_bird_deadline": (
+                    ticket.early_bird_deadline if ticket else None
+                ),
                 # ==== ORGANIZER (flattened) ====
                 "organizer_name": org.name if org else None,
                 "organizer_url": org.url if org else None,
@@ -532,37 +576,71 @@ class BasePipeline(ABC):
                 "engagement_likes_count": eng.likes_count if eng else None,
                 "engagement_updated_at": eng.updated_at if eng else None,
                 # ==== TAXONOMY - PRIMARY CATEGORY ====
-                "primary_category": (primary_dim.primary_category if primary_dim else None),
+                "primary_category": (
+                    primary_dim.primary_category if primary_dim else None
+                ),
                 # ==== TAXONOMY - PRIMARY DIMENSION (flattened) ====
-                "taxonomy_subcategory": (primary_dim.subcategory if primary_dim else None),
-                "taxonomy_subcategory_name": (primary_dim.subcategory_name if primary_dim else None),
-                "taxonomy_values": (", ".join(primary_dim.values) if primary_dim and primary_dim.values else None),
-                "taxonomy_activity_id": (primary_dim.activity_id if primary_dim else None),
-                "taxonomy_activity_name": (primary_dim.activity_name if primary_dim else None),
-                "taxonomy_energy_level": (primary_dim.energy_level if primary_dim else None),
-                "taxonomy_social_intensity": (primary_dim.social_intensity if primary_dim else None),
-                "taxonomy_cognitive_load": (primary_dim.cognitive_load if primary_dim else None),
-                "taxonomy_physical_involvement": (primary_dim.physical_involvement if primary_dim else None),
+                "taxonomy_subcategory": (
+                    primary_dim.subcategory if primary_dim else None
+                ),
+                "taxonomy_subcategory_name": (
+                    primary_dim.subcategory_name if primary_dim else None
+                ),
+                "taxonomy_values": (
+                    ", ".join(primary_dim.values)
+                    if primary_dim and primary_dim.values
+                    else None
+                ),
+                "taxonomy_activity_id": (
+                    primary_dim.activity_id if primary_dim else None
+                ),
+                "taxonomy_activity_name": (
+                    primary_dim.activity_name if primary_dim else None
+                ),
+                "taxonomy_energy_level": (
+                    primary_dim.energy_level if primary_dim else None
+                ),
+                "taxonomy_social_intensity": (
+                    primary_dim.social_intensity if primary_dim else None
+                ),
+                "taxonomy_cognitive_load": (
+                    primary_dim.cognitive_load if primary_dim else None
+                ),
+                "taxonomy_physical_involvement": (
+                    primary_dim.physical_involvement if primary_dim else None
+                ),
                 "taxonomy_cost_level": primary_dim.cost_level if primary_dim else None,
                 "taxonomy_time_scale": primary_dim.time_scale if primary_dim else None,
-                "taxonomy_environment": (primary_dim.environment if primary_dim else None),
+                "taxonomy_environment": (
+                    primary_dim.environment if primary_dim else None
+                ),
                 "taxonomy_emotional_output": (
-                    ", ".join(primary_dim.emotional_output) if primary_dim and primary_dim.emotional_output else None
+                    ", ".join(primary_dim.emotional_output)
+                    if primary_dim and primary_dim.emotional_output
+                    else None
                 ),
                 "taxonomy_risk_level": primary_dim.risk_level if primary_dim else None,
-                "taxonomy_age_accessibility": (primary_dim.age_accessibility if primary_dim else None),
-                "taxonomy_repeatability": (primary_dim.repeatability if primary_dim else None),
+                "taxonomy_age_accessibility": (
+                    primary_dim.age_accessibility if primary_dim else None
+                ),
+                "taxonomy_repeatability": (
+                    primary_dim.repeatability if primary_dim else None
+                ),
                 # ==== FULL TAXONOMY JSON ====
                 "taxonomy_dimension_json": taxonomy_json,
                 # ==== QUALITY & ERRORS ====
                 "data_quality_score": event.data_quality_score,
                 "normalization_errors": (
-                    ", ".join(e.message for e in event.normalization_errors) if event.normalization_errors else None
+                    ", ".join(e.message for e in event.normalization_errors)
+                    if event.normalization_errors
+                    else None
                 ),
                 # ==== ADDITIONAL METADATA ====
                 "tags": ", ".join(event.tags) if event.tags else None,
                 "artists": artists_str,
-                "custom_fields_json": (json.dumps(event.custom_fields) if event.custom_fields else None),
+                "custom_fields_json": (
+                    json.dumps(event.custom_fields) if event.custom_fields else None
+                ),
                 # ==== PLATFORM TIMESTAMPS ====
                 "created_at": event.created_at,
                 "updated_at": event.updated_at,

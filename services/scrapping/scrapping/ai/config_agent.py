@@ -157,7 +157,8 @@ class ConfigAgent:
 
         # Entry points
         entrypoints = [
-            {"url": u, "paging": {"mode": "page", "pages": 1, "start": 1, "step": 1}} for u in urls
+            {"url": u, "paging": {"mode": "page", "pages": 1, "start": 1, "step": 1}}
+            for u in urls
         ]
         if len(entrypoints) > 5:
             rationale.append(
@@ -283,7 +284,9 @@ class ConfigAgent:
         if hints:
             for h in hints:
                 if h.is_js_heavy is True:
-                    rationale.append("Hints indicate JS-heavy pages -> choosing hybrid engine.")
+                    rationale.append(
+                        "Hints indicate JS-heavy pages -> choosing hybrid engine."
+                    )
                     return "hybrid", 0.85, rationale
 
         # URL pattern heuristics: common SPA frameworks / dynamic search pages

@@ -136,7 +136,10 @@ class TestValidateSubcategoryForPrimary:
     def test_valid_subcategory_with_value(self):
         """Should accept primary category value as well as ID."""
         assert validate_subcategory_for_primary("1.4", "play_pure_fun") is True
-        assert validate_subcategory_for_primary("5.1", "social_connection_belonging") is True
+        assert (
+            validate_subcategory_for_primary("5.1", "social_connection_belonging")
+            is True
+        )
 
     def test_invalid_subcategory(self):
         """Invalid subcategory should return False."""
