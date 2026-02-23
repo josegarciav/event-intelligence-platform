@@ -152,13 +152,6 @@ uv sync
 uv lock
 ```
 
-
-Running pre-commit:
-
-```bash
-uv run pre-commit run --all-files --unsafe-fixes
-```
-
 Opening Claude:
 
 ```bash
