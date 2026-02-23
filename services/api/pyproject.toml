@@ -48,5 +48,5 @@ dev = [
 ]
 
 
-[tool.ruff.lint]
+[tool.ruff]
 exclude = ["notebooks"]

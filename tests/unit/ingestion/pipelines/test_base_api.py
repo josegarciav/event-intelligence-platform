@@ -4,8 +4,9 @@ Unit tests for the base_api module.
 Tests for BaseAPIPipeline, APISourceConfig, and ConfigDrivenAPIAdapter.
 """
 
+import asyncio
 from datetime import UTC, datetime, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from src.ingestion.adapters import FetchResult, SourceType
@@ -44,7 +45,7 @@ def sample_source_config():
             "source_event_id": "id",
         },
         taxonomy_config={
-            "default_primary": "play_and_fun",
+            "default_primary": "play_pure_fun",
             "default_subcategory": "1.4",
         },
         defaults={
@@ -529,7 +530,7 @@ class TestBaseAPIPipelineEnrichEvent:
             end_datetime=end,
         )
 
-        result = pipeline.enrich_event(event)
+        result = asyncio.run(pipeline.enrich_event(event))
 
         assert result.duration_minutes == 180
 
@@ -545,7 +546,7 @@ class TestBaseAPIPipelineEnrichEvent:
             location=LocationInfo(city="Berlin", venue_name="Test Venue"),
         )
 
-        result = pipeline.enrich_event(event)
+        result = asyncio.run(pipeline.enrich_event(event))
 
         assert result.location.timezone == "Europe/Berlin"
 
@@ -561,7 +562,7 @@ class TestBaseAPIPipelineEnrichEvent:
             location=LocationInfo(city="Unknown City", venue_name="Test Venue"),
         )
 
-        result = pipeline.enrich_event(event)
+        result = asyncio.run(pipeline.enrich_event(event))
 
         assert result.location.timezone == "Europe/Madrid"
 
@@ -572,7 +573,9 @@ class TestBaseAPIPipelineEnrichEvent:
         pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
         pipeline.source_config = sample_source_config
         pipeline.html_enrichment_scraper = MagicMock()
-        pipeline.html_enrichment_scraper.fetch_compressed_html.return_value = None
+        pipeline.html_enrichment_scraper.fetch_compressed_html = AsyncMock(
+            return_value=None
+        )
 
         event = create_event(
             title="Fallback Title",
@@ -581,7 +584,7 @@ class TestBaseAPIPipelineEnrichEvent:
         # Ensure source URL exists to trigger enrichment path.
         event.source.source_url = "https://example.com/event/1"
 
-        result = pipeline.enrich_event(event)
+        result = asyncio.run(pipeline.enrich_event(event))
 
         assert result.source.compressed_html is None
         assert any(
@@ -611,10 +614,12 @@ class TestBaseAPIPipelineNormalizeToSchema:
             "country_code": "ES",
             "source_url": "https://example.com/event/1",
         }
-        event = pipeline.normalize_to_schema(
-            parsed_event=parsed,
-            primary_cat="play_and_fun",
-            taxonomy_dims=[],
+        event = asyncio.run(
+            pipeline.normalize_to_schema(
+                parsed_event=parsed,
+                primary_cat="play_pure_fun",
+                taxonomy_dims=[],
+            )
         )
 
         assert event.age_restriction == "21"
@@ -638,10 +643,12 @@ class TestBaseAPIPipelineNormalizeToSchema:
             "country_code": "ES",
             "source_url": "https://example.com/event/2",
         }
-        event = pipeline.normalize_to_schema(
-            parsed_event=parsed,
-            primary_cat="play_and_fun",
-            taxonomy_dims=[],
+        event = asyncio.run(
+            pipeline.normalize_to_schema(
+                parsed_event=parsed,
+                primary_cat="play_pure_fun",
+                taxonomy_dims=[],
+            )
         )
 
         assert event.location.coordinates is not None
@@ -666,11 +673,11 @@ class TestBaseAPIPipelineExecuteNormalizationNoise:
         pipeline.execution_id = None
         pipeline.execution_start_time = None
 
-        pipeline._fetch_with_date_splitting = MagicMock(return_value=[{"id": "x"}])
+        pipeline._fetch_with_date_splitting = AsyncMock(return_value=[{"id": "x"}])
         event = create_event(title="No Noise")
-        pipeline._process_events_batch = MagicMock(return_value=[event])
+        pipeline._process_events_batch = AsyncMock(return_value=[event])
 
-        result = pipeline.execute()
+        result = asyncio.run(pipeline.execute())
 
         assert result.events
         # Verify no spurious normalization errors added by pipeline infrastructure
@@ -697,7 +704,7 @@ class TestCreateAPIPipelineFromConfig:
                 "response_path": "data.events",
             },
             "field_mappings": {"title": "name"},
-            "taxonomy": {"default_primary": "play_and_fun"},
+            "taxonomy": {"default_primary": "play_pure_fun"},
         }
 
         create_api_pipeline_from_config("test_source", config_dict)
@@ -777,6 +784,7 @@ def _make_pipeline_for_date_splitting(source_config=None, pipeline_config=None):
         source_type=SourceType.API,
     )
     pipeline.adapter = MagicMock()
+    pipeline.adapter.fetch = AsyncMock()
     pipeline.logger = MagicMock()
     return pipeline
 
@@ -803,13 +811,15 @@ class TestFetchWithDateSplitting:
     def test_single_window_non_saturated(self):
         """When all data fits in one window, no splitting occurs."""
         pipeline = _make_pipeline_for_date_splitting()
-        pipeline.adapter.fetch.return_value = _make_fetch_result(30, 30)
+        pipeline.adapter.fetch = AsyncMock(return_value=_make_fetch_result(30, 30))
 
-        events = pipeline._fetch_with_date_splitting(
-            area_id=20,
-            city_name="Barcelona",
-            date_from="2025-06-01",
-            date_to="2025-06-08",
+        events = asyncio.run(
+            pipeline._fetch_with_date_splitting(
+                area_id=20,
+                city_name="Barcelona",
+                date_from="2025-06-01",
+                date_to="2025-06-08",
+            )
         )
 
         assert len(events) == 30
@@ -821,17 +831,21 @@ class TestFetchWithDateSplitting:
 
         # First call: saturated (100 available, only 50 fetched) with 7d window
         # Second call: non-saturated after halving to ~3.5d
-        pipeline.adapter.fetch.side_effect = [
-            _make_fetch_result(50, total_available=100),  # saturated, retry
-            _make_fetch_result(40, total_available=40),  # ok, advance
-            _make_fetch_result(35, total_available=35),  # ok, advance
-        ]
+        pipeline.adapter.fetch = AsyncMock(
+            side_effect=[
+                _make_fetch_result(50, total_available=100),  # saturated, retry
+                _make_fetch_result(40, total_available=40),  # ok, advance
+                _make_fetch_result(35, total_available=35),  # ok, advance
+            ]
+        )
 
-        events = pipeline._fetch_with_date_splitting(
-            area_id=20,
-            city_name="Barcelona",
-            date_from="2025-06-01",
-            date_to="2025-06-08",
+        events = asyncio.run(
+            pipeline._fetch_with_date_splitting(
+                area_id=20,
+                city_name="Barcelona",
+                date_from="2025-06-01",
+                date_to="2025-06-08",
+            )
         )
 
         # First fetch was saturated, so data is NOT collected (retry with smaller window)
@@ -844,18 +858,22 @@ class TestFetchWithDateSplitting:
         pipeline = _make_pipeline_for_date_splitting()
 
         # 7d → saturated → 3.5d (84h) → saturated → 1.75d (42h) → ok
-        pipeline.adapter.fetch.side_effect = [
-            _make_fetch_result(50, total_available=200),  # 168h window, saturated
-            _make_fetch_result(50, total_available=150),  # 84h window, saturated
-            _make_fetch_result(40, total_available=40),  # 42h window, ok
-            _make_fetch_result(30, total_available=30),  # next window, ok
-        ]
+        pipeline.adapter.fetch = AsyncMock(
+            side_effect=[
+                _make_fetch_result(50, total_available=200),  # 168h window, saturated
+                _make_fetch_result(50, total_available=150),  # 84h window, saturated
+                _make_fetch_result(40, total_available=40),  # 42h window, ok
+                _make_fetch_result(30, total_available=30),  # next window, ok
+            ]
+        )
 
-        events = pipeline._fetch_with_date_splitting(
-            area_id=20,
-            city_name="Barcelona",
-            date_from="2025-06-01",
-            date_to="2025-06-04",
+        events = asyncio.run(
+            pipeline._fetch_with_date_splitting(
+                area_id=20,
+                city_name="Barcelona",
+                date_from="2025-06-01",
+                date_to="2025-06-04",
+            )
         )
 
         # Only non-saturated fetches contribute events
@@ -873,22 +891,26 @@ class TestFetchWithDateSplitting:
         # Halving: 168h→84h→42h→21h→10h→6h (min). At 6h: accept+warn.
         # After accepting at 6h, cursor advances to 06:00.
         # Window restores to 12h → fetch [06:00..18:00], then 24h → [18:00..June 2].
-        pipeline.adapter.fetch.side_effect = [
-            saturated,  # 168h, retry
-            saturated,  # 84h, retry
-            saturated,  # 42h, retry
-            saturated,  # 21h, retry
-            saturated,  # 10h, retry (10//2=5, clamped to 6)
-            saturated,  # 6h (min), accept + warn, advance to 06:00
-            non_saturated,  # 12h [06:00..18:00], ok, advance to 18:00
-            non_saturated,  # 24h [18:00..June 2], ok, done
-        ]
+        pipeline.adapter.fetch = AsyncMock(
+            side_effect=[
+                saturated,  # 168h, retry
+                saturated,  # 84h, retry
+                saturated,  # 42h, retry
+                saturated,  # 21h, retry
+                saturated,  # 10h, retry (10//2=5, clamped to 6)
+                saturated,  # 6h (min), accept + warn, advance to 06:00
+                non_saturated,  # 12h [06:00..18:00], ok, advance to 18:00
+                non_saturated,  # 24h [18:00..June 2], ok, done
+            ]
+        )
 
-        events = pipeline._fetch_with_date_splitting(
-            area_id=20,
-            city_name="Barcelona",
-            date_from="2025-06-01",
-            date_to="2025-06-02",
+        events = asyncio.run(
+            pipeline._fetch_with_date_splitting(
+                area_id=20,
+                city_name="Barcelona",
+                date_from="2025-06-01",
+                date_to="2025-06-02",
+            )
         )
 
         # Saturated window data (50) + two non-saturated windows (10 + 10)
@@ -908,17 +930,19 @@ class TestFetchWithDateSplitting:
         # Track the date_from in each fetch call to verify window sizing
         call_dates = []
 
-        def track_fetch(**kwargs):
+        async def track_fetch(**kwargs):
             call_dates.append((kwargs.get("date_from"), kwargs.get("date_to")))
             return _make_fetch_result(10, total_available=10)
 
-        pipeline.adapter.fetch.side_effect = track_fetch
+        pipeline.adapter.fetch = track_fetch
 
-        pipeline._fetch_with_date_splitting(
-            area_id=20,
-            city_name="Barcelona",
-            date_from="2025-06-01",
-            date_to="2025-07-01",
+        asyncio.run(
+            pipeline._fetch_with_date_splitting(
+                area_id=20,
+                city_name="Barcelona",
+                date_from="2025-06-01",
+                date_to="2025-07-01",
+            )
         )
 
         # All calls should succeed (non-saturated), window stays at 7 days
@@ -934,7 +958,7 @@ class TestFetchWithDateSplitting:
         seen_page_sizes = []
         seen_max_pages = []
 
-        def adaptive_fetch(**kwargs):
+        async def adaptive_fetch(**kwargs):
             ps = kwargs.get("page_size")
             mp = kwargs.get("max_pages")
             seen_page_sizes.append(ps)
@@ -948,15 +972,17 @@ class TestFetchWithDateSplitting:
                 return _make_fetch_result(20, total_available=20)
             return _make_fetch_result(5, total_available=53)
 
-        pipeline.adapter.fetch.side_effect = adaptive_fetch
+        pipeline.adapter.fetch = adaptive_fetch
 
-        events = pipeline._fetch_with_date_splitting(
-            area_id=20,
-            city_name="Barcelona",
-            date_from="2025-06-01",
-            date_to="2025-06-02",
-            page_size=5,
-            max_pages=1,
+        events = asyncio.run(
+            pipeline._fetch_with_date_splitting(
+                area_id=20,
+                city_name="Barcelona",
+                date_from="2025-06-01",
+                date_to="2025-06-02",
+                page_size=5,
+                max_pages=1,
+            )
         )
 
         assert len(events) > 0
@@ -967,16 +993,20 @@ class TestFetchWithDateSplitting:
         """Empty/failed fetch should advance cursor to avoid infinite loop."""
         pipeline = _make_pipeline_for_date_splitting()
 
-        pipeline.adapter.fetch.side_effect = [
-            _make_fetch_result(0, success=True),  # empty
-            _make_fetch_result(20, total_available=20),  # next window ok
-        ]
+        pipeline.adapter.fetch = AsyncMock(
+            side_effect=[
+                _make_fetch_result(0, success=True),  # empty
+                _make_fetch_result(20, total_available=20),  # next window ok
+            ]
+        )
 
-        events = pipeline._fetch_with_date_splitting(
-            area_id=20,
-            city_name="Barcelona",
-            date_from="2025-06-01",
-            date_to="2025-06-15",
+        events = asyncio.run(
+            pipeline._fetch_with_date_splitting(
+                area_id=20,
+                city_name="Barcelona",
+                date_from="2025-06-01",
+                date_to="2025-06-15",
+            )
         )
 
         assert len(events) == 20
@@ -986,16 +1016,20 @@ class TestFetchWithDateSplitting:
         """Failed fetch should advance cursor."""
         pipeline = _make_pipeline_for_date_splitting()
 
-        pipeline.adapter.fetch.side_effect = [
-            _make_fetch_result(0, success=False),  # failed
-            _make_fetch_result(15, total_available=15),  # ok
-        ]
+        pipeline.adapter.fetch = AsyncMock(
+            side_effect=[
+                _make_fetch_result(0, success=False),  # failed
+                _make_fetch_result(15, total_available=15),  # ok
+            ]
+        )
 
-        events = pipeline._fetch_with_date_splitting(
-            area_id=20,
-            city_name="Barcelona",
-            date_from="2025-06-01",
-            date_to="2025-06-15",
+        events = asyncio.run(
+            pipeline._fetch_with_date_splitting(
+                area_id=20,
+                city_name="Barcelona",
+                date_from="2025-06-01",
+                date_to="2025-06-15",
+            )
         )
 
         assert len(events) == 15
@@ -1005,17 +1039,19 @@ class TestFetchWithDateSplitting:
         """Should use days_ahead from config when date_to not provided."""
         pipeline = _make_pipeline_for_date_splitting()
         pipeline.source_config.defaults = {"days_ahead": 14}
-        pipeline.adapter.fetch.return_value = _make_fetch_result(10, 10)
+        pipeline.adapter.fetch = AsyncMock(return_value=_make_fetch_result(10, 10))
 
         with patch("src.ingestion.pipelines.apis.base_api.datetime") as mock_dt:
             mock_dt.now.return_value = datetime(2025, 6, 1, tzinfo=UTC)
             mock_dt.strptime = datetime.strptime
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
 
-            events = pipeline._fetch_with_date_splitting(
-                area_id=20,
-                city_name="Barcelona",
-                date_from="2025-06-01",
+            events = asyncio.run(
+                pipeline._fetch_with_date_splitting(
+                    area_id=20,
+                    city_name="Barcelona",
+                    date_from="2025-06-01",
+                )
             )
 
         # Should have fetched events (exact count depends on window math)
@@ -1027,17 +1063,19 @@ class TestFetchWithDateSplitting:
 
         fetched_ranges = []
 
-        def track_fetch(**kwargs):
+        async def track_fetch(**kwargs):
             fetched_ranges.append((kwargs["date_from"], kwargs["date_to"]))
             return _make_fetch_result(5, total_available=5)
 
-        pipeline.adapter.fetch.side_effect = track_fetch
+        pipeline.adapter.fetch = track_fetch
 
-        pipeline._fetch_with_date_splitting(
-            area_id=20,
-            city_name="Barcelona",
-            date_from="2025-06-01",
-            date_to="2025-06-22",
+        asyncio.run(
+            pipeline._fetch_with_date_splitting(
+                area_id=20,
+                city_name="Barcelona",
+                date_from="2025-06-01",
+                date_to="2025-06-22",
+            )
         )
 
         # Verify no gaps: each window starts where the last ended
@@ -1049,14 +1087,16 @@ class TestFetchWithDateSplitting:
     def test_passes_extra_kwargs_to_adapter(self):
         """Extra kwargs should be forwarded to adapter.fetch."""
         pipeline = _make_pipeline_for_date_splitting()
-        pipeline.adapter.fetch.return_value = _make_fetch_result(10, 10)
+        pipeline.adapter.fetch = AsyncMock(return_value=_make_fetch_result(10, 10))
 
-        pipeline._fetch_with_date_splitting(
-            area_id=20,
-            city_name="Barcelona",
-            date_from="2025-06-01",
-            date_to="2025-06-08",
-            custom_param="value",
+        asyncio.run(
+            pipeline._fetch_with_date_splitting(
+                area_id=20,
+                city_name="Barcelona",
+                date_from="2025-06-01",
+                date_to="2025-06-08",
+                custom_param="value",
+            )
         )
 
         # Verify custom_param was passed through
@@ -1071,13 +1111,15 @@ class TestFetchWithDateSplittingEdgeCases:
     def test_single_day_range(self):
         """Should handle a single-day date range."""
         pipeline = _make_pipeline_for_date_splitting()
-        pipeline.adapter.fetch.return_value = _make_fetch_result(5, 5)
+        pipeline.adapter.fetch = AsyncMock(return_value=_make_fetch_result(5, 5))
 
-        events = pipeline._fetch_with_date_splitting(
-            area_id=20,
-            city_name="Barcelona",
-            date_from="2025-06-01",
-            date_to="2025-06-02",
+        events = asyncio.run(
+            pipeline._fetch_with_date_splitting(
+                area_id=20,
+                city_name="Barcelona",
+                date_from="2025-06-01",
+                date_to="2025-06-02",
+            )
         )
 
         assert len(events) == 5
@@ -1087,11 +1129,13 @@ class TestFetchWithDateSplittingEdgeCases:
         """Should return empty when start == end."""
         pipeline = _make_pipeline_for_date_splitting()
 
-        events = pipeline._fetch_with_date_splitting(
-            area_id=20,
-            city_name="Barcelona",
-            date_from="2025-06-01",
-            date_to="2025-06-01",
+        events = asyncio.run(
+            pipeline._fetch_with_date_splitting(
+                area_id=20,
+                city_name="Barcelona",
+                date_from="2025-06-01",
+                date_to="2025-06-01",
+            )
         )
 
         assert len(events) == 0
@@ -1100,13 +1144,17 @@ class TestFetchWithDateSplittingEdgeCases:
     def test_all_windows_empty(self):
         """Should handle case where all windows return no data."""
         pipeline = _make_pipeline_for_date_splitting()
-        pipeline.adapter.fetch.return_value = _make_fetch_result(0, success=True)
+        pipeline.adapter.fetch = AsyncMock(
+            return_value=_make_fetch_result(0, success=True)
+        )
 
-        events = pipeline._fetch_with_date_splitting(
-            area_id=20,
-            city_name="Barcelona",
-            date_from="2025-06-01",
-            date_to="2025-06-15",
+        events = asyncio.run(
+            pipeline._fetch_with_date_splitting(
+                area_id=20,
+                city_name="Barcelona",
+                date_from="2025-06-01",
+                date_to="2025-06-15",
+            )
         )
 
         assert len(events) == 0
@@ -1121,10 +1169,7 @@ class TestFetchWithDateSplittingEdgeCases:
 class TestMultiCityExecution:
     """Tests for multi-city execution via execute()."""
 
-    @patch.object(BaseAPIPipeline, "_process_events_batch", return_value=[])
-    @patch.object(BaseAPIPipeline, "_fetch_with_date_splitting")
-    @patch.object(BaseAPIPipeline, "__init__", return_value=None)
-    def test_execute_iterates_over_areas(self, mock_init, mock_fetch, mock_process):
+    def test_execute_iterates_over_areas(self):
         """Should call _fetch_with_date_splitting for each city in areas."""
         pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
         pipeline.source_config = APISourceConfig(
@@ -1142,9 +1187,12 @@ class TestMultiCityExecution:
         pipeline.adapter = MagicMock()
         pipeline.adapter.source_type = SourceType.API
 
-        mock_fetch.return_value = [{"id": "1"}, {"id": "2"}]
+        mock_fetch = AsyncMock(return_value=[{"id": "1"}, {"id": "2"}])
+        mock_process = AsyncMock(return_value=[])
+        pipeline._fetch_with_date_splitting = mock_fetch
+        pipeline._process_events_batch = mock_process
 
-        pipeline.execute()
+        asyncio.run(pipeline.execute())
 
         # Should have been called twice — once per city
         assert mock_fetch.call_count == 2
@@ -1152,12 +1200,7 @@ class TestMultiCityExecution:
         assert "Barcelona" in city_names
         assert "Madrid" in city_names
 
-    @patch.object(BaseAPIPipeline, "_process_events_batch", return_value=[])
-    @patch.object(BaseAPIPipeline, "_fetch_with_date_splitting")
-    @patch.object(BaseAPIPipeline, "__init__", return_value=None)
-    def test_execute_continues_on_city_failure(
-        self, mock_init, mock_fetch, mock_process
-    ):
+    def test_execute_continues_on_city_failure(self):
         """Should continue with other cities if one fails."""
         pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
         pipeline.source_config = APISourceConfig(
@@ -1176,20 +1219,24 @@ class TestMultiCityExecution:
         pipeline.adapter.source_type = SourceType.API
 
         # First city fails, second succeeds
-        mock_fetch.side_effect = [
-            Exception("Network error"),
-            [{"id": "1"}],
-        ]
+        mock_fetch = AsyncMock(
+            side_effect=[
+                Exception("Network error"),
+                [{"id": "1"}],
+            ]
+        )
+        mock_process = AsyncMock(return_value=[])
+        pipeline._fetch_with_date_splitting = mock_fetch
+        pipeline._process_events_batch = mock_process
 
-        result = pipeline.execute()
+        result = asyncio.run(pipeline.execute())
 
         assert mock_fetch.call_count == 2
         # Should have recorded the error
         assert len(result.errors) == 1
         assert "Network error" in result.errors[0]["error"]
 
-    @patch.object(BaseAPIPipeline, "__init__", return_value=None)
-    def test_execute_falls_back_to_base_without_areas(self, mock_init):
+    def test_execute_falls_back_to_base_without_areas(self):
         """Without areas config, should fall back to BasePipeline.execute."""
         pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
         pipeline.source_config = APISourceConfig(
@@ -1206,7 +1253,7 @@ class TestMultiCityExecution:
 
         # Mock the parent execute
         with patch.object(
-            BasePipeline, "execute", return_value=MagicMock()
+            BasePipeline, "execute", new_callable=AsyncMock
         ) as mock_base_exec:
-            pipeline.execute()
+            asyncio.run(pipeline.execute())
             mock_base_exec.assert_called_once()

@@ -516,7 +516,7 @@ class BasePipeline(ABC):
                 "capacity": event.capacity,
                 "age_restriction": event.age_restriction,
                 # ==== PRICE (flattened) ====
-                "price_currency": price.currency if price else None,
+                "price_currency": price.currency_code if price else None,
                 "price_is_free": price.is_free if price else None,
                 "price_minimum": (
                     float(price.minimum_price)

@@ -16,7 +16,7 @@ from src.schemas.taxonomy import get_all_subcategory_ids
 def valid_subcategory_id():
     """Get a valid subcategory ID for testing."""
     all_ids = get_all_subcategory_ids()
-    # Find a subcategory starting with "1." for play_and_fun
+    # Find a subcategory starting with "1." for play_pure_fun
     for sub_id in all_ids:
         if sub_id.startswith("1."):
             return sub_id
@@ -28,7 +28,7 @@ def basic_mapper(valid_subcategory_id):
     """Create a basic TaxonomyMapper for testing."""
     return TaxonomyMapper(
         {
-            "default_primary": "play_and_fun",
+            "default_primary": "play_pure_fun",
             "default_subcategory": valid_subcategory_id,
             "rules": [],
         }
@@ -42,11 +42,11 @@ class TestTaxonomyMapperInit:
         """Should initialize with defaults."""
         mapper = TaxonomyMapper(
             {
-                "default_primary": "play_and_fun",
+                "default_primary": "play_pure_fun",
                 "default_subcategory": valid_subcategory_id,
             }
         )
-        assert mapper.default_primary == "play_and_fun"
+        assert mapper.default_primary == "play_pure_fun"
         assert mapper.default_subcategory == valid_subcategory_id
         assert mapper.rules == []
 
@@ -58,16 +58,16 @@ class TestTaxonomyMapperInit:
                 "default_subcategory": valid_subcategory_id,
             }
         )
-        assert mapper.default_primary == "play_and_fun"
+        assert mapper.default_primary == "play_pure_fun"
 
     def test_init_with_rules(self, valid_subcategory_id):
         """Should store rules."""
         rules = [
-            {"match": {"always": True}, "assign": {"primary_category": "play_and_fun"}}
+            {"match": {"always": True}, "assign": {"primary_category": "play_pure_fun"}}
         ]
         mapper = TaxonomyMapper(
             {
-                "default_primary": "play_and_fun",
+                "default_primary": "play_pure_fun",
                 "default_subcategory": valid_subcategory_id,
                 "rules": rules,
             }
@@ -88,20 +88,19 @@ class TestTaxonomyMapperInit:
             with pytest.raises(ValueError, match="does not belong to"):
                 TaxonomyMapper(
                     {
-                        "default_primary": "play_and_fun",  # Category 1
+                        "default_primary": "play_pure_fun",  # Category 1
                         "default_subcategory": cat2_sub,  # Category 2 subcategory
                     }
                 )
 
-    def test_init_invalid_primary_fallback(self, valid_subcategory_id):
-        """Should fallback to play_and_fun for invalid primary."""
+    def test_init_invalid_primary_fallback(self):
+        """Should fallback to 'other' for invalid primary."""
         mapper = TaxonomyMapper(
             {
                 "default_primary": "invalid_category",
-                "default_subcategory": valid_subcategory_id,
             }
         )
-        assert mapper.default_primary == "play_and_fun"
+        assert mapper.default_primary == "other"
 
 
 class TestEvaluateMatch:
@@ -252,7 +251,7 @@ class TestCreateDimension:
         """Should create dimension with primary category."""
         mapper = TaxonomyMapper(
             {
-                "default_primary": "play_and_fun",
+                "default_primary": "play_pure_fun",
                 "default_subcategory": valid_subcategory_id,
             }
         )
@@ -260,14 +259,14 @@ class TestCreateDimension:
         dim = mapper._create_dimension(
             event,
             {
-                "primary_category": "play_and_fun",
+                "primary_category": "play_pure_fun",
                 "subcategory": valid_subcategory_id,
                 "confidence": 0.8,
             },
         )
 
         assert dim is not None
-        assert dim.primary_category == "play_and_fun"
+        assert dim.primary_category == "play_pure_fun"
         assert dim.subcategory == valid_subcategory_id
         assert dim.confidence == 0.8
 
@@ -289,13 +288,13 @@ class TestCreateDimension:
         )
 
         assert dim is not None
-        assert dim.primary_category == "play_and_fun"
+        assert dim.primary_category == "play_pure_fun"
 
     def test_create_with_values(self, valid_subcategory_id):
         """Should include provided values."""
         mapper = TaxonomyMapper(
             {
-                "default_primary": "play_and_fun",
+                "default_primary": "play_pure_fun",
                 "default_subcategory": valid_subcategory_id,
             }
         )
@@ -303,7 +302,7 @@ class TestCreateDimension:
         dim = mapper._create_dimension(
             event,
             {
-                "primary_category": "play_and_fun",
+                "primary_category": "play_pure_fun",
                 "subcategory": valid_subcategory_id,
                 "values": ["energy", "excitement"],
             },
@@ -316,7 +315,7 @@ class TestCreateDimension:
         """Should return None for invalid primary category."""
         mapper = TaxonomyMapper(
             {
-                "default_primary": "play_and_fun",
+                "default_primary": "play_pure_fun",
                 "default_subcategory": valid_subcategory_id,
             }
         )
@@ -345,7 +344,7 @@ class TestCreateDimension:
         if cat1_sub and cat2_sub:
             mapper = TaxonomyMapper(
                 {
-                    "default_primary": "play_and_fun",
+                    "default_primary": "play_pure_fun",
                     "default_subcategory": cat1_sub,
                 }
             )
@@ -353,7 +352,7 @@ class TestCreateDimension:
             dim = mapper._create_dimension(
                 event,
                 {
-                    "primary_category": "play_and_fun",  # Category 1
+                    "primary_category": "play_pure_fun",  # Category 1
                     "subcategory": cat2_sub,  # Category 2 subcategory
                 },
             )
@@ -368,13 +367,13 @@ class TestMapEvent:
         """Should apply first matching rule."""
         mapper = TaxonomyMapper(
             {
-                "default_primary": "play_and_fun",
+                "default_primary": "play_pure_fun",
                 "default_subcategory": valid_subcategory_id,
                 "rules": [
                     {
                         "match": {"title_contains": ["techno"]},
                         "assign": {
-                            "primary_category": "play_and_fun",
+                            "primary_category": "play_pure_fun",
                             "subcategory": valid_subcategory_id,
                             "confidence": 0.9,
                         },
@@ -386,7 +385,7 @@ class TestMapEvent:
         event = {"title": "Techno Night"}
         primary, dimensions = mapper.map_event(event)
 
-        assert primary == "play_and_fun"
+        assert primary == "play_pure_fun"
         assert len(dimensions) == 1
         assert dimensions[0].confidence == 0.9
 
@@ -394,12 +393,12 @@ class TestMapEvent:
         """Should use defaults when no rules match."""
         mapper = TaxonomyMapper(
             {
-                "default_primary": "play_and_fun",
+                "default_primary": "play_pure_fun",
                 "default_subcategory": valid_subcategory_id,
                 "rules": [
                     {
                         "match": {"title_contains": ["techno"]},
-                        "assign": {"primary_category": "play_and_fun"},
+                        "assign": {"primary_category": "play_pure_fun"},
                     },
                 ],
             }
@@ -408,7 +407,7 @@ class TestMapEvent:
         event = {"title": "Jazz Concert"}
         primary, dimensions = mapper.map_event(event)
 
-        assert primary == "play_and_fun"
+        assert primary == "play_pure_fun"
         assert len(dimensions) == 1
         assert dimensions[0].subcategory == valid_subcategory_id
 
@@ -423,20 +422,20 @@ class TestMapEvent:
 
             mapper = TaxonomyMapper(
                 {
-                    "default_primary": "play_and_fun",
+                    "default_primary": "play_pure_fun",
                     "default_subcategory": sub1,
                     "rules": [
                         {
                             "match": {"title_contains": ["music"]},
                             "assign": {
-                                "primary_category": "play_and_fun",
+                                "primary_category": "play_pure_fun",
                                 "subcategory": sub1,
                             },
                         },
                         {
                             "match": {"title_contains": ["party"]},
                             "assign": {
-                                "primary_category": "play_and_fun",
+                                "primary_category": "play_pure_fun",
                                 "subcategory": sub2,
                             },
                         },
@@ -454,13 +453,13 @@ class TestMapEvent:
         """Should match 'always' rule."""
         mapper = TaxonomyMapper(
             {
-                "default_primary": "play_and_fun",
+                "default_primary": "play_pure_fun",
                 "default_subcategory": valid_subcategory_id,
                 "rules": [
                     {
                         "match": {"always": True},
                         "assign": {
-                            "primary_category": "play_and_fun",
+                            "primary_category": "play_pure_fun",
                             "subcategory": valid_subcategory_id,
                             "confidence": 0.95,
                         },
@@ -483,13 +482,13 @@ class TestGetFullTaxonomyData:
         """Should return full taxonomy dimension data."""
         mapper = TaxonomyMapper(
             {
-                "default_primary": "play_and_fun",
+                "default_primary": "play_pure_fun",
                 "default_subcategory": valid_subcategory_id,
                 "rules": [
                     {
                         "match": {"always": True},
                         "assign": {
-                            "primary_category": "play_and_fun",
+                            "primary_category": "play_pure_fun",
                             "subcategory": valid_subcategory_id,
                         },
                     },
@@ -500,7 +499,7 @@ class TestGetFullTaxonomyData:
         event = {"title": "Test Event", "description": "A fun event"}
         primary, full_dims = mapper.get_full_taxonomy_data(event)
 
-        assert primary == "play_and_fun"
+        assert primary == "play_pure_fun"
         assert len(full_dims) == 1
         assert "primary_category" in full_dims[0]
         assert "subcategory" in full_dims[0]
@@ -512,14 +511,14 @@ class TestFactoryFunction:
     def test_create_from_config(self, valid_subcategory_id):
         """Should create mapper from config dict."""
         config = {
-            "default_primary": "play_and_fun",
+            "default_primary": "play_pure_fun",
             "default_subcategory": valid_subcategory_id,
             "rules": [{"match": {"always": True}, "assign": {}}],
         }
         mapper = create_taxonomy_mapper_from_config(config)
 
         assert isinstance(mapper, TaxonomyMapper)
-        assert mapper.default_primary == "play_and_fun"
+        assert mapper.default_primary == "play_pure_fun"
 
     def test_create_with_minimal_config(self):
         """Should handle minimal config."""
@@ -527,4 +526,4 @@ class TestFactoryFunction:
         mapper = create_taxonomy_mapper_from_config(config)
 
         assert isinstance(mapper, TaxonomyMapper)
-        assert mapper.default_primary == "play_and_fun"
+        assert mapper.default_primary == "other"

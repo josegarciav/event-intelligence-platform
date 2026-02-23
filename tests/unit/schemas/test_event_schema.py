@@ -174,7 +174,7 @@ class TestPriceInfo:
     def test_default_values(self):
         """Default PriceInfo values."""
         price = PriceInfo()
-        assert price.currency == "USD"
+        assert price.currency_code == "USD"
         assert price.is_free is False
         assert price.minimum_price is None
 
@@ -417,9 +417,9 @@ class TestEventSchema:
 
     def test_event_with_price(self, create_event):
         """PriceInfo nested model should be stored correctly."""
-        price = PriceInfo(minimum_price=25, maximum_price=50, currency="EUR")
+        price = PriceInfo(minimum_price=25, maximum_price=50, currency_code="EUR")
         event = create_event(price=price)
-        assert event.price.currency == "EUR"
+        assert event.price.currency_code == "EUR"
         assert event.price.minimum_price == Decimal("25")
 
     def test_event_with_coordinates(self, create_event):

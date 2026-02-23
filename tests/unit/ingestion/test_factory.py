@@ -439,20 +439,25 @@ class TestRealConfigPipelineCreation:
         factory = PipelineFactory()
         sources = factory.list_sources()
 
+        # ra_co is present in the config (but may be disabled)
         assert "ra_co" in sources
-        assert sources["ra_co"]["enabled"] is True
         assert sources["ra_co"]["type"] == "api"
 
         assert "ticketmaster" in sources
         assert sources["ticketmaster"]["enabled"] is False
 
     def test_factory_creates_ra_co_pipeline(self):
-        """Should create a working pipeline from ra_co config."""
+        """Should create a working pipeline from ra_co config (via direct creation)."""
         from src.ingestion.factory import PipelineFactory
-        from src.ingestion.pipelines.apis.base_api import BaseAPIPipeline
+        from src.ingestion.pipelines.apis.base_api import (
+            BaseAPIPipeline,
+            create_api_pipeline_from_config,
+        )
 
         factory = PipelineFactory()
-        pipeline = factory.create_pipeline("ra_co")
+        # Create pipeline directly from config (bypassing enabled check)
+        config = factory.get_source_config("ra_co")
+        pipeline = create_api_pipeline_from_config("ra_co", config)
 
         assert isinstance(pipeline, BaseAPIPipeline)
         assert pipeline.source_config.source_name == "ra_co"
@@ -464,9 +469,13 @@ class TestRealConfigPipelineCreation:
     def test_factory_creates_pipeline_with_field_mappings(self):
         """Pipeline should have field mappings from config."""
         from src.ingestion.factory import PipelineFactory
+        from src.ingestion.pipelines.apis.base_api import (
+            create_api_pipeline_from_config,
+        )
 
         factory = PipelineFactory()
-        pipeline = factory.create_pipeline("ra_co")
+        config = factory.get_source_config("ra_co")
+        pipeline = create_api_pipeline_from_config("ra_co", config)
 
         assert "title" in pipeline.source_config.field_mappings
         assert pipeline.source_config.field_mappings["title"] == "event.title"
@@ -475,9 +484,13 @@ class TestRealConfigPipelineCreation:
     def test_factory_creates_pipeline_with_areas(self):
         """Pipeline should have multi-city areas from config."""
         from src.ingestion.factory import PipelineFactory
+        from src.ingestion.pipelines.apis.base_api import (
+            create_api_pipeline_from_config,
+        )
 
         factory = PipelineFactory()
-        pipeline = factory.create_pipeline("ra_co")
+        config = factory.get_source_config("ra_co")
+        pipeline = create_api_pipeline_from_config("ra_co", config)
 
         areas = pipeline.source_config.defaults.get("areas", {})
         assert "Barcelona" in areas
@@ -488,9 +501,13 @@ class TestRealConfigPipelineCreation:
     def test_factory_creates_pipeline_with_event_type_rules(self):
         """Pipeline should have event type rules from config."""
         from src.ingestion.factory import PipelineFactory
+        from src.ingestion.pipelines.apis.base_api import (
+            create_api_pipeline_from_config,
+        )
 
         factory = PipelineFactory()
-        pipeline = factory.create_pipeline("ra_co")
+        config = factory.get_source_config("ra_co")
+        pipeline = create_api_pipeline_from_config("ra_co", config)
 
         rules = pipeline.source_config.event_type_rules
         assert len(rules) > 0
@@ -514,8 +531,13 @@ class TestRealConfigPipelineCreation:
         factory = PipelineFactory()
         pipelines = factory.create_all_enabled_pipelines()
 
-        assert "ra_co" in pipelines
+        # Only enabled sources should be in the result
+        enabled_sources = factory.list_enabled_sources()
+        for source in enabled_sources:
+            assert source in pipelines
+        # Disabled sources should not be included
         assert "ticketmaster" not in pipelines
+        assert "ra_co" not in pipelines
 
 
 class TestRESTAPIPipelineConfig:

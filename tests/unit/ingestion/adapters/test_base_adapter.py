@@ -181,18 +181,19 @@ class TestBaseSourceAdapter:
         assert adapter.source_type == SourceType.API
 
     def test_context_manager(self):
-        """Should work as context manager."""
+        """Should work as async context manager."""
+        import asyncio
 
         class ConcreteAdapter(BaseSourceAdapter):
             closed = False
 
-            def fetch(self, **kwargs):
+            async def fetch(self, **kwargs):
                 return FetchResult(success=True, source_type=self.source_type)
 
             def _validate_config(self):
                 pass
 
-            def close(self):
+            async def close(self):
                 self.closed = True
 
         config = AdapterConfig(
@@ -200,10 +201,12 @@ class TestBaseSourceAdapter:
             source_type=SourceType.API,
         )
 
-        with ConcreteAdapter(config) as adapter:
-            assert adapter.closed is False
+        async def run():
+            async with ConcreteAdapter(config) as adapter:
+                assert adapter.closed is False
+            assert adapter.closed is True
 
-        assert adapter.closed is True
+        asyncio.run(run())
 
     def test_close_default_implementation(self):
         """Should have default close that does nothing."""
