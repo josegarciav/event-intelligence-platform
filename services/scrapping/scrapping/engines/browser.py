@@ -49,7 +49,9 @@ class BrowserEngineOptions:
 
     # context behavior
     user_agent: str | None = None
-    viewport: dict[str, int] | None = field(default_factory=lambda: {"width": 1280, "height": 720})
+    viewport: dict[str, int] | None = field(
+        default_factory=lambda: {"width": 1280, "height": 720}
+    )
     locale: str = "en-US"
     timezone_id: str = "UTC"
 
@@ -136,7 +138,10 @@ class BrowserEngine(BaseEngine):
             try:
                 self._browser = browser_launcher.launch(headless=self.options.headless)
             except Exception as e:
-                if "executable doesn't exist" in str(e) or "not installed" in str(e).lower():
+                if (
+                    "executable doesn't exist" in str(e)
+                    or "not installed" in str(e).lower()
+                ):
                     raise RuntimeError(
                         f"Browser binaries for {self.options.browser_name} are missing. "
                         "Run: playwright install"
@@ -155,7 +160,9 @@ class BrowserEngine(BaseEngine):
             self._context = self._browser.new_context(**context_kwargs)
 
             if self.options.trace:
-                self._context.tracing.start(screenshots=True, snapshots=True, sources=True)
+                self._context.tracing.start(
+                    screenshots=True, snapshots=True, sources=True
+                )
 
         except Exception:
             self.close()
@@ -251,7 +258,9 @@ class BrowserEngine(BaseEngine):
                 return future.result()
         except RuntimeError:
             # No loop, just run it.
-            return self._get_rendered_sync(url, ctx=ctx, actions=actions, wait_for=wait_for)
+            return self._get_rendered_sync(
+                url, ctx=ctx, actions=actions, wait_for=wait_for
+            )
 
     async def aget_rendered(
         self,
@@ -319,7 +328,9 @@ class BrowserEngine(BaseEngine):
                     page.route("**/*", _make_route_filter())
 
                 # Navigate
-                resp = page.goto(url, wait_until="domcontentloaded", timeout=nav_timeout_s * 1000)
+                resp = page.goto(
+                    url, wait_until="domcontentloaded", timeout=nav_timeout_s * 1000
+                )
                 status_code = resp.status if resp is not None else None
                 final_url = page.url
 
@@ -395,7 +406,9 @@ class BrowserEngine(BaseEngine):
 
             except Exception as e:
                 elapsed_ms = (time.time() - t0) * 1000
-                err = EngineError(type=type(e).__name__, message=str(e), is_retryable=True)
+                err = EngineError(
+                    type=type(e).__name__, message=str(e), is_retryable=True
+                )
 
                 # Screenshot on error
                 artifacts_meta = {}
@@ -523,9 +536,14 @@ class AsyncBrowserEngine(BaseEngine):
             self._pw = await async_playwright().start()
             browser_launcher = getattr(self._pw, self.options.browser_name)
             try:
-                self._browser = await browser_launcher.launch(headless=self.options.headless)
+                self._browser = await browser_launcher.launch(
+                    headless=self.options.headless
+                )
             except Exception as e:
-                if "executable doesn't exist" in str(e) or "not installed" in str(e).lower():
+                if (
+                    "executable doesn't exist" in str(e)
+                    or "not installed" in str(e).lower()
+                ):
                     raise RuntimeError(
                         f"Browser binaries for {self.options.browser_name} are missing. "
                         "Run: playwright install"
@@ -543,7 +561,9 @@ class AsyncBrowserEngine(BaseEngine):
             self._context = await self._browser.new_context(**context_kwargs)
 
             if self.options.trace:
-                await self._context.tracing.start(screenshots=True, snapshots=True, sources=True)
+                await self._context.tracing.start(
+                    screenshots=True, snapshots=True, sources=True
+                )
 
         except Exception:
             await self.close()
@@ -643,7 +663,9 @@ class AsyncBrowserEngine(BaseEngine):
 
                 # Optional wait_for selector
                 if wait_for:
-                    await page.wait_for_selector(wait_for, timeout=render_timeout_s * 1000)
+                    await page.wait_for_selector(
+                        wait_for, timeout=render_timeout_s * 1000
+                    )
 
                 # Run actions
                 action_results = []
@@ -659,7 +681,9 @@ class AsyncBrowserEngine(BaseEngine):
                 # Handle artifacts
                 artifacts_meta = {}
                 if self.options.save_artifacts:
-                    artifacts_meta = await self._asave_page_artifacts(page, url, attempt, html)
+                    artifacts_meta = await self._asave_page_artifacts(
+                        page, url, attempt, html
+                    )
                 elapsed_ms = (time.time() - t0) * 1000
 
                 resp_headers: Headers = {}
@@ -713,7 +737,9 @@ class AsyncBrowserEngine(BaseEngine):
 
             except Exception as e:
                 elapsed_ms = (time.time() - t0) * 1000
-                err = EngineError(type=type(e).__name__, message=str(e), is_retryable=True)
+                err = EngineError(
+                    type=type(e).__name__, message=str(e), is_retryable=True
+                )
 
                 # Screenshot on error
                 artifacts_meta = {}
@@ -757,7 +783,9 @@ class AsyncBrowserEngine(BaseEngine):
         return last_result or FetchResult(
             final_url=url,
             text="",
-            error=EngineError(type="AsyncBrowserEngineError", message="Exhausted retries"),
+            error=EngineError(
+                type="AsyncBrowserEngineError", message="Exhausted retries"
+            ),
             engine_trace=trace,
         )
 

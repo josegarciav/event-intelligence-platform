@@ -125,7 +125,9 @@ class APIAdapter(BaseSourceAdapter):
 
                 all_data.extend(data)
                 metadata["pages_fetched"] = 1
-                metadata["total_available"] = self._extract_total_available(response, data)
+                metadata["total_available"] = self._extract_total_available(
+                    response, data
+                )
 
         except Exception as e:
             logger.error(f"API fetch failed: {e}")
@@ -206,7 +208,11 @@ class APIAdapter(BaseSourceAdapter):
     def _default_response_parser(self, response: dict) -> list[dict]:
         """Parse a default response structure into a list of dicts."""
         if "data" in response:
-            return response["data"] if isinstance(response["data"], list) else [response["data"]]
+            return (
+                response["data"]
+                if isinstance(response["data"], list)
+                else [response["data"]]
+            )
         return [response]
 
     async def close(self) -> None:

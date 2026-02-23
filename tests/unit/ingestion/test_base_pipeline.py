@@ -4,14 +4,15 @@ Unit tests for the base_pipeline module.
 Tests for BasePipeline, PipelineConfig, and PipelineExecutionResult.
 """
 
+import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from src.ingestion.adapters import BaseSourceAdapter, FetchResult, SourceType
-from src.ingestion.base_pipeline import (
+from src.ingestion.pipelines.base_pipeline import (
     BasePipeline,
     PipelineConfig,
     PipelineExecutionResult,
@@ -23,7 +24,6 @@ from src.schemas.event import (
     LocationInfo,
     NormalizationError,
     OrganizerInfo,
-    PrimaryCategory,
     SourceInfo,
     TaxonomyDimension,
 )
@@ -63,6 +63,8 @@ def mock_adapter():
     """Create a mock adapter."""
     adapter = MagicMock(spec=BaseSourceAdapter)
     adapter.source_type = SourceType.API
+    adapter.fetch = AsyncMock()
+    adapter.close = AsyncMock()
     return adapter
 
 
@@ -71,13 +73,11 @@ def sample_event(create_event, valid_subcategory_id):
     """Create a sample EventSchema for testing."""
     return create_event(
         title="Test Event",
-        taxonomy_dimensions=[
-            TaxonomyDimension(
-                primary_category=PrimaryCategory.PLAY_AND_PURE_FUN,
-                subcategory=valid_subcategory_id,
-                confidence=0.8,
-            )
-        ],
+        taxonomy_dimension=TaxonomyDimension(
+            primary_category="play_pure_fun",
+            subcategory=valid_subcategory_id,
+            confidence=0.8,
+        ),
     )
 
 
@@ -93,11 +93,13 @@ class ConcretePipeline(BasePipeline):
         """Return raw event as-is for testing."""
         return raw_event
 
-    def map_to_taxonomy(self, parsed_event: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
+    def map_to_taxonomy(
+        self, parsed_event: dict[str, Any]
+    ) -> tuple[str, list[dict[str, Any]]]:
         """Return default taxonomy mapping."""
-        return "play_and_fun", []
+        return "play_pure_fun", []
 
-    def normalize_to_schema(
+    async def normalize_to_schema(
         self,
         parsed_event: dict[str, Any],
         primary_cat: str,
@@ -111,7 +113,6 @@ class ConcretePipeline(BasePipeline):
             title=parsed_event.get("title", "Test Event"),
             location=LocationInfo(city=parsed_event.get("city", "Test City")),
             start_datetime=datetime.now(UTC) + timedelta(days=1),
-            primary_category=PrimaryCategory.PLAY_AND_PURE_FUN,
             format=EventFormat.IN_PERSON,
             organizer=OrganizerInfo(name="Test Organizer"),
             source=SourceInfo(
@@ -126,7 +127,7 @@ class ConcretePipeline(BasePipeline):
         """Return configured validation result."""
         return self._validate_result
 
-    def enrich_event(self, event: EventSchema) -> EventSchema:
+    async def enrich_event(self, event: EventSchema) -> EventSchema:
         """Return event unchanged."""
         return event
 
@@ -287,7 +288,9 @@ class TestBasePipelineInit:
 class TestCalculateQualityScore:
     """Tests for _calculate_quality_score method."""
 
-    def test_quality_all_key_fields(self, sample_pipeline_config, mock_adapter, create_event):
+    def test_quality_all_key_fields(
+        self, sample_pipeline_config, mock_adapter, create_event
+    ):
         """Should score 0.4 for key fields present."""
         pipeline = ConcretePipeline(sample_pipeline_config, mock_adapter)
         event = create_event(title="Test Event")
@@ -295,14 +298,18 @@ class TestCalculateQualityScore:
         # Has key fields (0.4), no enrichment, no taxonomy
         assert score >= 0.4
 
-    def test_quality_missing_key_fields(self, sample_pipeline_config, mock_adapter, create_event):
+    def test_quality_missing_key_fields(
+        self, sample_pipeline_config, mock_adapter, create_event
+    ):
         """Should score 0 for missing key fields."""
         pipeline = ConcretePipeline(sample_pipeline_config, mock_adapter)
         event = create_event(title="")  # Empty title
         score = pipeline._calculate_quality_score(event)
         assert score < 0.4
 
-    def test_quality_with_enrichment(self, sample_pipeline_config, mock_adapter, create_event):
+    def test_quality_with_enrichment(
+        self, sample_pipeline_config, mock_adapter, create_event
+    ):
         """Should add bonus for enrichment fields."""
         from src.schemas.event import Coordinates
 
@@ -329,19 +336,19 @@ class TestCalculateQualityScore:
         pipeline = ConcretePipeline(sample_pipeline_config, mock_adapter)
         event = create_event(
             title="Test Event",
-            taxonomy_dimensions=[
-                TaxonomyDimension(
-                    primary_category=PrimaryCategory.PLAY_AND_PURE_FUN,
-                    subcategory=valid_subcategory_id,
-                    confidence=0.9,
-                )
-            ],
+            taxonomy_dimension=TaxonomyDimension(
+                primary_category="play_pure_fun",
+                subcategory=valid_subcategory_id,
+                confidence=0.9,
+            ),
         )
         score = pipeline._calculate_quality_score(event)
         # Key fields (0.4) + taxonomy confidence (0.9 * 0.2 = 0.18)
         assert score >= 0.5
 
-    def test_quality_penalizes_errors(self, sample_pipeline_config, mock_adapter, create_event):
+    def test_quality_penalizes_errors(
+        self, sample_pipeline_config, mock_adapter, create_event
+    ):
         """Should penalize validation errors."""
         pipeline = ConcretePipeline(sample_pipeline_config, mock_adapter)
         event = create_event(
@@ -358,7 +365,9 @@ class TestCalculateQualityScore:
         # Penalty is capped at 0.1 (5 * 0.02 = 0.1)
         assert score <= 0.4
 
-    def test_quality_bounded_0_to_1(self, sample_pipeline_config, mock_adapter, create_event):
+    def test_quality_bounded_0_to_1(
+        self, sample_pipeline_config, mock_adapter, create_event
+    ):
         """Should always return score between 0 and 1."""
         pipeline = ConcretePipeline(sample_pipeline_config, mock_adapter)
         # Event with errors
@@ -383,21 +392,25 @@ class TestExecute:
             total_fetched=2,
             metadata={},
         )
-        mock_adapter.fetch.return_value = fetch_result
+        mock_adapter.fetch = AsyncMock(return_value=fetch_result)
 
         events = [
             create_event(title="Event 1"),
             create_event(title="Event 2"),
         ]
 
-        pipeline = ConcretePipeline(sample_pipeline_config, mock_adapter, return_events=events)
-        result = pipeline.execute()
+        pipeline = ConcretePipeline(
+            sample_pipeline_config, mock_adapter, return_events=events
+        )
+        result = asyncio.run(pipeline.execute())
 
         assert result.status == PipelineStatus.SUCCESS
         assert result.total_events_processed == 2
         assert result.successful_events == 2
 
-    def test_execute_fetch_failure(self, sample_pipeline_config, mock_adapter, create_event):
+    def test_execute_fetch_failure(
+        self, sample_pipeline_config, mock_adapter, create_event
+    ):
         """Should return failed status when fetch fails."""
         fetch_result = FetchResult(
             success=False,
@@ -407,16 +420,18 @@ class TestExecute:
             errors=["Connection failed"],
             metadata={},
         )
-        mock_adapter.fetch.return_value = fetch_result
+        mock_adapter.fetch = AsyncMock(return_value=fetch_result)
 
         pipeline = ConcretePipeline(sample_pipeline_config, mock_adapter)
-        result = pipeline.execute()
+        result = asyncio.run(pipeline.execute())
 
         assert result.status == PipelineStatus.FAILED
         assert len(result.errors) > 0
         assert "Connection failed" in result.errors[0]["error"]
 
-    def test_execute_partial_success(self, sample_pipeline_config, mock_adapter, create_event):
+    def test_execute_partial_success(
+        self, sample_pipeline_config, mock_adapter, create_event
+    ):
         """Should return partial success when some events fail."""
         fetch_result = FetchResult(
             success=True,
@@ -425,30 +440,34 @@ class TestExecute:
             total_fetched=2,
             metadata={},
         )
-        mock_adapter.fetch.return_value = fetch_result
+        mock_adapter.fetch = AsyncMock(return_value=fetch_result)
 
         # Only one event will be processed successfully
         events = [create_event(title="Event 1")]
 
         # Create pipeline that will raise exception on second event
-        pipeline = ConcretePipeline(sample_pipeline_config, mock_adapter, return_events=events)
+        pipeline = ConcretePipeline(
+            sample_pipeline_config, mock_adapter, return_events=events
+        )
         # Mock normalize_to_schema to fail on second call
         original_normalize = pipeline.normalize_to_schema
         call_count = [0]
 
-        def mock_normalize(*args, **kwargs):
+        async def mock_normalize(*args, **kwargs):
             call_count[0] += 1
             if call_count[0] > 1:
                 raise ValueError("Processing error")
-            return original_normalize(*args, **kwargs)
+            return await original_normalize(*args, **kwargs)
 
         pipeline.normalize_to_schema = mock_normalize
-        result = pipeline.execute()
+        result = asyncio.run(pipeline.execute())
 
         assert result.status == PipelineStatus.PARTIAL_SUCCESS
         assert result.successful_events < result.total_events_processed
 
-    def test_execute_generates_execution_id(self, sample_pipeline_config, mock_adapter, sample_event):
+    def test_execute_generates_execution_id(
+        self, sample_pipeline_config, mock_adapter, sample_event
+    ):
         """Should generate unique execution ID."""
         fetch_result = FetchResult(
             success=True,
@@ -457,16 +476,20 @@ class TestExecute:
             total_fetched=1,
             metadata={},
         )
-        mock_adapter.fetch.return_value = fetch_result
+        mock_adapter.fetch = AsyncMock(return_value=fetch_result)
 
         events = [sample_event]
-        pipeline = ConcretePipeline(sample_pipeline_config, mock_adapter, return_events=events)
-        result = pipeline.execute()
+        pipeline = ConcretePipeline(
+            sample_pipeline_config, mock_adapter, return_events=events
+        )
+        result = asyncio.run(pipeline.execute())
 
         assert result.execution_id is not None
         assert "test_source" in result.execution_id
 
-    def test_execute_with_deduplication(self, sample_pipeline_config, mock_adapter, create_event):
+    def test_execute_with_deduplication(
+        self, sample_pipeline_config, mock_adapter, create_event
+    ):
         """Should deduplicate events when enabled."""
         fetch_result = FetchResult(
             success=True,
@@ -479,7 +502,7 @@ class TestExecute:
             total_fetched=3,
             metadata={},
         )
-        mock_adapter.fetch.return_value = fetch_result
+        mock_adapter.fetch = AsyncMock(return_value=fetch_result)
 
         base_time = datetime.utcnow() + timedelta(days=1)
         # All events have same title/venue so exact match will dedupe
@@ -501,8 +524,10 @@ class TestExecute:
             ),
         ]
 
-        pipeline = ConcretePipeline(sample_pipeline_config, mock_adapter, return_events=events)
-        result = pipeline.execute()
+        pipeline = ConcretePipeline(
+            sample_pipeline_config, mock_adapter, return_events=events
+        )
+        result = asyncio.run(pipeline.execute())
 
         # Should have 2 unique events after deduplication
         assert result.successful_events == 2
@@ -518,7 +543,7 @@ class TestExecute:
             total_fetched=2,
             metadata={},
         )
-        mock_adapter.fetch.return_value = fetch_result
+        mock_adapter.fetch = AsyncMock(return_value=fetch_result)
 
         base_time = datetime.utcnow() + timedelta(days=1)
         events = [
@@ -535,17 +560,17 @@ class TestExecute:
         ]
 
         pipeline = ConcretePipeline(config, mock_adapter, return_events=events)
-        result = pipeline.execute()
+        result = asyncio.run(pipeline.execute())
 
         # Should keep both duplicates
         assert result.successful_events == 2
 
     def test_execute_exception_handling(self, sample_pipeline_config, mock_adapter):
         """Should handle exceptions gracefully."""
-        mock_adapter.fetch.side_effect = Exception("Unexpected error")
+        mock_adapter.fetch = AsyncMock(side_effect=Exception("Unexpected error"))
 
         pipeline = ConcretePipeline(sample_pipeline_config, mock_adapter)
-        result = pipeline.execute()
+        result = asyncio.run(pipeline.execute())
 
         assert result.status == PipelineStatus.FAILED
         assert len(result.errors) > 0
@@ -555,7 +580,9 @@ class TestExecute:
 class TestProcessEventsBatch:
     """Tests for _process_events_batch method."""
 
-    def test_process_batch_success(self, sample_pipeline_config, mock_adapter, sample_event):
+    def test_process_batch_success(
+        self, sample_pipeline_config, mock_adapter, sample_event
+    ):
         """Should process all events in batch."""
         pipeline = ConcretePipeline(
             sample_pipeline_config,
@@ -564,27 +591,35 @@ class TestProcessEventsBatch:
         )
 
         raw_events = [{"title": "Event 1"}, {"title": "Event 2"}]
-        result = pipeline._process_events_batch(raw_events)
+        result = asyncio.run(pipeline._process_events_batch(raw_events))
 
         assert len(result) == 2
 
-    def test_process_batch_continues_on_error(self, sample_pipeline_config, mock_adapter, sample_event):
+    def test_process_batch_continues_on_error(
+        self, sample_pipeline_config, mock_adapter, sample_event
+    ):
         """Should continue processing after individual event error."""
-        pipeline = ConcretePipeline(sample_pipeline_config, mock_adapter, return_events=[sample_event])
+        pipeline = ConcretePipeline(
+            sample_pipeline_config, mock_adapter, return_events=[sample_event]
+        )
 
         # First event will raise exception (no more return_events)
         raw_events = [{"title": "Event 1"}, {"title": "Event 2"}]
-        result = pipeline._process_events_batch(raw_events)
+        result = asyncio.run(pipeline._process_events_batch(raw_events))
 
         # Only the first event succeeded before return_events ran out
         assert len(result) >= 1
 
-    def test_process_batch_calculates_quality(self, sample_pipeline_config, mock_adapter, sample_event):
+    def test_process_batch_calculates_quality(
+        self, sample_pipeline_config, mock_adapter, sample_event
+    ):
         """Should calculate quality score for each event."""
-        pipeline = ConcretePipeline(sample_pipeline_config, mock_adapter, return_events=[sample_event])
+        pipeline = ConcretePipeline(
+            sample_pipeline_config, mock_adapter, return_events=[sample_event]
+        )
 
         raw_events = [{"title": "Event 1"}]
-        result = pipeline._process_events_batch(raw_events)
+        result = asyncio.run(pipeline._process_events_batch(raw_events))
 
         assert len(result) == 1
         assert result[0].data_quality_score is not None
@@ -594,7 +629,9 @@ class TestProcessEventsBatch:
 class TestToDataFrame:
     """Tests for to_dataframe method."""
 
-    def test_dataframe_columns(self, sample_pipeline_config, mock_adapter, sample_event):
+    def test_dataframe_columns(
+        self, sample_pipeline_config, mock_adapter, sample_event
+    ):
         """Should have all expected columns."""
         pipeline = ConcretePipeline(sample_pipeline_config, mock_adapter)
 
@@ -612,7 +649,9 @@ class TestToDataFrame:
         for col in expected_columns:
             assert col in df.columns
 
-    def test_dataframe_flattens_location(self, sample_pipeline_config, mock_adapter, create_event):
+    def test_dataframe_flattens_location(
+        self, sample_pipeline_config, mock_adapter, create_event
+    ):
         """Should flatten location fields."""
         from src.schemas.event import Coordinates
 
@@ -634,7 +673,9 @@ class TestToDataFrame:
         assert df["latitude"].iloc[0] == 41.3851
         assert df["longitude"].iloc[0] == 2.1734
 
-    def test_dataframe_flattens_price(self, sample_pipeline_config, mock_adapter, create_event):
+    def test_dataframe_flattens_price(
+        self, sample_pipeline_config, mock_adapter, create_event
+    ):
         """Should flatten price fields."""
         from decimal import Decimal
 
@@ -643,7 +684,7 @@ class TestToDataFrame:
         event = create_event(
             title="Test Event",
             price=PriceInfo(
-                currency="EUR",
+                currency_code="EUR",
                 minimum_price=Decimal("15.00"),
                 maximum_price=Decimal("25.00"),
             ),
@@ -663,7 +704,9 @@ class TestToDataFrame:
 
         assert len(df) == 0
 
-    def test_dataframe_handles_none_values(self, sample_pipeline_config, mock_adapter, create_event):
+    def test_dataframe_handles_none_values(
+        self, sample_pipeline_config, mock_adapter, create_event
+    ):
         """Should handle None values gracefully."""
         event = create_event(title="Test Event")
 
@@ -681,7 +724,7 @@ class TestClose:
     def test_close_calls_adapter_close(self, sample_pipeline_config, mock_adapter):
         """Should call adapter close method."""
         pipeline = ConcretePipeline(sample_pipeline_config, mock_adapter)
-        pipeline.close()
+        asyncio.run(pipeline.close())
 
         mock_adapter.close.assert_called_once()
 
@@ -691,7 +734,7 @@ class TestClose:
         pipeline.adapter = None
 
         # Should not raise
-        pipeline.close()
+        asyncio.run(pipeline.close())
 
 
 class TestGenerateExecutionId:

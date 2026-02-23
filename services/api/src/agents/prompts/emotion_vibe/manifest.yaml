@@ -1,0 +1,7 @@
+prompt_name: "emotion_vibe"
+active_version: "v1"
+versions:
+  v1:
+    description: "Emotional and vibe output mapping"
+    created_at: "2026-02-18"
+    notes: "Infers emotional_output, cost_level, environment, risk_level, age_accessibility, time_scale. Used by EmotionMapperAgent."

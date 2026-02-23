@@ -37,7 +37,11 @@ class Config:
                 placeholder = f"${{{key}}}"
                 if placeholder in content:
                     # Handle SecretStr
-                    val_str = value.get_secret_value() if hasattr(value, "get_secret_value") else str(value)
+                    val_str = (
+                        value.get_secret_value()
+                        if hasattr(value, "get_secret_value")
+                        else str(value)
+                    )
                     content = content.replace(placeholder, val_str)
 
             return yaml.safe_load(content)

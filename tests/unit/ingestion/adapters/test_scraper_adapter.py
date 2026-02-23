@@ -4,8 +4,9 @@ Unit tests for the scraper_adapter module.
 Tests for ScraperAdapterConfig and ScraperAdapter classes.
 """
 
+import asyncio
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from src.ingestion.adapters.base_adapter import SourceType
@@ -154,7 +155,9 @@ class TestScraperAdapterGetScraper:
         adapter = ScraperAdapter(scraper_config)
 
         # Mock the scraper inside _get_scraper
-        with patch("src.ingestion.pipelines.scrapers.base_scraper.EventScraper") as mock_scraper_class:
+        with patch(
+            "src.ingestion.pipelines.scrapers.base_scraper.EventScraper"
+        ) as mock_scraper_class:
             mock_scraper = MagicMock()
             mock_scraper_class.return_value = mock_scraper
 
@@ -183,54 +186,62 @@ class TestScraperAdapterFetch:
     def test_fetch_success(self, mock_get_scraper, scraper_config, mock_fetch_result):
         """Should return successful FetchResult."""
         mock_scraper = MagicMock()
-        mock_scraper.fetch_listing_pages.return_value = [mock_fetch_result]
+        mock_scraper.fetch_listing_pages = AsyncMock(return_value=[mock_fetch_result])
         mock_scraper.extract_event_urls.return_value = ["https://example.com/events/1"]
-        mock_scraper.fetch_event_pages.return_value = [mock_fetch_result]
+        mock_scraper.fetch_event_pages = AsyncMock(return_value=[mock_fetch_result])
         mock_get_scraper.return_value = mock_scraper
 
         adapter = ScraperAdapter(scraper_config)
-        result = adapter.fetch()
+        result = asyncio.run(adapter.fetch())
 
         assert result.success is True
         assert result.source_type == SourceType.SCRAPER
         assert result.total_fetched >= 0
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_with_html_parser(self, mock_get_scraper, scraper_config, mock_fetch_result):
+    def test_fetch_with_html_parser(
+        self, mock_get_scraper, scraper_config, mock_fetch_result
+    ):
         """Should use custom HTML parser."""
         mock_scraper = MagicMock()
-        mock_scraper.fetch_listing_pages.return_value = [mock_fetch_result]
+        mock_scraper.fetch_listing_pages = AsyncMock(return_value=[mock_fetch_result])
         mock_scraper.extract_event_urls.return_value = ["https://example.com/events/1"]
-        mock_scraper.fetch_event_pages.return_value = [mock_fetch_result]
+        mock_scraper.fetch_event_pages = AsyncMock(return_value=[mock_fetch_result])
         mock_get_scraper.return_value = mock_scraper
 
         parser = MagicMock(return_value={"title": "Parsed Event"})
         adapter = ScraperAdapter(scraper_config, html_parser=parser)
-        result = adapter.fetch()
+        result = asyncio.run(adapter.fetch())
 
         assert result.success is True
         parser.assert_called()
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_tracks_metadata(self, mock_get_scraper, scraper_config, mock_fetch_result):
+    def test_fetch_tracks_metadata(
+        self, mock_get_scraper, scraper_config, mock_fetch_result
+    ):
         """Should track metadata."""
         mock_scraper = MagicMock()
-        mock_scraper.fetch_listing_pages.return_value = [
-            mock_fetch_result,
-            mock_fetch_result,
-        ]
+        mock_scraper.fetch_listing_pages = AsyncMock(
+            return_value=[
+                mock_fetch_result,
+                mock_fetch_result,
+            ]
+        )
         mock_scraper.extract_event_urls.return_value = [
             "https://example.com/events/1",
             "https://example.com/events/2",
         ]
-        mock_scraper.fetch_event_pages.return_value = [
-            mock_fetch_result,
-            mock_fetch_result,
-        ]
+        mock_scraper.fetch_event_pages = AsyncMock(
+            return_value=[
+                mock_fetch_result,
+                mock_fetch_result,
+            ]
+        )
         mock_get_scraper.return_value = mock_scraper
 
         adapter = ScraperAdapter(scraper_config)
-        result = adapter.fetch()
+        result = asyncio.run(adapter.fetch())
 
         assert "pages_fetched" in result.metadata
         assert "events_fetched" in result.metadata
@@ -241,21 +252,23 @@ class TestScraperAdapterFetch:
         mock_get_scraper.side_effect = Exception("Scraper failed")
 
         adapter = ScraperAdapter(scraper_config)
-        result = adapter.fetch()
+        result = asyncio.run(adapter.fetch())
 
         assert result.success is False
         assert "Scraper failed" in result.errors
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_with_kwargs(self, mock_get_scraper, scraper_config, mock_fetch_result):
+    def test_fetch_with_kwargs(
+        self, mock_get_scraper, scraper_config, mock_fetch_result
+    ):
         """Should pass kwargs to scraper."""
         mock_scraper = MagicMock()
-        mock_scraper.fetch_listing_pages.return_value = [mock_fetch_result]
+        mock_scraper.fetch_listing_pages = AsyncMock(return_value=[mock_fetch_result])
         mock_scraper.extract_event_urls.return_value = []
         mock_get_scraper.return_value = mock_scraper
 
         adapter = ScraperAdapter(scraper_config)
-        adapter.fetch(city="madrid", country_code="es", max_pages=3)
+        asyncio.run(adapter.fetch(city="madrid", country_code="es", max_pages=3))
 
         mock_scraper.fetch_listing_pages.assert_called_with(
             city="madrid",
@@ -264,40 +277,46 @@ class TestScraperAdapterFetch:
         )
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_dedupes_urls(self, mock_get_scraper, scraper_config, mock_fetch_result):
+    def test_fetch_dedupes_urls(
+        self, mock_get_scraper, scraper_config, mock_fetch_result
+    ):
         """Should deduplicate event URLs."""
         mock_scraper = MagicMock()
-        mock_scraper.fetch_listing_pages.return_value = [
-            mock_fetch_result,
-            mock_fetch_result,
-        ]
+        mock_scraper.fetch_listing_pages = AsyncMock(
+            return_value=[
+                mock_fetch_result,
+                mock_fetch_result,
+            ]
+        )
         # Return duplicate URLs
         mock_scraper.extract_event_urls.return_value = [
             "https://example.com/events/1",
             "https://example.com/events/1",  # Duplicate
         ]
-        mock_scraper.fetch_event_pages.return_value = [mock_fetch_result]
+        mock_scraper.fetch_event_pages = AsyncMock(return_value=[mock_fetch_result])
         mock_get_scraper.return_value = mock_scraper
 
         adapter = ScraperAdapter(scraper_config)
-        adapter.fetch()
+        asyncio.run(adapter.fetch())
 
         # Should fetch only unique URLs
         mock_scraper.fetch_event_pages.assert_called_once()
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_tracks_parse_failures(self, mock_get_scraper, scraper_config, mock_fetch_result):
+    def test_fetch_tracks_parse_failures(
+        self, mock_get_scraper, scraper_config, mock_fetch_result
+    ):
         """Should track parse failures in metadata."""
         mock_scraper = MagicMock()
-        mock_scraper.fetch_listing_pages.return_value = [mock_fetch_result]
+        mock_scraper.fetch_listing_pages = AsyncMock(return_value=[mock_fetch_result])
         mock_scraper.extract_event_urls.return_value = ["https://example.com/events/1"]
-        mock_scraper.fetch_event_pages.return_value = [mock_fetch_result]
+        mock_scraper.fetch_event_pages = AsyncMock(return_value=[mock_fetch_result])
         mock_get_scraper.return_value = mock_scraper
 
         # Parser that raises exception
         parser = MagicMock(side_effect=Exception("Parse error"))
         adapter = ScraperAdapter(scraper_config, html_parser=parser)
-        result = adapter.fetch()
+        result = asyncio.run(adapter.fetch())
 
         assert result.metadata["parse_failures"] >= 1
 
@@ -313,24 +332,26 @@ class TestScraperAdapterFetch:
         failed_result.url = "https://example.com/events"
         failed_result.error = "Connection timeout"
 
-        mock_scraper.fetch_listing_pages.return_value = [failed_result]
+        mock_scraper.fetch_listing_pages = AsyncMock(return_value=[failed_result])
         mock_get_scraper.return_value = mock_scraper
 
         adapter = ScraperAdapter(scraper_config)
-        result = adapter.fetch()
+        result = asyncio.run(adapter.fetch())
 
         assert result.metadata["pages_fetched"] == 0
 
     @patch.object(ScraperAdapter, "_get_scraper")
-    def test_fetch_timestamps(self, mock_get_scraper, scraper_config, mock_fetch_result):
+    def test_fetch_timestamps(
+        self, mock_get_scraper, scraper_config, mock_fetch_result
+    ):
         """Should track fetch timestamps."""
         mock_scraper = MagicMock()
-        mock_scraper.fetch_listing_pages.return_value = [mock_fetch_result]
+        mock_scraper.fetch_listing_pages = AsyncMock(return_value=[mock_fetch_result])
         mock_scraper.extract_event_urls.return_value = []
         mock_get_scraper.return_value = mock_scraper
 
         adapter = ScraperAdapter(scraper_config)
-        result = adapter.fetch()
+        result = asyncio.run(adapter.fetch())
 
         assert result.fetch_started_at is not None
         assert result.fetch_ended_at is not None
@@ -344,9 +365,10 @@ class TestScraperAdapterClose:
         """Should close the scraper."""
         adapter = ScraperAdapter(scraper_config)
         mock_scraper = MagicMock()
+        mock_scraper.close = AsyncMock()
         adapter._scraper = mock_scraper
 
-        adapter.close()
+        asyncio.run(adapter.close())
 
         mock_scraper.close.assert_called_once()
         assert adapter._scraper is None
@@ -356,7 +378,7 @@ class TestScraperAdapterClose:
         adapter = ScraperAdapter(scraper_config)
 
         # Should not raise
-        adapter.close()
+        asyncio.run(adapter.close())
         assert adapter._scraper is None
 
 
@@ -364,13 +386,20 @@ class TestScraperAdapterContextManager:
     """Tests for ScraperAdapter context manager usage."""
 
     def test_context_manager(self, scraper_config):
-        """Should work as context manager."""
-        adapter = ScraperAdapter(scraper_config)
+        """Should work as async context manager."""
+        import asyncio
+        from unittest.mock import AsyncMock
 
-        with patch.object(adapter, "close") as mock_close:
-            with adapter as ctx:
+        adapter = ScraperAdapter(scraper_config)
+        mock_close = AsyncMock()
+        adapter.close = mock_close
+
+        async def run():
+            async with adapter as ctx:
                 assert ctx is adapter
-            mock_close.assert_called_once()
+
+        asyncio.run(run())
+        mock_close.assert_called_once()
 
 
 class TestHtmlEnrichmentScraper:
@@ -421,12 +450,44 @@ class TestHtmlEnrichmentScraper:
         mock_result.ok = True
         mock_result.status_code = 200
         mock_result.block_signals = []
-        mock_result.text = "<html><body><main>" + ("content " * 50) + "</main></body></html>"
+        mock_result.text = (
+            "<html><body><main>" + ("content " * 50) + "</main></body></html>"
+        )
         mock_engine.get_rendered.return_value = mock_result
         scraper._get_engine = MagicMock(return_value=mock_engine)
 
-        text = scraper.fetch_compressed_html("https://example.com/event/1")
+        # Mock the scrapping imports that fetch_compressed_html uses
+        mock_doc = MagicMock()
+        mock_doc.ok = True
+        mock_doc.text = "content " * 50
+        mock_doc.title = "Test Event"
+        mock_html_to_structured = MagicMock(return_value=mock_doc)
+
+        mock_quality = MagicMock()
+        mock_quality.keep = True
+        mock_quality.errors.return_value = []
+        mock_evaluate_quality = MagicMock(return_value=mock_quality)
+
+        mock_scrapping_html = MagicMock()
+        mock_scrapping_html.html_to_structured = mock_html_to_structured
+        mock_scrapping_quality = MagicMock()
+        mock_scrapping_quality.evaluate_quality = mock_evaluate_quality
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "scrapping": MagicMock(),
+                "scrapping.processing": MagicMock(),
+                "scrapping.processing.html_to_structured": mock_scrapping_html,
+                "scrapping.processing.quality_filters": mock_scrapping_quality,
+            },
+        ):
+            text = asyncio.run(
+                scraper.fetch_compressed_html("https://example.com/event/1")
+            )
 
         assert text is not None
         assert mock_engine.get_rendered.call_count >= 1
-        assert mock_engine.get_rendered.call_args_list[-1].args[0] == ("https://example.com/event/1")
+        assert mock_engine.get_rendered.call_args_list[-1].args[0] == (
+            "https://example.com/event/1"
+        )

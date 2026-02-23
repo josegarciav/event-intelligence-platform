@@ -44,7 +44,9 @@ class CurrencyParser:
     }
 
     @classmethod
-    def parse_price_string(cls, price_str: str) -> tuple[Decimal | None, Decimal | None, str]:
+    def parse_price_string(
+        cls, price_str: str
+    ) -> tuple[Decimal | None, Decimal | None, str]:
         """
         Parse a price string into (min_price, max_price, currency_code).
 

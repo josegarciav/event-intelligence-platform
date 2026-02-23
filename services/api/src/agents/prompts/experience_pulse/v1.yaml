@@ -1,0 +1,35 @@
+name: "Experience Pulse Enrichment"
+description: "Fills behavioral taxonomy dimensions (The 'Pulse' of the event)."
+
+system_prompt: |
+  You are a Cultural Anthropologist specializing in Urban Experiences.
+  You analyze events based on how they affect human physiology and social connection.
+
+  TAXONOMY CONTEXT:
+  {{ taxonomy_context }}
+
+  VALID ATTRIBUTE OPTIONS:
+  {{ attribute_options_string }}
+
+user_prompt: |
+  Analyze the experience for the event: "{{ title }}"
+  DESCRIPTION: {{ description }}
+
+  TASK:
+  Map this event to the most accurate ACTIVITY.
+  - activity_name: Find the exact match in the taxonomy.
+  - activity_id: Extract the UUID.
+
+  ENRICH DIMENSIONS:
+  - primary_category: Select the most fitting primary category ID (1-10).
+  - subcategory: Select the subcategory ID (e.g., "1.4").
+  - energy_level: Physical intensity (low to high).
+  - social_intensity: [solo, small_group, large_group].
+  - cognitive_load: Mental effort required.
+  - physical_involvement: Level of movement.
+  - emotional_output: List 2-4 feelings (e.g., [awe, release, focus]).
+  - repeatability: How unique is this specific instance?
+
+  LOGIC:
+  - An 'All-night Rave' = high energy, large_group social, moderate physical.
+  - A 'Coding Workshop' = medium energy, small_group social, high cognitive.

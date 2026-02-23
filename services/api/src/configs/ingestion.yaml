@@ -8,7 +8,7 @@ sources:
   # RA.CO - GraphQL API-based ingestion
   # =========================================================================
   ra_co:
-    enabled: true
+    enabled: false
     pipeline_type: "api"
 
     # Connection settings
@@ -195,31 +195,6 @@ sources:
         engine_type: hybrid
         rate_limit_per_second: 2.0
         timeout_s: 15.0
-      # Feature extraction (LLM-based)
-      feature_extraction:
-        enabled: false
-        provider: "openai"
-        model_name: "gpt-4o-mini"
-        fill_missing:
-          - "event_type"
-          - "tags"
-          - "activity_id"
-          - "activity_name"
-          - "energy_level"
-          - "social_intensity"
-          - "cognitive_load"
-          - "physical_involvement"
-          - "cost_level"
-          - "time_scale"
-          - "environment"
-          - "emotional_output"
-          - "risk_level"
-          - "age_accessibility"
-          - "repeatability"
-          - "event_type"
-          - "capacity"
-          - "event_format"
-          - "tags"
 
     # Scheduling
     schedule:
@@ -232,7 +207,7 @@ sources:
   # TICKETMASTER - REST API-based ingestion
   # =========================================================================
   ticketmaster:
-    enabled: true
+    enabled: false
     pipeline_type: "api"
 
     # Connection settings
@@ -405,9 +380,6 @@ sources:
         engine_type: hybrid
         rate_limit_per_second: 2.0
         timeout_s: 15.0
-      # Feature extraction (LLM-based)
-      feature_extraction:
-        enabled: false
 
     # Scheduling
     schedule:
@@ -416,10 +388,531 @@ sources:
       cron_expression: "0 */12 * * *"  # Every 12 hours
       enabled: false
 
+  # =========================================================================
+  # TRIPADVISOR - Content API (location/attraction search)
+  # =========================================================================
+  tripadvisor:
+    enabled: false
+    pipeline_type: "api"
+
+    connection:
+      endpoint: "https://api.content.tripadvisor.com/api/v1/location/search"
+      protocol: "rest"
+      timeout_seconds: 30
+
+    max_retries: 3
+    rate_limit_per_second: 2.0
+
+    query:
+      params:
+        key: "${TRIPADVISOR_API_KEY}"
+        searchQuery: "{{city}}"
+        category: "attractions"
+        language: "en"
+        limit: "{{page_size}}"
+      response_path: "data"
+      # TripAdvisor search does not expose a total count field
+
+    pagination:
+      type: "page_number"
+      max_pages: 1              # TripAdvisor search returns max 10 results/call
+      default_page_size: 10     # API hard limit per call
+      start_page: 0
+
+    field_mappings:
+      source_event_id:   "location_id"
+      title:             "name"
+      description:       "description"                      # may be null in search; HTML enrichment fills it
+      venue_name:        "name"
+      venue_address:     "address_obj.street1"
+      city:              "address_obj.city"
+      state_or_region:   "address_obj.state"
+      postal_code:       "address_obj.postalcode"
+      country_code:      "address_obj.country"
+      latitude:          "latitude"
+      longitude:         "longitude"
+      source_url_raw:    "web_url"
+      image_url_raw:     "photo.images.large.url"           # may be null; enrichment fills
+      category_key:      "category.key"
+      subcategory_keys:  "subcategory[*].key"               # list -> regex-matchable via str()
+      rating:            "rating"
+      num_reviews:       "num_reviews"
+      price_level:       "price_level"                      # e.g. "$$" -> stored in custom_fields
+
+    transformations:
+      source_url:
+        type: "template"
+        template: "{{source_url_raw}}"
+        when: "source_url_raw"
+      image_url:
+        type: "template"
+        template: "{{image_url_raw}}"
+        when: "image_url_raw"
+      country_code:
+        type: "uppercase"
+        source: "country_code"
+
+    # Taxonomy: default -> EXPLORATION & ADVENTURE / Cultural Discovery
+    # subcategory_keys list is coerced to str() for regex matching inside TaxonomyMapper
+    taxonomy_suggestions:
+      default_primary: "2"       # EXPLORATION & ADVENTURE
+      default_subcategory: "2.4" # Cultural Discovery
+
+    event_type_rules:
+      - match:
+          regex:
+            subcategory_keys: "museum|gallery|exhibit"
+        type: "exhibition"
+      - match:
+          title_contains: ["museum", "museu", "museo", "gallery", "art"]
+        type: "exhibition"
+      - match:
+          regex:
+            subcategory_keys: "nature|park|garden|outdoor"
+        type: "other"
+      - match:
+          title_contains: ["park", "garden", "jardín", "parc"]
+        type: "other"
+      - match:
+          regex:
+            subcategory_keys: "restaurant|food|gastro"
+        type: "food_beverage"
+      - default: true
+        type: "other"
+
+    defaults:
+      page_size: 10
+      days_ahead: 1
+      location:
+        cities: ["Barcelona", "Madrid"]
+        country_code: "ES"
+        timezone: "Europe/Madrid"
+        currency: "EUR"
+
+    validation:
+      required_fields: ["title", "source_event_id"]   # no start_datetime: attractions are recurring
+      future_events_only: false
+
+    enrichment:
+      geocoding: true
+      compressed_html:
+        enabled: true           # Fetch web_url page to extract descriptions + images
+        engine_type: hybrid
+        rate_limit_per_second: 1.0
+        timeout_s: 20.0
+
+    schedule:
+      type: "cron"
+      cron_expression: "0 0 * * 1"   # Weekly on Monday (attractions don't change often)
+      enabled: false
+
+  # =========================================================================
+  # CIVITATIS - Affiliate Activity API (tours, shows, guided experiences)
+  # =========================================================================
+  civitatis:
+    enabled: false
+    pipeline_type: "api"
+
+    connection:
+      endpoint: "https://api.civitatis.com/v1/activities"
+      protocol: "rest"
+      timeout_seconds: 30
+
+    max_retries: 3
+    rate_limit_per_second: 2.0
+
+    query:
+      params:
+        apiKey: "${CIVITATIS_API_KEY}"
+        destination: "{{area_id}}"   # numeric city ID from defaults.areas
+        limit: "{{page_size}}"
+        page: "{{page}}"
+        language: "en"
+        sort: "popularity"
+      response_path: "activities"
+      total_results_path: "total"
+
+    pagination:
+      type: "page_number"
+      max_pages: 5
+      default_page_size: 50
+      start_page: 1              # Civitatis affiliate API is 1-indexed
+
+    field_mappings:
+      source_event_id:       "id"
+      title:                 "title"
+      description:           "description"
+      city:                  "destination.name"
+      country_code:          "destination.countryCode"
+      cost_min:              "price.from"
+      cost_currency:         "price.currency"
+      is_free:               "price.isFree"
+      duration_minutes_raw:  "duration.minutes"
+      start_time:            "schedule.startTimes[0]"   # first available time slot
+      image_url_raw:         "images[0].url"
+      source_url_raw:        "url"
+      rating_average:        "rating.average"
+      rating_count:          "rating.count"
+      categories:            "categories[*]"             # list -> str() for regex matching
+
+    transformations:
+      source_url:
+        type: "template"
+        template: "{{source_url_raw}}"
+        when: "source_url_raw"
+      image_url:
+        type: "template"
+        template: "{{image_url_raw}}"
+        when: "image_url_raw"
+      country_code:
+        type: "uppercase"
+        source: "country_code"
+      description:
+        type: "strip_html"
+        source: "description"
+
+    # Taxonomy: default -> EXPLORATION & ADVENTURE / Travel & Trip Adventures
+    # Subcategory rules cover Civitatis's main category types
+    taxonomy_suggestions:
+      default_primary: "2"       # EXPLORATION & ADVENTURE
+      default_subcategory: "2.3" # Travel & Trip Adventures
+
+    event_type_rules:
+      - match:
+          title_contains: ["flamenco", "show", "espectáculo", "spectacle", "dance"]
+        type: "dance"
+      - match:
+          regex:
+            categories: "gastronomy|food|culinary|wine|tapas"
+        type: "food_beverage"
+      - match:
+          title_contains: ["cooking", "gastronomy", "wine", "food tour", "tapas"]
+        type: "food_beverage"
+      - match:
+          title_contains: ["workshop", "class", "course", "taller"]
+        type: "workshop"
+      - match:
+          title_contains: ["museum", "gallery", "monument", "cathedral", "palace"]
+        type: "exhibition"
+      - match:
+          title_contains: ["tour", "walk", "route", "ruta", "excursion"]
+        type: "other"
+      - default: true
+        type: "other"
+
+    defaults:
+      page_size: 50
+      days_ahead: 1
+      areas:
+        Barcelona: 5     # Civitatis destination ID -- verify with affiliate docs
+        Madrid: 12       # Civitatis destination ID -- verify with affiliate docs
+      location:
+        country_code: "ES"
+        timezone: "Europe/Madrid"
+        currency: "EUR"
+
+    validation:
+      required_fields: ["title", "source_event_id"]   # no start_datetime: recurring activities
+      future_events_only: false
+
+    enrichment:
+      geocoding: true
+      compressed_html:
+        enabled: false
+        engine_type: hybrid
+        rate_limit_per_second: 1.0
+        timeout_s: 20.0
+
+    schedule:
+      type: "cron"
+      cron_expression: "0 0 * * 1"   # Weekly on Monday
+      enabled: false
+
+  # =========================================================================
+  # GETYOURGUIDE - Partner API (tours, activities, experiences)
+  # =========================================================================
+  getyourguide:
+    enabled: true
+    pipeline_type: "api"
+
+    connection:
+      endpoint: "https://api.getyourguide.com/1/tours"
+      protocol: "rest"
+      timeout_seconds: 30
+      headers:
+        X-ACCESS-TOKEN: "${GETYOURGUIDE_API_KEY}"
+        Accept: "application/json"
+
+    max_retries: 3
+    rate_limit_per_second: 2.0        # well within GYG's 130 req/min cap
+
+    query:
+      params:
+        destination_id: "{{area_id}}"  # numeric city ID from defaults.areas
+        cnt_language: "en"
+        currency: "EUR"
+        offset: "{{page}}"             # offset pagination: {{page}} = page_index * page_size
+        limit: "{{page_size}}"
+        sort: "top_sellers"
+      response_path: "tours"
+      total_results_path: "total_count"
+
+    pagination:
+      type: "offset"
+      max_pages: 5
+      default_page_size: 50
+      start_page: 0
+
+    field_mappings:
+      source_event_id:      "id"
+      title:                "title"
+      description:          "description"
+      city:                 "location.city"
+      venue_address:        "location.address"
+      latitude:             "location.latitude"
+      longitude:            "location.longitude"
+      country_code:         "location.country_code"
+      cost_min:             "price"
+      image_url_raw:        "images[0].url"
+      source_url_raw:       "booking_url"
+      rating:               "rating"
+      num_reviews:          "reviews"
+      categories:           "categories[*]"
+      duration_min_secs:    "duration_min"   # seconds; stored in custom_fields
+      duration_max_secs:    "duration_max"   # seconds; stored in custom_fields
+
+    transformations:
+      source_url:
+        type: "template"
+        template: "{{source_url_raw}}"
+        when: "source_url_raw"
+      image_url:
+        type: "template"
+        template: "{{image_url_raw}}"
+        when: "image_url_raw"
+      country_code:
+        type: "uppercase"
+        source: "country_code"
+      description:
+        type: "strip_html"
+        source: "description"
+
+    # Taxonomy: default → EXPLORATION & ADVENTURE / Travel & Trip Adventures
+    taxonomy_suggestions:
+      default_primary: "2"       # EXPLORATION & ADVENTURE
+      default_subcategory: "2.3" # Travel & Trip Adventures
+
+    event_type_rules:
+      - match:
+          title_contains: ["flamenco", "show", "dance", "cabaret", "spectacle"]
+        type: "dance"
+      - match:
+          regex:
+            categories: "gastronomy|food|culinary|wine|tapas|cooking"
+        type: "food_beverage"
+      - match:
+          title_contains: ["cooking", "gastronomy", "wine tasting", "food tour", "tapas"]
+        type: "food_beverage"
+      - match:
+          title_contains: ["workshop", "class", "course", "lesson", "taller"]
+        type: "workshop"
+      - match:
+          title_contains: ["museum", "gallery", "exhibition", "monument", "cathedral", "palace", "art"]
+        type: "exhibition"
+      - match:
+          title_contains: ["concert", "live music", "opera", "musical"]
+        type: "concert"
+      - match:
+          title_contains: ["tour", "walk", "route", "excursion", "day trip", "hiking"]
+        type: "other"
+      - default: true
+        type: "other"
+
+    defaults:
+      page_size: 50
+      days_ahead: 1
+      areas:
+        Barcelona: 45   # GYG destination ID — inferred from /barcelona-l45/ URL slug; verify with docs
+        Madrid: 46      # GYG destination ID — inferred from /madrid-l46/ URL slug; verify with docs
+      location:
+        country_code: "ES"
+        timezone: "Europe/Madrid"
+        currency: "EUR"
+
+    validation:
+      required_fields: ["title", "source_event_id"]   # no start_datetime: recurring activities
+      future_events_only: false
+
+    enrichment:
+      geocoding: true
+      compressed_html:
+        enabled: false
+        engine_type: hybrid
+        rate_limit_per_second: 1.0
+        timeout_s: 20.0
+
+    schedule:
+      type: "cron"
+      cron_expression: "0 0 * * 1"   # Weekly on Monday
+      enabled: false
+
+  # =========================================================================
+  # EVENTBRITE - Partner REST API (ticketed events, concerts, workshops, etc.)
+  # =========================================================================
+  eventbrite:
+    enabled: true
+    pipeline_type: "api"
+
+    connection:
+      endpoint: "https://www.eventbriteapi.com/v3/organizers/{{area_id}}/events/"
+      protocol: "rest"
+      timeout_seconds: 30
+      headers:
+        Authorization: "Bearer ${EVENTBRITE_API_KEY}"
+        Accept: "application/json"
+
+    max_retries: 3
+    rate_limit_per_second: 0.25     # 1000 req/hr cap → 0.28 req/s; 0.25 leaves headroom
+
+    query:
+      params:
+        status: "live"
+        order_by: "start_asc"
+        expand: "venue,logo,ticket_availability,category,organizer"
+        start_date.range_start: "{{date_from_iso}}"
+        start_date.range_end:   "{{date_to_iso}}"
+        page:      "{{page}}"
+        page_size: "{{page_size}}"
+      response_path: "events"
+      total_results_path: "pagination.object_count"
+
+    pagination:
+      type: "page_number"
+      max_pages: 5
+      default_page_size: 50
+      start_page: 1
+
+    field_mappings:
+      source_event_id:    "id"
+      title:              "name.text"
+      description:        "description.text"
+      start_datetime_raw: "start.utc"
+      end_datetime_raw:   "end.utc"
+      timezone_raw:       "start.timezone"
+      venue_name:         "venue.name"
+      venue_address:      "venue.address.address_1"
+      city:               "venue.address.city"
+      state:              "venue.address.region"
+      postal_code:        "venue.address.postal_code"
+      country_code:       "venue.address.country"
+      latitude:           "venue.latitude"
+      longitude:          "venue.longitude"
+      is_free:            "is_free"
+      currency:           "currency"
+      capacity:           "capacity"
+      online_event:       "online_event"
+      image_url_raw:      "logo.url"
+      source_url_raw:     "url"
+      cost_min:           "ticket_availability.minimum_ticket_price.value"
+      cost_max:           "ticket_availability.maximum_ticket_price.value"
+      is_sold_out:        "ticket_availability.is_sold_out"
+      category_name:      "category.name"
+      organizer_name:     "organizer.name"
+      source_updated_at:  "changed"
+      status:             "status"
+
+    transformations:
+      source_url:
+        type: "template"
+        template: "{{source_url_raw}}"
+        when: "source_url_raw"
+      image_url:
+        type: "template"
+        template: "{{image_url_raw}}"
+        when: "image_url_raw"
+      country_code:
+        type: "uppercase"
+        source: "country_code"
+      description:
+        type: "strip_html"
+        source: "description"
+
+    # Taxonomy: ticketed events → Play & Pure Fun (same primary as Ra.co)
+    taxonomy_suggestions:
+      default_primary: "1"       # Play & Pure Fun
+      default_subcategory: "1.1" # Social & Playful Gatherings
+
+    event_type_rules:
+      - match:
+          title_contains: ["festival", "fest"]
+        type: "festival"
+      - match:
+          title_contains: ["party", "fiesta", "rave", "club night", "nightlife"]
+        type: "party"
+      - match:
+          title_contains: ["concert", "live music", "gig", "recital", "opera", "live show"]
+        type: "concert"
+      - match:
+          title_contains: ["workshop", "class", "course", "masterclass", "training", "taller"]
+        type: "workshop"
+      - match:
+          title_contains: ["conference", "summit", "symposium", "seminar", "meetup", "networking"]
+        type: "conference"
+      - match:
+          title_contains: ["exhibition", "expo", "fair", "trade show", "museum", "gallery", "art show"]
+        type: "exhibition"
+      - match:
+          title_contains: ["comedy", "stand-up", "standup", "humor", "improv"]
+        type: "comedy"
+      - match:
+          title_contains: ["food", "wine", "tasting", "gastronomy", "culinary", "tapas", "cooking"]
+        type: "food_beverage"
+      - match:
+          regex:
+            category_name: "music|concert"
+        type: "concert"
+      - match:
+          regex:
+            category_name: "business|professional|technology|science"
+        type: "conference"
+      - match:
+          regex:
+            category_name: "food|drink|wine"
+        type: "food_beverage"
+      - default: true
+        type: "other"
+
+    defaults:
+      page_size: 50
+      days_ahead: 7
+      areas:
+        # Map city name → Eventbrite organizer ID for major promoters in each city.
+        Barcelona: 28166836273
+        Madrid: 24081003379
+      location:
+        country_code: "ES"
+        timezone: "Europe/Madrid"
+        currency: "EUR"
+
+    validation:
+      required_fields: ["title", "source_event_id", "start_datetime"]
+      future_events_only: true
+
+    enrichment:
+      geocoding: false        # venue.latitude/longitude provided directly via expand=venue
+      compressed_html:
+        enabled: false
+
+    schedule:
+      type: "cron"
+      cron_expression: "0 */12 * * *"   # Every 12 hours (same cadence as Ra.co)
+      enabled: false
+
+  # FEVER has no public API — use scraper_adapter with a custom pipeline config when adding.
+
 # =========================================================================
 # GLOBAL SETTINGS
 # =========================================================================
-
 global:
   # Storage settings
   storage:

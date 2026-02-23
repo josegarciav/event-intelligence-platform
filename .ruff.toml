@@ -1,4 +1,4 @@
-extend = "services/api/pyproject.toml"
 exclude = [
-    "notebooks/*",
+    "notebooks",
+    "*.ipynb"
 ]

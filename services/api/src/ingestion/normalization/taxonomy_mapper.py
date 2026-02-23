@@ -63,7 +63,9 @@ class TaxonomyMapper:
 
         # Validate that default_subcategory belongs to default_primary
         if self.default_subcategory:
-            if not Subcategory.validate_for_primary(self.default_subcategory, self.default_primary):
+            if not Subcategory.validate_for_primary(
+                self.default_subcategory, self.default_primary
+            ):
                 raise ValueError(
                     f"default_subcategory '{self.default_subcategory}' does not belong to "
                     f"default_primary '{self.default_primary}'. "
@@ -98,7 +100,9 @@ class TaxonomyMapper:
 
                     # First matching rule sets the primary category
                     if not dimensions[:-1]:  # First dimension
-                        primary_category = assign_config.get("primary_category", self.default_primary)
+                        primary_category = assign_config.get(
+                            "primary_category", self.default_primary
+                        )
 
         # If no rules matched, use defaults
         if not dimensions and self.default_subcategory:
@@ -185,7 +189,9 @@ class TaxonomyMapper:
         Returns:
             TaxonomyDimension or None
         """
-        primary_category_raw = assign_config.get("primary_category", self.default_primary)
+        primary_category_raw = assign_config.get(
+            "primary_category", self.default_primary
+        )
         subcategory_id = assign_config.get("subcategory", self.default_subcategory)
         values = assign_config.get("values", [])
         confidence = assign_config.get("confidence", 0.5)
@@ -194,9 +200,11 @@ class TaxonomyMapper:
         primary_category = resolve_primary_category(primary_category_raw)
 
         # Validate subcategory belongs to primary category
-        if subcategory_id and not Subcategory.validate_for_primary(subcategory_id, primary_category):
+        if subcategory_id and not Subcategory.validate_for_primary(
+            subcategory_id, primary_category
+        ):
             logger.warning(
-                f"Subcategory '{subcategory_id}' does not belong to " f"primary category '{primary_category}'"
+                f"Subcategory '{subcategory_id}' does not belong to primary category '{primary_category}'"
             )
             return None
 
@@ -250,17 +258,27 @@ class TaxonomyMapper:
             # Try to find matching activity
             if include_activity and dim.subcategory:
                 event_context = f"{parsed_event.get('title', '')} {parsed_event.get('description', '')}"
-                activity_match = find_best_activity_match(event_context, dim.subcategory)
+                activity_match = find_best_activity_match(
+                    event_context, dim.subcategory
+                )
                 if activity_match:
                     full_dim["activity_id"] = activity_match.get("activity_id")
                     full_dim["activity_name"] = activity_match.get("name")
                     full_dim["energy_level"] = activity_match.get("energy_level")
-                    full_dim["social_intensity"] = activity_match.get("social_intensity")
+                    full_dim["social_intensity"] = activity_match.get(
+                        "social_intensity"
+                    )
                     full_dim["cognitive_load"] = activity_match.get("cognitive_load")
-                    full_dim["physical_involvement"] = activity_match.get("physical_involvement")
+                    full_dim["physical_involvement"] = activity_match.get(
+                        "physical_involvement"
+                    )
                     full_dim["environment"] = activity_match.get("environment")
-                    full_dim["emotional_output"] = activity_match.get("emotional_output", [])
-                    full_dim["_activity_match_score"] = activity_match.get("_match_score")
+                    full_dim["emotional_output"] = activity_match.get(
+                        "emotional_output", []
+                    )
+                    full_dim["_activity_match_score"] = activity_match.get(
+                        "_match_score"
+                    )
 
             full_dimensions.append(full_dim)
 

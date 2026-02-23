@@ -69,7 +69,11 @@ class FetchResult:
     @property
     def ok(self) -> bool:
         """Perform the operation."""
-        return self.error is None and self.status_code is not None and 200 <= self.status_code < 400
+        return (
+            self.error is None
+            and self.status_code is not None
+            and 200 <= self.status_code < 400
+        )
 
     @property
     def is_retryable(self) -> bool:

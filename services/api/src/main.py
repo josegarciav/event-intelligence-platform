@@ -183,16 +183,14 @@ def list_categories(
     try:
         cur = db.cursor()
 
-        cur.execute(
-            """
+        cur.execute("""
             SELECT
                 primary_category_id,
                 name,
                 description
             FROM primary_categories
             ORDER BY name;
-            """
-        )
+            """)
 
         rows = cur.fetchall()
 

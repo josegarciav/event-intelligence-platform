@@ -147,7 +147,9 @@ class ScraperAdapter(BaseSourceAdapter):
             logger.info(f"Found {len(event_urls)} unique event URLs")
 
             # Fetch event detail pages
-            event_results = await scraper.fetch_event_pages(event_urls, max_events=max_events)
+            event_results = await scraper.fetch_event_pages(
+                event_urls, max_events=max_events
+            )
             metadata["events_fetched"] = len(event_results)
 
             # Parse each event page
@@ -249,7 +251,12 @@ class HtmlEnrichmentScraper:
         else:
             # repo/services/api/src/ingestion/adapters/scraper_adapter.py
             # -> repo/services/scrapping/generated_configs/sources
-            base_dir = Path(__file__).resolve().parents[4] / "scrapping" / "generated_configs" / "sources"
+            base_dir = (
+                Path(__file__).resolve().parents[4]
+                / "scrapping"
+                / "generated_configs"
+                / "sources"
+            )
 
         candidates = [
             base_dir / f"{source_name}.json",
@@ -295,13 +302,17 @@ class HtmlEnrichmentScraper:
             for entry in entrypoints:
                 if isinstance(entry, dict):
                     ep_url = entry.get("url")
-                    if isinstance(ep_url, str) and ep_url.startswith(("http://", "https://")):
+                    if isinstance(ep_url, str) and ep_url.startswith(
+                        ("http://", "https://")
+                    ):
                         urls.append(ep_url)
             if urls:
                 self._preflight_urls = urls
 
         # If generated config recommends browser/hybrid, do not stay on plain http.
-        generated_engine_type = ((cfg.get("engine", {}) or {}).get("type") or "").lower()
+        generated_engine_type = (
+            (cfg.get("engine", {}) or {}).get("type") or ""
+        ).lower()
         if self.config.engine_type == "http" and generated_engine_type in {
             "browser",
             "hybrid",
@@ -323,7 +334,9 @@ class HtmlEnrichmentScraper:
         try:
             from src.ingestion.source_detector import SourceDetector
 
-            detection = SourceDetector(min_text_len=self.config.min_text_len).probe(seed_url)
+            detection = SourceDetector(min_text_len=self.config.min_text_len).probe(
+                seed_url
+            )
             if detection.needs_javascript and self.config.engine_type == "http":
                 self.logger.info(
                     "SourceDetector recommends '%s' engine for %s (was http)",
@@ -458,7 +471,9 @@ class HtmlEnrichmentScraper:
                 result = engine.get(url)
 
             if not result.text:
-                self.logger.debug(f"Fetch failed for {url}: status={result.status_code}")
+                self.logger.debug(
+                    f"Fetch failed for {url}: status={result.status_code}"
+                )
                 return None
             if not result.ok and result.block_signals:
                 self.logger.debug(
@@ -524,10 +539,18 @@ class HtmlEnrichmentScraper:
                             doc = html_to_structured(rendered.text, url=url)
                             if doc.ok and doc.text:
                                 retry_quality = evaluate_quality(
-                                    {"url": url, "title": doc.title or "", "text": doc.text},
+                                    {
+                                        "url": url,
+                                        "title": doc.title or "",
+                                        "text": doc.text,
+                                    },
                                     rules={"min_text_len": self.config.min_text_len},
                                 )
-                                retry_hard = [i for i in retry_quality.errors() if i.code != "short_text"]
+                                retry_hard = [
+                                    i
+                                    for i in retry_quality.errors()
+                                    if i.code != "short_text"
+                                ]
                                 if not retry_hard:
                                     text = doc.text
                                     if len(text) > self.config.max_text_length:
@@ -535,7 +558,9 @@ class HtmlEnrichmentScraper:
                                     return text
                     self.logger.debug(f"Quality check failed for {url}: {issues}")
                     return None
-                self.logger.debug(f"Quality short-text fallback accepted for {url}: {issues}")
+                self.logger.debug(
+                    f"Quality short-text fallback accepted for {url}: {issues}"
+                )
 
             # Truncate if needed
             text = doc.text

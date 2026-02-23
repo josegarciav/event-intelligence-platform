@@ -46,7 +46,7 @@ class TaxonomyAttributesOutput(BaseModel):
         description="Risk level of the activity. Most events are 'very_low' or 'low'"
     )
     age_accessibility: Literal["all", "teens+", "adults"] = Field(
-        description="Age appropriateness. " "'all' = family-friendly; 'teens+' = 13+; 'adults' = 18+/21+ (clubs, bars)"
+        description="Age appropriateness. 'all' = family-friendly; 'teens+' = 13+; 'adults' = 18+/21+ (clubs, bars)"
     )
     repeatability: Literal["high", "medium", "low"] = Field(
         description="How often people typically repeat this experience. "
@@ -65,14 +65,18 @@ class ActivityMatchOutput(BaseModel):
         default=None,
         description="UUID of the best matching activity from the taxonomy, or null if no good match",
     )
-    activity_name: str | None = Field(default=None, description="Name of the matched activity")
+    activity_name: str | None = Field(
+        default=None, description="Name of the matched activity"
+    )
     match_confidence: float = Field(
         default=0.5,
         ge=0.0,
         le=1.0,
         description="Confidence in the match (0.0-1.0)",
     )
-    reasoning: str | None = Field(default=None, description="Brief explanation of why this activity was chosen")
+    reasoning: str | None = Field(
+        default=None, description="Brief explanation of why this activity was chosen"
+    )
 
 
 class SubcategoryMatchOutput(BaseModel):
@@ -82,10 +86,16 @@ class SubcategoryMatchOutput(BaseModel):
     The LLM determines the best subcategory within a primary category.
     """
 
-    subcategory_id: str = Field(description="Subcategory ID (e.g., '1.4' for Music & Rhythm Play)")
+    subcategory_id: str = Field(
+        description="Subcategory ID (e.g., '1.4' for Music & Rhythm Play)"
+    )
     subcategory_name: str = Field(description="Name of the subcategory")
-    confidence: float = Field(default=0.7, ge=0.0, le=1.0, description="Confidence in classification")
-    reasoning: str | None = Field(default=None, description="Brief explanation of the classification")
+    confidence: float = Field(
+        default=0.7, ge=0.0, le=1.0, description="Confidence in classification"
+    )
+    reasoning: str | None = Field(
+        default=None, description="Brief explanation of the classification"
+    )
 
 
 class PrimaryCategoryOutput(BaseModel):
@@ -98,8 +108,12 @@ class PrimaryCategoryOutput(BaseModel):
     category_id: str = Field(
         description="Primary category ID ('1' through '10')",
     )
-    category_name: str = Field(description="Name of the category (e.g., 'PLAY & PURE FUN')")
-    confidence: float = Field(default=0.7, ge=0.0, le=1.0, description="Confidence in classification")
+    category_name: str = Field(
+        description="Name of the category (e.g., 'PLAY & PURE FUN')"
+    )
+    confidence: float = Field(
+        default=0.7, ge=0.0, le=1.0, description="Confidence in classification"
+    )
 
 
 class EmotionalOutputExtraction(BaseModel):
@@ -123,23 +137,33 @@ class FullTaxonomyEnrichmentOutput(BaseModel):
     """
 
     # Activity matching
-    activity_id: str | None = Field(default=None, description="UUID of matched activity")
-    activity_name: str | None = Field(default=None, description="Name of matched activity")
+    activity_id: str | None = Field(
+        default=None, description="UUID of matched activity"
+    )
+    activity_name: str | None = Field(
+        default=None, description="Name of matched activity"
+    )
 
     # Attribute selections
     energy_level: Literal["low", "medium", "high"] = Field(default="medium")
-    social_intensity: Literal["solo", "small_group", "large_group"] = Field(default="large_group")
+    social_intensity: Literal["solo", "small_group", "large_group"] = Field(
+        default="large_group"
+    )
     cognitive_load: Literal["low", "medium", "high"] = Field(default="low")
     physical_involvement: Literal["none", "light", "moderate"] = Field(default="light")
     cost_level: Literal["free", "low", "medium", "high"] = Field(default="medium")
     time_scale: Literal["short", "long", "recurring"] = Field(default="long")
-    environment: Literal["indoor", "outdoor", "digital", "mixed"] = Field(default="indoor")
+    environment: Literal["indoor", "outdoor", "digital", "mixed"] = Field(
+        default="indoor"
+    )
     risk_level: Literal["none", "very_low", "low", "medium"] = Field(default="very_low")
     age_accessibility: Literal["all", "teens+", "adults"] = Field(default="adults")
     repeatability: Literal["high", "medium", "low"] = Field(default="medium")
 
     # Emotional output
-    emotional_output: list[str] = Field(default_factory=lambda: ["enjoyment", "connection"])
+    emotional_output: list[str] = Field(
+        default_factory=lambda: ["enjoyment", "connection"]
+    )
 
 
 # =============================================================================
@@ -167,7 +191,9 @@ class EventTypeOutput(BaseModel):
         "art_show",
         "other",
     ] = Field(description="Type of event")
-    confidence: float = Field(default=0.7, ge=0.0, le=1.0, description="Confidence in classification")
+    confidence: float = Field(
+        default=0.7, ge=0.0, le=1.0, description="Confidence in classification"
+    )
 
 
 class MusicGenresOutput(BaseModel):
@@ -177,7 +203,9 @@ class MusicGenresOutput(BaseModel):
         default_factory=list,
         description="List of music genres (e.g., ['electronic', 'techno', 'house'])",
     )
-    is_music_event: bool = Field(default=True, description="Whether this is a music-related event")
+    is_music_event: bool = Field(
+        default=True, description="Whether this is a music-related event"
+    )
 
 
 class TagsOutput(BaseModel):

@@ -5,12 +5,13 @@ Tests for PageFetchResult, ScraperConfig, EventScraper, BaseScraperPipeline,
 and config loading utilities.
 """
 
+import asyncio
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
-from src.ingestion.base_pipeline import PipelineConfig
+from src.ingestion.pipelines.base_pipeline import PipelineConfig
 from src.ingestion.pipelines.scrapers.base_scraper import (
     BaseScraperPipeline,
     EventScraper,
@@ -246,7 +247,9 @@ class TestLoadConfigRaw:
         """Should load and parse JSON config."""
         mock_get_path.return_value = Path("/fake/path.json")
 
-        with patch("builtins.open", mock_open(read_data=json.dumps(MOCK_SCRAPER_CONFIG_JSON))):
+        with patch(
+            "builtins.open", mock_open(read_data=json.dumps(MOCK_SCRAPER_CONFIG_JSON))
+        ):
             result = load_config_raw("test_source")
 
         assert result["source_id"] == "test_source"
@@ -317,10 +320,13 @@ class TestEventScraperEnsureBrowser:
         """Should raise ImportError when playwright not installed."""
         scraper = EventScraper(scraper_config)
 
-        with patch.dict("sys.modules", {"playwright.sync_api": None}):
-            with patch("builtins.__import__", side_effect=ImportError("No module")):
-                with pytest.raises(ImportError, match="playwright is required"):
-                    scraper._ensure_browser()
+        async def run():
+            with patch.dict("sys.modules", {"playwright.async_api": None}):
+                with patch("builtins.__import__", side_effect=ImportError("No module")):
+                    with pytest.raises(ImportError, match="playwright is required"):
+                        await scraper._ensure_browser()
+
+        asyncio.run(run())
 
 
 class TestEventScraperClose:
@@ -328,13 +334,17 @@ class TestEventScraperClose:
 
     def test_close_browser(self, scraper_config):
         """Should close browser and playwright."""
+        from unittest.mock import AsyncMock
+
         scraper = EventScraper(scraper_config)
         mock_browser = MagicMock()
+        mock_browser.close = AsyncMock()
         mock_playwright = MagicMock()
+        mock_playwright.stop = AsyncMock()
         scraper._browser = mock_browser
         scraper._playwright = mock_playwright
 
-        scraper.close()
+        asyncio.run(scraper.close())
 
         mock_browser.close.assert_called_once()
         mock_playwright.stop.assert_called_once()
@@ -346,7 +356,7 @@ class TestEventScraperClose:
         scraper = EventScraper(scraper_config)
 
         # Should not raise
-        scraper.close()
+        asyncio.run(scraper.close())
 
 
 class TestEventScraperExtractEventUrls:
@@ -400,13 +410,19 @@ class TestEventScraperContextManager:
     """Tests for EventScraper context manager."""
 
     def test_context_manager(self, scraper_config):
-        """Should work as context manager."""
-        scraper = EventScraper(scraper_config)
+        """Should work as async context manager."""
+        from unittest.mock import AsyncMock
 
-        with patch.object(scraper, "close") as mock_close:
-            with scraper as ctx:
+        scraper = EventScraper(scraper_config)
+        mock_close = AsyncMock()
+        scraper.close = mock_close
+
+        async def run():
+            async with scraper as ctx:
                 assert ctx is scraper
-            mock_close.assert_called_once()
+
+        asyncio.run(run())
+        mock_close.assert_called_once()
 
 
 # =============================================================================
@@ -465,7 +481,9 @@ class TestBaseScraperPipelineInit:
                 return event
 
         custom_parser = MagicMock(return_value={"custom": True})
-        pipeline = ConcretePipeline(pipeline_config, scraper_config, html_parser=custom_parser)
+        pipeline = ConcretePipeline(
+            pipeline_config, scraper_config, html_parser=custom_parser
+        )
 
         # Access adapter's html_parser
         assert pipeline.adapter.html_parser is custom_parser

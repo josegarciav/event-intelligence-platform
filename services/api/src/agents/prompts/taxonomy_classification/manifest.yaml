@@ -1,0 +1,7 @@
+prompt_name: "taxonomy_classification"
+active_version: "v1"
+versions:
+  v1:
+    description: "Full taxonomy classification — primary category, subcategory, activity mapping"
+    created_at: "2026-02-18"
+    notes: "Used by TaxonomyClassifierAgent. Combines experience_pulse + logistics into a single structured output."

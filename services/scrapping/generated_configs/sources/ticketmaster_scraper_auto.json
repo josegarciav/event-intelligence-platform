@@ -1,0 +1,24 @@
+{
+  "source_id": "ticketmaster",
+  "labels": { "domain": "ticketmaster.com" },
+  "engine": {
+    "type": "hybrid",
+    "timeout_s": 20,
+    "verify_ssl": true,
+    "retry_policy": { "max_retries": 2, "backoff": "exp", "retry_on_status": [429, 500, 502, 503, 504] },
+    "rate_limit_policy": { "min_delay_s": 1.5, "jitter_s": 0.5 }
+  },
+  "entrypoints": [],
+  "discovery": {
+    "wait_for": "h1",
+    "link_extract": null
+  },
+  "actions": [],
+  "quality": {
+    "min_text_len": 100,
+    "min_title_len": 3,
+    "max_boilerplate_ratio": 0.90
+  },
+  "enabled": true,
+  "config_version": "1.0"
+}

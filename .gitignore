@@ -20,6 +20,4 @@ data/
 .vscode/
 node_modules
 mypy.ini
-.ruff.toml
 setup.cfg
-.pre-commit-config.yaml
