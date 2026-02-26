@@ -17,6 +17,7 @@ Directory structure:
 
 import json
 import logging
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,8 @@ logger = logging.getLogger(__name__)
 
 # Default output root (relative to project root — resolved at runtime)
 DEFAULT_BATCH_DIR = Path(__file__).resolve().parents[4] / "data" / "batches"
+
+_SAFE_SOURCE_NAME = re.compile(r"^[a-zA-Z0-9_\-]{1,64}$")
 
 
 class BatchWriter:
@@ -70,6 +73,14 @@ class BatchWriter:
         Returns:
             Path to the written JSONL file
         """
+        if not _SAFE_SOURCE_NAME.match(source_name):
+            raise ValueError(f"Invalid source_name: {source_name!r}")
+        resolved = (self.batch_dir / source_name).resolve()
+        if not str(resolved).startswith(str(self.batch_dir.resolve())):
+            raise ValueError(
+                f"Path traversal detected for source_name: {source_name!r}"
+            )
+
         today = datetime.now(UTC).strftime("%Y-%m-%d")
         source_dir = self.batch_dir / source_name
         source_dir.mkdir(parents=True, exist_ok=True)
@@ -142,7 +153,9 @@ class BatchWriter:
                 try:
                     records.append(json.loads(line))
                 except json.JSONDecodeError as e:
-                    logger.warning("Skipping malformed line %d in %s: %s", line_no, path, e)
+                    logger.warning(
+                        "Skipping malformed line %d in %s: %s", line_no, path, e
+                    )
         return records
 
     def list_batches(

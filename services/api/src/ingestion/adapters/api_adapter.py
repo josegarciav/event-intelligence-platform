@@ -84,7 +84,7 @@ class APIAdapter(BaseSourceAdapter):
             }
             if self.api_config.api_key:
                 headers["Authorization"] = f"Bearer {self.api_config.api_key}"
-            self._client = httpx.AsyncClient(headers=headers)
+            self._client = httpx.AsyncClient(headers=headers, verify=True)
         return self._client
 
     async def fetch(self, **kwargs) -> FetchResult:

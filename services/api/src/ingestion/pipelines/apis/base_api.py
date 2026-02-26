@@ -189,6 +189,18 @@ class ConfigDrivenAPIAdapter(APIAdapter):
                 params,
             )
 
+    def _resolve_settings_var(self, var_name: str) -> str | None:
+        """Resolve an env var through the Settings whitelist only (not raw os.environ)."""
+        from src.configs.settings import get_settings
+
+        settings = get_settings()
+        value = settings.model_dump().get(var_name)
+        if value is None:
+            return None
+        if hasattr(value, "get_secret_value"):
+            return value.get_secret_value()
+        return str(value)
+
     def _substitute_variables(
         self,
         template: Any,
@@ -216,8 +228,8 @@ class ConfigDrivenAPIAdapter(APIAdapter):
             stripped = template.strip()
             if stripped.startswith("${") and stripped.endswith("}"):
                 env_var = stripped[2:-1]
-                resolved = os.environ.get(env_var, stripped)
-                return resolved
+                resolved = self._resolve_settings_var(env_var)
+                return resolved if resolved is not None else stripped
 
             # Fast path: if the entire string is exactly one placeholder,
             # return the raw value to preserve its type (int, float, bool, etc.)
@@ -1029,7 +1041,10 @@ class BaseAPIPipeline(BasePipeline):
         # Build custom_fields from config-driven mapping.
         # Collect all non-None values listed in source_config.custom_fields_mapping.
         custom_fields: dict[str, Any] = {}
-        for custom_key, parsed_field in self.source_config.custom_fields_mapping.items():
+        for (
+            custom_key,
+            parsed_field,
+        ) in self.source_config.custom_fields_mapping.items():
             value = parsed_event.get(parsed_field)
             if value is not None:
                 custom_fields[custom_key] = value

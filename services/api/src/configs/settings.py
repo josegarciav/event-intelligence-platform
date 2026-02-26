@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     # ENVIRONMENT
     # -------------------------------------------------------------------------
     ENV: str = "development"
-    DEBUG: bool = True
+    DEBUG: bool = False
 
     # -------------------------------------------------------------------------
     # DATABASE
@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     RA_CO_API_KEY: SecretStr | None = None
     MEETUP_API_KEY: SecretStr | None = None
     TICKETMASTER_API_KEY: SecretStr | None = None
+    TRIPADVISOR_API_KEY: SecretStr | None = None
+    CIVITATIS_API_KEY: SecretStr | None = None
+    GETYOURGUIDE_API_KEY: SecretStr | None = None
+    EVENTBRITE_API_KEY: SecretStr | None = None
 
     # -------------------------------------------------------------------------
     # ENRICHMENT SERVICES
@@ -42,6 +46,11 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: SecretStr | None = None
     ANTHROPIC_API_KEY: SecretStr | None = None
     GEOCODING_API_KEY: SecretStr | None = None
+
+    # -------------------------------------------------------------------------
+    # LOCAL LLM
+    # -------------------------------------------------------------------------
+    OLLAMA_BASE_URL: str = "http://localhost:11434/v1"
 
     # -------------------------------------------------------------------------
     # MONITORING & ALERTING

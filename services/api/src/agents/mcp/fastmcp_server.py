@@ -187,6 +187,34 @@ def fetch_taxonomy_enums() -> str:
 # WRITE TOOLS
 # =============================================================================
 
+_ALLOWED_WRITE_FIELDS = {
+    "title",
+    "description",
+    "start_datetime",
+    "end_datetime",
+    "venue_name",
+    "location",
+    "price_info",
+    "ticket_info",
+    "tags",
+    "custom_fields",
+    "source_info",
+}
+
+_ALLOWED_TAXONOMY_FIELDS = {
+    "energy_level",
+    "social_intensity",
+    "cognitive_load",
+    "physical_involvement",
+    "environment",
+    "risk_level",
+    "age_accessibility",
+    "repeatability",
+    "cost_level",
+    "time_scale",
+    "emotional_output",
+}
+
 
 @mcp.tool()
 def write_features(event_id: str, fields_json: str) -> str:
@@ -213,6 +241,16 @@ def write_features(event_id: str, fields_json: str) -> str:
     except json.JSONDecodeError as e:
         return json.dumps(
             {"success": False, "fields_written": [], "error": f"Invalid JSON: {e}"}
+        )
+
+    unknown = set(fields.keys()) - _ALLOWED_WRITE_FIELDS
+    if unknown:
+        return json.dumps(
+            {
+                "success": False,
+                "fields_written": [],
+                "error": f"Disallowed fields: {unknown}",
+            }
         )
 
     _event_store[event_id].update(fields)
@@ -246,6 +284,16 @@ def write_taxonomy(event_id: str, taxonomy_json: str) -> str:
     except json.JSONDecodeError as e:
         return json.dumps(
             {"success": False, "fields_written": [], "error": f"Invalid JSON: {e}"}
+        )
+
+    unknown = set(taxonomy_data.keys()) - _ALLOWED_TAXONOMY_FIELDS
+    if unknown:
+        return json.dumps(
+            {
+                "success": False,
+                "fields_written": [],
+                "error": f"Disallowed taxonomy fields: {unknown}",
+            }
         )
 
     event = _event_store[event_id]
