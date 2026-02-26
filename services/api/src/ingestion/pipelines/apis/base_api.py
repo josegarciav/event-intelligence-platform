@@ -115,6 +115,11 @@ class APISourceConfig:
     # Connection-level headers (for header-based auth, e.g. X-ACCESS-TOKEN for GetYourGuide)
     connection_headers: dict[str, str] = field(default_factory=dict)
 
+    # Custom fields mapping: custom_key -> parsed_event_field_name
+    # Fields listed here are collected from the already-mapped parsed_event dict
+    # and stored in EventSchema.custom_fields for LLM enrichment context.
+    custom_fields_mapping: dict[str, str] = field(default_factory=dict)
+
 
 class ConfigDrivenAPIAdapter(APIAdapter):
     """
@@ -1021,10 +1026,18 @@ class BaseAPIPipeline(BasePipeline):
             if minimum_age is not None:
                 age_restriction = str(minimum_age)
 
-        # Build custom_fields (RA-specific metadata)
-        custom_fields = {}
+        # Build custom_fields from config-driven mapping.
+        # Collect all non-None values listed in source_config.custom_fields_mapping.
+        custom_fields: dict[str, Any] = {}
+        for custom_key, parsed_field in self.source_config.custom_fields_mapping.items():
+            value = parsed_event.get(parsed_field)
+            if value is not None:
+                custom_fields[custom_key] = value
+
+        # Backward-compat: ensure is_ticketed is always in custom_fields when present,
+        # even for sources that haven't updated their custom_fields_mapping yet.
         is_ticketed = parsed_event.get("is_ticketed")
-        if is_ticketed is not None:
+        if is_ticketed is not None and "is_ticketed" not in custom_fields:
             custom_fields["is_ticketed"] = bool(is_ticketed)
 
         # Build ticket info — set URL to event source page when ticketed
@@ -1042,12 +1055,6 @@ class BaseAPIPipeline(BasePipeline):
             url=ticket_url or None,
             is_sold_out=is_sold_out,
         )
-        pick_blurb = parsed_event.get("pick_blurb")
-        if pick_blurb:
-            custom_fields["pick_blurb"] = pick_blurb
-        pick_id = parsed_event.get("pick_id")
-        if pick_id:
-            custom_fields["pick_id"] = pick_id
 
         # Combine description + please_note when both present
         description_raw = parsed_event.get("description") or None
@@ -1481,6 +1488,7 @@ def create_api_pipeline_from_config(
             "geocoding", False
         ),
         connection_headers=connection.get("headers", {}),
+        custom_fields_mapping=source_config_dict.get("custom_fields_mapping", {}),
     )
 
     # Create pipeline config if not provided

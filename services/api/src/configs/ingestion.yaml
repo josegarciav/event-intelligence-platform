@@ -1,6 +1,17 @@
 # Configuration for Ingestion Pipelines
 # This file defines which sources are enabled, their settings,
 # scheduling, and source-specific configuration.
+#
+# CUSTOM FIELDS:
+# Each source may declare a `custom_fields_mapping` block:
+#   custom_fields_mapping:
+#     <custom_key>: "<parsed_event_field_name>"
+#
+# Fields listed here are collected from the already-mapped intermediate
+# dict (parsed_event) and stored in EventSchema.custom_fields for the
+# LLM enrichment layer to use as additional context.
+# All field names in custom_fields_mapping must have a corresponding
+# entry in field_mappings so they are extracted from the raw API response.
 
 sources:
 
@@ -129,6 +140,7 @@ sources:
       source_updated_at: "event.dateUpdated"
       lineup: "event.lineup"
       organizer_name: "event.admin.name"
+      organizer_username: "event.admin.username"
       venue_phone: "event.venue.phone"
       venue_website: "event.venue.website"
       venue_follower_count: "event.venue.followerCount"
@@ -147,6 +159,22 @@ sources:
         template: "https://ra.co{{content_url}}"
       country_code:
         type: "uppercase"
+
+    # Custom fields: source-specific context for LLM enrichment.
+    # Keys become dict entries in EventSchema.custom_fields.
+    # Values reference field names already extracted by field_mappings.
+    custom_fields_mapping:
+      is_ticketed: "is_ticketed"
+      pick_id: "pick_id"
+      pick_blurb: "pick_blurb"
+      attending: "attending"
+      interested_count: "interested_count"
+      venue_follower_count: "venue_follower_count"
+      venue_content_url: "venue_content_url"
+      venue_live_capacity: "venue_live"
+      country_name: "country_name"
+      organizer_username: "organizer_username"
+      image_crop: "image_crop"
 
     # Taxonomy mapping rules
     taxonomy_suggestions:
@@ -272,9 +300,11 @@ sources:
       venue_longitude: "_embedded.venues[0].location.longitude"
       timezone: "_embedded.venues[0].timezone"
       venue_box_office_phone: "_embedded.venues[0].boxOfficeInfo.phoneNumberDetail"
+      venue_box_office_hours: "_embedded.venues[0].boxOfficeInfo.openHoursDetail"
       venue_general_info: "_embedded.venues[0].generalInfo.generalRule"
       venue_child_rule: "_embedded.venues[0].generalInfo.childRule"
       venue_accessible_seating: "_embedded.venues[0].accessibleSeatingDetail"
+      venue_parking_detail: "_embedded.venues[0].parkingDetail"
 
       # Artists / performers from attractions
       artists: "_embedded.attractions[*].name"
@@ -284,6 +314,7 @@ sources:
 
       # Promoter (event organizer / promoter company)
       promoter_name: "promoter.name"
+      promoter_id: "promoter.id"
 
       # Pricing
       cost_min: "priceRanges[0].min"
@@ -300,11 +331,12 @@ sources:
       image_url_raw: "images[0].url"
       seatmap_url: "seatmap.staticUrl"
 
-      # Classification (used for event_type rules)
+      # Classification (used for event_type rules and custom_fields context)
       classification_segment: "classifications[0].segment.name"
       classification_genre: "classifications[0].genre.name"
       classification_subgenre: "classifications[0].subGenre.name"
       classification_type: "classifications[0].type.name"
+      classification_family: "classifications[0].family.name"
 
     # Transformations applied after field extraction
     transformations:
@@ -324,13 +356,35 @@ sources:
       country_code:
         type: "uppercase"
 
+    # Custom fields: source-specific context for LLM enrichment
+    custom_fields_mapping:
+      event_status: "event_status"
+      sale_start: "sale_start"
+      sale_end: "sale_end"
+      venue_box_office_phone: "venue_box_office_phone"
+      venue_box_office_hours: "venue_box_office_hours"
+      venue_general_info: "venue_general_info"
+      venue_child_rule: "venue_child_rule"
+      venue_accessible_seating: "venue_accessible_seating"
+      venue_parking_detail: "venue_parking_detail"
+      ticket_limit: "ticket_limit"
+      promoter_name: "promoter_name"
+      promoter_id: "promoter_id"
+      classification_segment: "classification_segment"
+      classification_genre: "classification_genre"
+      classification_subgenre: "classification_subgenre"
+      classification_type: "classification_type"
+      classification_family: "classification_family"
+      country_name: "country_name"
+      attraction_genre: "attraction_genre"
+      please_note: "please_note"
+
     # Taxonomy mapping rules
     taxonomy_suggestions:
       default_primary: "1"  # Play & Pure Fun
       default_subcategory: "1.4"  # Music & Rhythm Play
 
     # Event type determination rules
-    # NOTE: TM classification_segment/genre are also available for matching
     event_type_rules:
       - match:
           title_contains: ["festival", "fest"]
@@ -411,7 +465,6 @@ sources:
         language: "en"
         limit: "{{page_size}}"
       response_path: "data"
-      # TripAdvisor search does not expose a total count field
 
     pagination:
       type: "page_number"
@@ -422,9 +475,10 @@ sources:
     field_mappings:
       source_event_id:   "location_id"
       title:             "name"
-      description:       "description"                      # may be null in search; HTML enrichment fills it
+      description:       "description"
       venue_name:        "name"
       venue_address:     "address_obj.street1"
+      venue_address2:    "address_obj.street2"
       city:              "address_obj.city"
       state_or_region:   "address_obj.state"
       postal_code:       "address_obj.postalcode"
@@ -432,12 +486,19 @@ sources:
       latitude:          "latitude"
       longitude:         "longitude"
       source_url_raw:    "web_url"
-      image_url_raw:     "photo.images.large.url"           # may be null; enrichment fills
+      image_url_raw:     "photo.images.large.url"
       category_key:      "category.key"
-      subcategory_keys:  "subcategory[*].key"               # list -> regex-matchable via str()
+      category_name:     "category.name"
+      subcategory_keys:  "subcategory[*].key"
+      subcategory_names: "subcategory[*].name"
       rating:            "rating"
       num_reviews:       "num_reviews"
-      price_level:       "price_level"                      # e.g. "$$" -> stored in custom_fields
+      price_level:       "price_level"
+      ranking_position:  "ranking_position"
+      ranking_string:    "ranking"
+      phone:             "phone"
+      email:             "email"
+      awards:            "awards[*].award_type"
 
     transformations:
       source_url:
@@ -452,8 +513,22 @@ sources:
         type: "uppercase"
         source: "country_code"
 
-    # Taxonomy: default -> EXPLORATION & ADVENTURE / Cultural Discovery
-    # subcategory_keys list is coerced to str() for regex matching inside TaxonomyMapper
+    # Custom fields: source-specific context for LLM enrichment
+    custom_fields_mapping:
+      rating: "rating"
+      num_reviews: "num_reviews"
+      price_level: "price_level"
+      category_key: "category_key"
+      category_name: "category_name"
+      subcategory_keys: "subcategory_keys"
+      subcategory_names: "subcategory_names"
+      ranking_position: "ranking_position"
+      ranking_string: "ranking_string"
+      awards: "awards"
+      venue_address2: "venue_address2"
+      phone: "phone"
+      email: "email"
+
     taxonomy_suggestions:
       default_primary: "2"       # EXPLORATION & ADVENTURE
       default_subcategory: "2.4" # Cultural Discovery
@@ -490,20 +565,20 @@ sources:
         currency: "EUR"
 
     validation:
-      required_fields: ["title", "source_event_id"]   # no start_datetime: attractions are recurring
+      required_fields: ["title", "source_event_id"]
       future_events_only: false
 
     enrichment:
       geocoding: true
       compressed_html:
-        enabled: true           # Fetch web_url page to extract descriptions + images
+        enabled: true
         engine_type: hybrid
         rate_limit_per_second: 1.0
         timeout_s: 20.0
 
     schedule:
       type: "cron"
-      cron_expression: "0 0 * * 1"   # Weekly on Monday (attractions don't change often)
+      cron_expression: "0 0 * * 1"
       enabled: false
 
   # =========================================================================
@@ -524,7 +599,7 @@ sources:
     query:
       params:
         apiKey: "${CIVITATIS_API_KEY}"
-        destination: "{{area_id}}"   # numeric city ID from defaults.areas
+        destination: "{{area_id}}"
         limit: "{{page_size}}"
         page: "{{page}}"
         language: "en"
@@ -536,24 +611,34 @@ sources:
       type: "page_number"
       max_pages: 5
       default_page_size: 50
-      start_page: 1              # Civitatis affiliate API is 1-indexed
+      start_page: 1
 
     field_mappings:
-      source_event_id:       "id"
-      title:                 "title"
-      description:           "description"
-      city:                  "destination.name"
-      country_code:          "destination.countryCode"
-      cost_min:              "price.from"
-      cost_currency:         "price.currency"
-      is_free:               "price.isFree"
-      duration_minutes_raw:  "duration.minutes"
-      start_time:            "schedule.startTimes[0]"   # first available time slot
-      image_url_raw:         "images[0].url"
-      source_url_raw:        "url"
-      rating_average:        "rating.average"
-      rating_count:          "rating.count"
-      categories:            "categories[*]"             # list -> str() for regex matching
+      source_event_id:        "id"
+      title:                  "title"
+      description:            "description"
+      city:                   "destination.name"
+      country_code:           "destination.countryCode"
+      cost_min:               "price.from"
+      cost_currency:          "price.currency"
+      is_free:                "price.isFree"
+      duration_minutes_raw:   "duration.minutes"
+      duration_hours_raw:     "duration.hours"
+      duration_label:         "duration.label"
+      start_time:             "schedule.startTimes[0]"
+      schedule_days:          "schedule.days"
+      image_url_raw:          "images[0].url"
+      source_url_raw:         "url"
+      rating_average:         "rating.average"
+      rating_count:           "rating.count"
+      categories:             "categories[*]"
+      cancellation_policy:    "cancellationPolicy"
+      max_participants:       "maxParticipants"
+      language_available:     "languages[*]"
+      includes:               "includes[*]"
+      excludes:               "excludes[*]"
+      meeting_point:          "meetingPoint.address"
+      voucher_type:           "voucherType"
 
     transformations:
       source_url:
@@ -571,8 +656,24 @@ sources:
         type: "strip_html"
         source: "description"
 
-    # Taxonomy: default -> EXPLORATION & ADVENTURE / Travel & Trip Adventures
-    # Subcategory rules cover Civitatis's main category types
+    # Custom fields: source-specific context for LLM enrichment
+    custom_fields_mapping:
+      rating_average: "rating_average"
+      rating_count: "rating_count"
+      categories: "categories"
+      duration_minutes: "duration_minutes_raw"
+      duration_hours: "duration_hours_raw"
+      duration_label: "duration_label"
+      schedule_days: "schedule_days"
+      cancellation_policy: "cancellation_policy"
+      max_participants: "max_participants"
+      languages_available: "language_available"
+      includes: "includes"
+      excludes: "excludes"
+      meeting_point: "meeting_point"
+      voucher_type: "voucher_type"
+      is_free: "is_free"
+
     taxonomy_suggestions:
       default_primary: "2"       # EXPLORATION & ADVENTURE
       default_subcategory: "2.3" # Travel & Trip Adventures
@@ -604,15 +705,15 @@ sources:
       page_size: 50
       days_ahead: 1
       areas:
-        Barcelona: 5     # Civitatis destination ID -- verify with affiliate docs
-        Madrid: 12       # Civitatis destination ID -- verify with affiliate docs
+        Barcelona: 5
+        Madrid: 12
       location:
         country_code: "ES"
         timezone: "Europe/Madrid"
         currency: "EUR"
 
     validation:
-      required_fields: ["title", "source_event_id"]   # no start_datetime: recurring activities
+      required_fields: ["title", "source_event_id"]
       future_events_only: false
 
     enrichment:
@@ -625,7 +726,7 @@ sources:
 
     schedule:
       type: "cron"
-      cron_expression: "0 0 * * 1"   # Weekly on Monday
+      cron_expression: "0 0 * * 1"
       enabled: false
 
   # =========================================================================
@@ -644,14 +745,14 @@ sources:
         Accept: "application/json"
 
     max_retries: 3
-    rate_limit_per_second: 2.0        # well within GYG's 130 req/min cap
+    rate_limit_per_second: 2.0
 
     query:
       params:
-        destination_id: "{{area_id}}"  # numeric city ID from defaults.areas
+        destination_id: "{{area_id}}"
         cnt_language: "en"
         currency: "EUR"
-        offset: "{{page}}"             # offset pagination: {{page}} = page_index * page_size
+        offset: "{{page}}"
         limit: "{{page_size}}"
         sort: "top_sellers"
       response_path: "tours"
@@ -678,8 +779,14 @@ sources:
       rating:               "rating"
       num_reviews:          "reviews"
       categories:           "categories[*]"
-      duration_min_secs:    "duration_min"   # seconds; stored in custom_fields
-      duration_max_secs:    "duration_max"   # seconds; stored in custom_fields
+      duration_min_secs:    "duration_min"
+      duration_max_secs:    "duration_max"
+      abstract:             "abstract"
+      flags:                "flags[*]"
+      supplier_name:        "supplier.name"
+      languages:            "languages[*]"
+      cancellation_policy:  "cancellation_policy"
+      max_travelers:        "max_travelers"
 
     transformations:
       source_url:
@@ -697,7 +804,20 @@ sources:
         type: "strip_html"
         source: "description"
 
-    # Taxonomy: default → EXPLORATION & ADVENTURE / Travel & Trip Adventures
+    # Custom fields: source-specific context for LLM enrichment
+    custom_fields_mapping:
+      rating: "rating"
+      num_reviews: "num_reviews"
+      categories: "categories"
+      duration_min_seconds: "duration_min_secs"
+      duration_max_seconds: "duration_max_secs"
+      abstract: "abstract"
+      flags: "flags"
+      supplier_name: "supplier_name"
+      languages: "languages"
+      cancellation_policy: "cancellation_policy"
+      max_travelers: "max_travelers"
+
     taxonomy_suggestions:
       default_primary: "2"       # EXPLORATION & ADVENTURE
       default_subcategory: "2.3" # Travel & Trip Adventures
@@ -732,15 +852,15 @@ sources:
       page_size: 50
       days_ahead: 1
       areas:
-        Barcelona: 45   # GYG destination ID — inferred from /barcelona-l45/ URL slug; verify with docs
-        Madrid: 46      # GYG destination ID — inferred from /madrid-l46/ URL slug; verify with docs
+        Barcelona: 45
+        Madrid: 46
       location:
         country_code: "ES"
         timezone: "Europe/Madrid"
         currency: "EUR"
 
     validation:
-      required_fields: ["title", "source_event_id"]   # no start_datetime: recurring activities
+      required_fields: ["title", "source_event_id"]
       future_events_only: false
 
     enrichment:
@@ -753,7 +873,7 @@ sources:
 
     schedule:
       type: "cron"
-      cron_expression: "0 0 * * 1"   # Weekly on Monday
+      cron_expression: "0 0 * * 1"
       enabled: false
 
   # =========================================================================
@@ -772,13 +892,13 @@ sources:
         Accept: "application/json"
 
     max_retries: 3
-    rate_limit_per_second: 0.25     # 1000 req/hr cap → 0.28 req/s; 0.25 leaves headroom
+    rate_limit_per_second: 0.25
 
     query:
       params:
         status: "live"
         order_by: "start_asc"
-        expand: "venue,logo,ticket_availability,category,organizer"
+        expand: "venue,logo,ticket_availability,category,organizer,format,subcategory"
         start_date.range_start: "{{date_from_iso}}"
         start_date.range_end:   "{{date_to_iso}}"
         page:      "{{page}}"
@@ -793,33 +913,46 @@ sources:
       start_page: 1
 
     field_mappings:
-      source_event_id:    "id"
-      title:              "name.text"
-      description:        "description.text"
-      start_datetime_raw: "start.utc"
-      end_datetime_raw:   "end.utc"
-      timezone_raw:       "start.timezone"
-      venue_name:         "venue.name"
-      venue_address:      "venue.address.address_1"
-      city:               "venue.address.city"
-      state:              "venue.address.region"
-      postal_code:        "venue.address.postal_code"
-      country_code:       "venue.address.country"
-      latitude:           "venue.latitude"
-      longitude:          "venue.longitude"
-      is_free:            "is_free"
-      currency:           "currency"
-      capacity:           "capacity"
-      online_event:       "online_event"
-      image_url_raw:      "logo.url"
-      source_url_raw:     "url"
-      cost_min:           "ticket_availability.minimum_ticket_price.value"
-      cost_max:           "ticket_availability.maximum_ticket_price.value"
-      is_sold_out:        "ticket_availability.is_sold_out"
-      category_name:      "category.name"
-      organizer_name:     "organizer.name"
-      source_updated_at:  "changed"
-      status:             "status"
+      source_event_id:       "id"
+      title:                 "name.text"
+      description:           "description.text"
+      summary:               "summary"
+      start_datetime_raw:    "start.utc"
+      end_datetime_raw:      "end.utc"
+      timezone_raw:          "start.timezone"
+      venue_name:            "venue.name"
+      venue_address:         "venue.address.address_1"
+      venue_address2:        "venue.address.address_2"
+      city:                  "venue.address.city"
+      state:                 "venue.address.region"
+      postal_code:           "venue.address.postal_code"
+      country_code:          "venue.address.country"
+      latitude:              "venue.latitude"
+      longitude:             "venue.longitude"
+      is_free:               "is_free"
+      currency:              "currency"
+      capacity:              "capacity"
+      online_event:          "online_event"
+      image_url_raw:         "logo.url"
+      source_url_raw:        "url"
+      cost_min:              "ticket_availability.minimum_ticket_price.value"
+      cost_max:              "ticket_availability.maximum_ticket_price.value"
+      is_sold_out:           "ticket_availability.is_sold_out"
+      has_available_tickets: "ticket_availability.has_available_tickets"
+      waitlist_available:    "ticket_availability.waitlist_available"
+      category_name:         "category.name"
+      subcategory_name:      "subcategory.name"
+      format_name:           "format.name"
+      organizer_name:        "organizer.name"
+      organizer_url:         "organizer.website"
+      organizer_description: "organizer.description.text"
+      organizer_num_upcoming: "organizer.num_upcoming_events"
+      source_updated_at:     "changed"
+      status:                "status"
+      listed:                "listed"
+      shareable:             "shareable"
+      invite_only:           "invite_only"
+      show_remaining:        "show_remaining"
 
     transformations:
       source_url:
@@ -837,7 +970,25 @@ sources:
         type: "strip_html"
         source: "description"
 
-    # Taxonomy: ticketed events → Play & Pure Fun (same primary as Ra.co)
+    # Custom fields: source-specific context for LLM enrichment
+    custom_fields_mapping:
+      status: "status"
+      online_event: "online_event"
+      category_name: "category_name"
+      subcategory_name: "subcategory_name"
+      format_name: "format_name"
+      is_sold_out: "is_sold_out"
+      has_available_tickets: "has_available_tickets"
+      waitlist_available: "waitlist_available"
+      capacity: "capacity"
+      organizer_description: "organizer_description"
+      organizer_num_upcoming: "organizer_num_upcoming"
+      summary: "summary"
+      invite_only: "invite_only"
+      listed: "listed"
+      show_remaining: "show_remaining"
+      venue_address2: "venue_address2"
+
     taxonomy_suggestions:
       default_primary: "1"       # Play & Pure Fun
       default_subcategory: "1.1" # Social & Playful Gatherings
@@ -879,6 +1030,10 @@ sources:
           regex:
             category_name: "food|drink|wine"
         type: "food_beverage"
+      - match:
+          regex:
+            format_name: "conference|seminar|summit"
+        type: "conference"
       - default: true
         type: "other"
 
@@ -886,7 +1041,6 @@ sources:
       page_size: 50
       days_ahead: 7
       areas:
-        # Map city name → Eventbrite organizer ID for major promoters in each city.
         Barcelona: 28166836273
         Madrid: 24081003379
       location:
@@ -899,13 +1053,267 @@ sources:
       future_events_only: true
 
     enrichment:
-      geocoding: false        # venue.latitude/longitude provided directly via expand=venue
+      geocoding: false
       compressed_html:
         enabled: false
 
     schedule:
       type: "cron"
-      cron_expression: "0 */12 * * *"   # Every 12 hours (same cadence as Ra.co)
+      cron_expression: "0 */12 * * *"
+      enabled: false
+
+  # =========================================================================
+  # MEETUP - GraphQL API (community events, tech meetups, social gatherings)
+  # =========================================================================
+  # Auth: OAuth2 Bearer token — set MEETUP_API_KEY in .env
+  # Meetup v3 uses cursor-based pagination; the pipeline runs one fetch
+  # per date window (the sliding window strategy handles high-density days).
+  # Area lookup uses lat/lon stored in defaults.city_coords (not integer IDs).
+  # =========================================================================
+  meetup:
+    enabled: false
+    pipeline_type: "api"
+
+    connection:
+      endpoint: "https://api.meetup.com/gql"
+      protocol: "graphql"
+      timeout_seconds: 30
+      headers:
+        Authorization: "Bearer ${MEETUP_API_KEY}"
+        Content-Type: "application/json"
+
+    max_retries: 3
+    rate_limit_per_second: 2.0
+
+    query:
+      template: |
+        query GetUpcomingEvents($lat: Float!, $lon: Float!, $radius: Float, $startDateRange: ZonedDateTime, $endDateRange: ZonedDateTime, $first: Int) {
+          keywordSearch(
+            filter: {
+              lat: $lat
+              lon: $lon
+              radius: $radius
+              startDateRange: $startDateRange
+              endDateRange: $endDateRange
+              source: EVENTS
+            }
+            input: {
+              first: $first
+            }
+          ) {
+            count
+            edges {
+              node {
+                result {
+                  ... on Event {
+                    id
+                    title
+                    description
+                    shortDescription
+                    dateTime
+                    endTime
+                    duration
+                    eventUrl
+                    isOnline
+                    going
+                    waiting
+                    maxTickets
+                    venue {
+                      id
+                      name
+                      address
+                      city
+                      state
+                      country
+                      lat
+                      lng
+                      postalCode
+                    }
+                    group {
+                      id
+                      name
+                      urlname
+                      city
+                      state
+                      country
+                      timezone
+                      membersCount
+                      description
+                      organizer {
+                        name
+                      }
+                    }
+                    images {
+                      baseUrl
+                    }
+                    feeSettings {
+                      amount
+                      currency
+                      type
+                      label
+                    }
+                    topics {
+                      name
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      variables:
+        lat: "{{lat}}"
+        lon: "{{lon}}"
+        radius: "{{radius}}"
+        startDateRange: "{{date_from_iso}}"
+        endDateRange: "{{date_to_iso}}"
+        first: "{{page_size}}"
+      response_path: "data.keywordSearch.edges"
+      total_results_path: "data.keywordSearch.count"
+
+    pagination:
+      type: "page_number"
+      max_pages: 1              # One call per sliding window; density handled by window shrink
+      default_page_size: 50
+      start_page: 1
+
+    # Field mappings — paths relative to each edge object
+    field_mappings:
+      source_event_id:    "node.result.id"
+      title:              "node.result.title"
+      description:        "node.result.description"
+      short_description:  "node.result.shortDescription"
+      start_time:         "node.result.dateTime"
+      end_time:           "node.result.endTime"
+      duration:           "node.result.duration"          # milliseconds
+      content_url:        "node.result.eventUrl"
+      is_online:          "node.result.isOnline"
+      going:              "node.result.going"
+      waiting:            "node.result.waiting"
+      max_tickets:        "node.result.maxTickets"
+      # Venue
+      venue_id:           "node.result.venue.id"
+      venue_name:         "node.result.venue.name"
+      venue_address:      "node.result.venue.address"
+      city:               "node.result.venue.city"
+      state_or_region:    "node.result.venue.state"
+      country_code:       "node.result.venue.country"
+      latitude:           "node.result.venue.lat"
+      longitude:          "node.result.venue.lng"
+      postal_code:        "node.result.venue.postalCode"
+      # Group (organizer)
+      group_id:           "node.result.group.id"
+      group_name:         "node.result.group.name"
+      group_urlname:      "node.result.group.urlname"
+      group_city:         "node.result.group.city"
+      group_timezone:     "node.result.group.timezone"
+      group_members:      "node.result.group.membersCount"
+      group_description:  "node.result.group.description"
+      organizer_name:     "node.result.group.organizer.name"
+      # Media
+      image_url_raw:      "node.result.images[0].baseUrl"
+      # Fee
+      cost_min:           "node.result.feeSettings.amount"
+      cost_currency:      "node.result.feeSettings.currency"
+      fee_type:           "node.result.feeSettings.type"   # cash | paypal | wepay | no_payment
+      fee_label:          "node.result.feeSettings.label"
+      # Topics (Meetup's tagging system — good for LLM context)
+      topics:             "node.result.topics[*].name"
+
+    transformations:
+      source_url:
+        type: "template"
+        template: "{{content_url}}"
+        when: "content_url"
+      image_url:
+        type: "template"
+        template: "{{image_url_raw}}"
+        when: "image_url_raw"
+      country_code:
+        type: "uppercase"
+        source: "country_code"
+      description:
+        type: "strip_html"
+        source: "description"
+
+    # Custom fields: source-specific context for LLM enrichment
+    custom_fields_mapping:
+      group_name: "group_name"
+      group_urlname: "group_urlname"
+      group_members: "group_members"
+      group_description: "group_description"
+      going: "going"
+      waiting: "waiting"
+      max_tickets: "max_tickets"
+      is_online: "is_online"
+      fee_type: "fee_type"
+      fee_label: "fee_label"
+      topics: "topics"
+      short_description: "short_description"
+      duration_ms: "duration"
+
+    taxonomy_suggestions:
+      default_primary: "1"       # Play & Pure Fun
+      default_subcategory: "1.1" # Social & Playful Gatherings
+
+    event_type_rules:
+      - match:
+          title_contains: ["conference", "summit", "symposium", "seminar", "networking"]
+        type: "conference"
+      - match:
+          title_contains: ["workshop", "class", "course", "masterclass", "training", "bootcamp"]
+        type: "workshop"
+      - match:
+          title_contains: ["concert", "live music", "gig", "recital"]
+        type: "concert"
+      - match:
+          title_contains: ["festival", "fest"]
+        type: "festival"
+      - match:
+          title_contains: ["party", "fiesta", "social", "mixer", "happy hour"]
+        type: "party"
+      - match:
+          title_contains: ["exhibition", "expo", "fair", "museum", "gallery"]
+        type: "exhibition"
+      - match:
+          title_contains: ["hike", "hiking", "walk", "run", "sport", "fitness", "yoga"]
+        type: "sports"
+      - default: true
+        type: "meetup"
+
+    defaults:
+      page_size: 50
+      days_ahead: 7
+      radius: 25               # search radius in miles
+      # For Meetup, areas map city_name -> sentinel 0.
+      # Actual lat/lon is read from city_coords and injected as query variables.
+      areas:
+        Barcelona: 0
+        Madrid: 0
+      city_coords:
+        Barcelona:
+          lat: 41.3851
+          lon: 2.1734
+        Madrid:
+          lat: 40.4168
+          lon: -3.7038
+      location:
+        country_code: "ES"
+        timezone: "Europe/Madrid"
+        currency: "EUR"
+
+    validation:
+      required_fields: ["title", "source_event_id"]
+      future_events_only: true
+
+    enrichment:
+      geocoding: false
+      compressed_html:
+        enabled: false
+
+    schedule:
+      type: "cron"
+      cron_expression: "0 */6 * * *"
       enabled: false
 
   # FEVER has no public API — use scraper_adapter with a custom pipeline config when adding.
@@ -914,12 +1322,18 @@ sources:
 # GLOBAL SETTINGS
 # =========================================================================
 global:
-  # Storage settings
+  # Primary storage (DB persistence — only used by LLM enrichment layer)
   storage:
     type: "postgresql"
     url: "${DATABASE_URL}"
     pool_size: 10
     max_overflow: 20
+
+  # Batch storage: ingestion output written here; LLM enrichment reads from here
+  batch_storage:
+    enabled: true
+    output_dir: "data/batches"   # relative to project root
+    format: "jsonl"              # jsonl | parquet
 
   # Logging
   logging:
