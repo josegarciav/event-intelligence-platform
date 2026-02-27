@@ -318,7 +318,12 @@ class EventDataWriter:
     # ------------------------------------------------------------------
 
     def _persist_event(
-        self, cur, event: EventSchema, location_id, source_id, organizer_id,
+        self,
+        cur,
+        event: EventSchema,
+        location_id,
+        source_id,
+        organizer_id,
         duplicate_group_id=None,
     ):
         # Convert primary category value to taxonomy ID
@@ -499,9 +504,9 @@ class EventDataWriter:
                     dim.risk_level,
                     dim.age_accessibility,
                     dim.repeatability,
-                    None,  # unconstrained_primary_category (future LLM)
-                    None,  # unconstrained_subcategory (future LLM)
-                    None,  # unconstrained_activity (future LLM)
+                    dim.unconstrained_primary_category,
+                    dim.unconstrained_subcategory,
+                    dim.unconstrained_activity,
                 )
             )
 
@@ -752,9 +757,7 @@ class EventDataWriter:
         if not audit:
             return
 
-        cur.execute(
-            "DELETE FROM event_quality_audits WHERE event_id = %s", (event_id,)
-        )
+        cur.execute("DELETE FROM event_quality_audits WHERE event_id = %s", (event_id,))
         cur.execute(
             """
             INSERT INTO event_quality_audits
@@ -834,8 +837,7 @@ class EventDataWriter:
         """
         # Build source_event_id → event_id (UUID) map from the batch
         source_to_event_id: dict[str, str] = {
-            str(e.source.source_event_id): str(e.event_id)
-            for e in events
+            str(e.source.source_event_id): str(e.event_id) for e in events
         }
 
         # Find the primary event_id for each group

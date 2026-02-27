@@ -239,6 +239,20 @@ class TaxonomyDimension(BaseModel):
         description="Repeatability: 'high' | 'medium' | 'low'",
     )
 
+    # Unconstrained taxonomy (taxonomy gap detection)
+    unconstrained_primary_category: str | None = Field(
+        default=None,
+        description="LLM-suggested primary category when predefined taxonomy is a poor fit",
+    )
+    unconstrained_subcategory: str | None = Field(
+        default=None,
+        description="LLM-suggested subcategory when predefined taxonomy is a poor fit",
+    )
+    unconstrained_activity: str | None = Field(
+        default=None,
+        description="LLM-suggested activity name when predefined taxonomy is a poor fit",
+    )
+
     @field_validator("primary_category", mode="before")
     @classmethod
     def normalize_primary_category(cls, v: str) -> str:

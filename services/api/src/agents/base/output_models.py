@@ -74,6 +74,29 @@ class TaxonomyAttributesExtraction(BaseModel):
         description="Repeat frequency: high=weekly, medium=monthly, low=unique/annual",
     )
 
+    # Unconstrained taxonomy (taxonomy gap detection)
+    unconstrained_primary_category: str | None = Field(
+        default=None,
+        description=(
+            "Free-form primary category label to use if none of the predefined "
+            "categories is a good fit. Null when the predefined taxonomy fits well."
+        ),
+    )
+    unconstrained_subcategory: str | None = Field(
+        default=None,
+        description=(
+            "Free-form subcategory label to use if none of the predefined "
+            "subcategories is a good fit. Null when the predefined taxonomy fits well."
+        ),
+    )
+    unconstrained_activity: str | None = Field(
+        default=None,
+        description=(
+            "Free-form activity name to use if no predefined activity matches. "
+            "Null when the predefined taxonomy fits well."
+        ),
+    )
+
 
 # =============================================================================
 # MISSING FIELDS BATCH EXTRACTION

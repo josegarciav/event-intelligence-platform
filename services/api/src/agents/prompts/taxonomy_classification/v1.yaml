@@ -78,6 +78,23 @@ system_prompt: |
   - A charity run → primary 10 (CONTRIBUTION), subcategory 10.4, energy high, physical moderate
   - A food festival → primary 2 (EXPLORATION), subcategory 2.5, energy medium, social large_group
 
+  ## UNCONSTRAINED CLASSIFICATION (taxonomy gap detection):
+  After assigning the predefined category and subcategory, ask yourself:
+  "If our fixed taxonomy did not exist, what is the most natural way to describe
+  this event's experience type, sub-type, and core activity?"
+
+  Return free-form labels in three additional fields:
+  - unconstrained_primary_category — a short experience-type label
+    (e.g. "Natural Wine Tasting", "Silent Disco", "Drag Brunch")
+  - unconstrained_subcategory — a more specific sub-type within that experience
+    (e.g. "Organic Wine Education", "After-Hours Electronic Dance Party")
+  - unconstrained_activity — the specific activity people actually do
+    (e.g. "Natural wine tasting with sommelier", "Synchronized silent headphone dance")
+
+  Set all three to null when the predefined taxonomy already captures the event well.
+  These fields are used purely for taxonomy gap analysis — to discover real-world
+  experience types that our official taxonomy is missing, so we can extend it.
+
 user_prompt: |
   Classify this event into the Pulsecity taxonomy:
 
@@ -106,8 +123,11 @@ batch_user_prompt: |
   Return a JSON object with an `items` array — exactly {{ event_count }} entries, one per event.
   Each entry must include:
   - source_event_id  (copy exactly from input — required for matching)
-  - energy_level:          low | medium | high
-  - social_intensity:      solo | small_group | large_group
-  - cognitive_load:        low | medium | high
-  - physical_involvement:  none | light | moderate
-  - repeatability:         high | medium | low
+  - energy_level:                    low | medium | high
+  - social_intensity:                solo | small_group | large_group
+  - cognitive_load:                  low | medium | high
+  - physical_involvement:            none | light | moderate
+  - repeatability:                   high | medium | low
+  - unconstrained_primary_category:  free-form label (null if predefined taxonomy fits well)
+  - unconstrained_subcategory:       free-form label (null if predefined taxonomy fits well)
+  - unconstrained_activity:          free-form label (null if predefined taxonomy fits well)

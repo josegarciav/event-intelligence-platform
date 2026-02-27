@@ -76,7 +76,7 @@ class DeduplicationAgent(BaseAgent):
     """
 
     name = "deduplication"
-    prompt_name = "deduplication" # rules_v1_llama3_threshold_0.8
+    prompt_name = "deduplication"  # rules_v1_llama3_threshold_0.8
 
     def __init__(self, config: dict[str, Any] | None = None):
         self._config = config or {}
@@ -133,7 +133,8 @@ class DeduplicationAgent(BaseAgent):
         # Pass 2: LLM fuzzy analysis on remaining candidates
         # ------------------------------------------------------------------
         remaining = [
-            e for e in enriched_events
+            e
+            for e in enriched_events
             if str(e.source.source_event_id) not in already_grouped
         ]
 

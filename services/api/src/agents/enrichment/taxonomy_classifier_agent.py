@@ -114,6 +114,11 @@ class TaxonomyClassifierAgent(BaseAgent):
                         tax.physical_involvement = item.physical_involvement
                     if item.repeatability:
                         tax.repeatability = item.repeatability
+                    tax.unconstrained_primary_category = (
+                        item.unconstrained_primary_category
+                    )
+                    tax.unconstrained_subcategory = item.unconstrained_subcategory
+                    tax.unconstrained_activity = item.unconstrained_activity
                     enriched_events[idx].taxonomy_dimension = tax
 
                 usage = self._llm.get_token_usage()

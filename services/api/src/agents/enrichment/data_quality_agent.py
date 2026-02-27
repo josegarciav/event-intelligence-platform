@@ -101,11 +101,11 @@ class DataQualityAgent(BaseAgent):
                         enriched_events[idx].custom_fields = {}
                     enriched_events[idx].data_quality_score = item.quality_score
                     enriched_events[idx].custom_fields["quality_audit"] = {
-                        "quality_score":        item.quality_score,
-                        "missing_fields":       item.missing_fields,
+                        "quality_score": item.quality_score,
+                        "missing_fields": item.missing_fields,
                         "normalization_errors": item.normalization_errors,
-                        "confidence_flags":     item.confidence_flags,
-                        "recommendations":      item.recommendations,
+                        "confidence_flags": item.confidence_flags,
+                        "recommendations": item.recommendations,
                     }
                     confidence_scores[sid] = item.quality_score
 
@@ -155,11 +155,11 @@ class DataQualityAgent(BaseAgent):
                 enriched[i].custom_fields = {}
             enriched[i].data_quality_score = round(score, 3)
             enriched[i].custom_fields["quality_audit"] = {
-                "quality_score":        round(score, 3),
-                "missing_fields":       [],
+                "quality_score": round(score, 3),
+                "missing_fields": [],
                 "normalization_errors": [],
-                "confidence_flags":     {},
-                "recommendations":      [],
+                "confidence_flags": {},
+                "recommendations": [],
             }
             scores[str(event.source.source_event_id)] = score
 

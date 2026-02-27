@@ -11,7 +11,6 @@ The pipeline uses:
 
 import asyncio
 import logging
-import os
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
