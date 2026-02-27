@@ -69,9 +69,6 @@ system_prompt: |
   social_intensity:     solo | small_group | large_group
   cognitive_load:       low | medium | high
   physical_involvement: none | light | moderate
-  environment:          indoor | outdoor | digital | mixed
-  risk_level:           none | very_low | low | medium
-  age_accessibility:    all | teens+ | adults
   repeatability:        high | medium | low
 
   ## CLASSIFICATION RULES:
@@ -97,9 +94,20 @@ user_prompt: |
   - social_intensity
   - cognitive_load
   - physical_involvement
-  - environment
-  - risk_level
-  - age_accessibility
   - repeatability
-  - emotional_output (list of 2-4 feelings from: joy, excitement, connection, energy,
-    relaxation, inspiration, growth, belonging, awe, release, focus, nostalgia, pride, calm)
+
+batch_user_prompt: |
+  Classify these {{ event_count }} events into the Pulsecity taxonomy.
+  Apply the same category rules and attribute values as single-event mode.
+
+  EVENTS:
+  {{ events_json }}
+
+  Return a JSON object with an `items` array — exactly {{ event_count }} entries, one per event.
+  Each entry must include:
+  - source_event_id  (copy exactly from input — required for matching)
+  - energy_level:          low | medium | high
+  - social_intensity:      solo | small_group | large_group
+  - cognitive_load:        low | medium | high
+  - physical_involvement:  none | light | moderate
+  - repeatability:         high | medium | low

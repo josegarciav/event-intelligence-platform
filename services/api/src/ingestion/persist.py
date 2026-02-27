@@ -6,6 +6,7 @@ Handles the atomic upsert of EventSchema objects into the relational
 PostgreSQL schema, managing foreign key relationships and transactions.
 """
 
+import json
 import logging
 from datetime import date
 
@@ -148,8 +149,8 @@ class EventDataWriter:
             # 11. Artists
             self._persist_artists(cur, event, event_id)
 
-            # 12. Normalization errors
-            self._persist_normalization_errors(cur, event, event_id)
+            # 12. Quality audit
+            self._persist_quality_audit(cur, event, event_id)
 
     # ------------------------------------------------------------------
     # 1. Location
@@ -743,24 +744,32 @@ class EventDataWriter:
         )
 
     # ------------------------------------------------------------------
-    # 12. Normalization errors
+    # 12. Quality audit
     # ------------------------------------------------------------------
 
-    def _persist_normalization_errors(self, cur, event: EventSchema, event_id):
-        # 1. Cleanup existing records
-        cur.execute("DELETE FROM normalization_errors WHERE event_id = %s", (event_id,))
-
-        if not event.normalization_errors:
+    def _persist_quality_audit(self, cur, event: EventSchema, event_id):
+        audit = (event.custom_fields or {}).get("quality_audit")
+        if not audit:
             return
 
-        # 2. Bulk insert
-        error_data = [
-            (event_id, err.severity, err.message) for err in event.normalization_errors
-        ]
-        execute_values(
-            cur,
-            "INSERT INTO normalization_errors (event_id, severity, error_message) VALUES %s;",
-            error_data,
+        cur.execute(
+            "DELETE FROM event_quality_audits WHERE event_id = %s", (event_id,)
+        )
+        cur.execute(
+            """
+            INSERT INTO event_quality_audits
+                (event_id, quality_score, missing_fields,
+                 normalization_errors, confidence_flags, recommendations)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (
+                event_id,
+                audit["quality_score"],
+                json.dumps(audit.get("missing_fields", [])),
+                json.dumps(audit.get("normalization_errors", [])),
+                json.dumps(audit.get("confidence_flags", {})),
+                json.dumps(audit.get("recommendations", [])),
+            ),
         )
 
     # ------------------------------------------------------------------

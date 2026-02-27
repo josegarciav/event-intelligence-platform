@@ -1,8 +1,10 @@
 """
-FeatureAlignmentAgent — restructured from the former feature_extractor.py.
+FeatureAlignmentAgent — fills event_type, tags, and event_format.
 
-Fills in event_type, tags, and event_format using the core_metadata prompt.
-Targets fields that are deterministic from title + description.
+Uses the 'core_metadata' prompt in batch mode: events are chunked and sent
+to the LLM together to save on round-trip latency.  Each chunk produces a
+single structured response (MissingFieldsExtractionBatch) with one item per
+event, keyed by source_event_id.
 """
 
 import logging
@@ -10,7 +12,7 @@ import time
 from typing import Any
 
 from src.agents.base.base_agent import BaseAgent
-from src.agents.base.output_models import MissingFieldsExtraction
+from src.agents.base.output_models import MissingFieldsExtractionBatch
 from src.agents.base.task import AgentResult, AgentTask
 from src.agents.llm.provider_router import get_llm_client
 from src.agents.registry.prompt_registry import get_prompt_registry
@@ -22,7 +24,8 @@ class FeatureAlignmentAgent(BaseAgent):
     """
     Fills core metadata fields: event_type, tags, event_format.
 
-    Uses the 'core_metadata' prompt. Gracefully skips if LLM is unavailable.
+    Processes events in configurable batches (default 8) to reduce LLM
+    round-trips.  Gracefully skips if LLM is unavailable.
     """
 
     name = "feature_alignment"
@@ -58,6 +61,7 @@ class FeatureAlignmentAgent(BaseAgent):
             )
 
         prompt_version = self._registry.get_active_version(self.prompt_name)
+        batch_size = self._config.get("batch_size", 8)
         start = time.monotonic()
         errors: list[str] = []
         total_tokens: dict[str, int] = {
@@ -66,54 +70,65 @@ class FeatureAlignmentAgent(BaseAgent):
             "total": 0,
         }
         enriched_events = list(task.events)
+        # Build an index so we can apply results back by source_event_id
+        event_index = {
+            str(e.source.source_event_id): i for i, e in enumerate(enriched_events)
+        }
 
-        for i, event in enumerate(enriched_events):
-            ctx = self._build_event_context(event)
-            if not ctx.get("title"):
-                continue
-
+        for chunk in self._chunk(enriched_events, batch_size):
+            batch_ctx = self._build_batch_context(chunk)
+            chunk_ids = [str(e.source.source_event_id) for e in chunk]
             try:
                 system_prompt, user_prompt = self._registry.render(
                     self.prompt_name,
                     version=task.prompt_version,
-                    variables=ctx,
+                    variables=batch_ctx,
                     agent_name=self.name,
-                    event_id=str(event.source_event_id),
+                    batch=True,
                 )
-                result: MissingFieldsExtraction = await self._llm.complete_structured(
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                    output_schema=MissingFieldsExtraction,
-                    temperature=self._config.get("temperature", 0.1),
+                result: MissingFieldsExtractionBatch = (
+                    await self._llm.complete_structured(
+                        system_prompt=system_prompt,
+                        user_prompt=user_prompt,
+                        output_schema=MissingFieldsExtractionBatch,
+                        temperature=self._config.get("temperature", 0.1),
+                    )
                 )
-                # Apply extracted fields
-                if result.event_type and not event.event_type:
-                    from src.schemas.event import EventType
 
-                    try:
-                        enriched_events[i].event_type = EventType(result.event_type)
-                    except ValueError:
-                        pass
-                if result.tags:
-                    existing = set(event.tags or [])
-                    enriched_events[i].tags = list(existing | set(result.tags))
-                if result.event_format and not event.event_format:
-                    from src.schemas.event import EventFormat
+                for item in result.items:
+                    sid = item.source_event_id
+                    idx = event_index.get(sid)
+                    if idx is None:
+                        continue
 
-                    try:
-                        enriched_events[i].event_format = EventFormat(
-                            result.event_format
-                        )
-                    except ValueError:
-                        pass
+                    event = enriched_events[idx]
+                    if item.event_type and not event.event_type:
+                        from src.schemas.event import EventType
+
+                        try:
+                            enriched_events[idx].event_type = EventType(item.event_type)
+                        except ValueError:
+                            pass
+                    if item.tags:
+                        existing = set(event.tags or [])
+                        enriched_events[idx].tags = list(existing | set(item.tags))
+                    if item.event_format and not event.event_format:
+                        from src.schemas.event import EventFormat
+
+                        try:
+                            enriched_events[idx].event_format = EventFormat(
+                                item.event_format
+                            )
+                        except ValueError:
+                            pass
 
                 usage = self._llm.get_token_usage()
                 for k in total_tokens:
                     total_tokens[k] += usage.get(k, 0)
 
             except Exception as e:
-                msg = f"event={event.source_event_id}: {e}"
-                logger.warning(f"{self.name} error: {msg}")
+                msg = f"batch {chunk_ids}: {e}"
+                logger.warning(f"{self.name} batch error: {msg}")
                 errors.append(msg)
 
         return AgentResult(

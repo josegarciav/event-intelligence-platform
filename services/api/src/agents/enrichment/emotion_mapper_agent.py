@@ -1,8 +1,9 @@
 """
 EmotionMapperAgent — infers emotional outputs and practical access dimensions.
 
-Uses the 'emotion_vibe' prompt to fill:
-emotional_output, cost_level, environment, risk_level, age_accessibility, time_scale.
+Uses the 'emotion_vibe' prompt in batch mode: events are chunked and sent
+together to reduce LLM round-trips.  Each chunk produces a single
+EmotionVibeOutputBatch response keyed by source_event_id.
 """
 
 import logging
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class EmotionVibeOutput(BaseModel):
-    """Structured output from the emotion_vibe prompt."""
+    """Structured output from the emotion_vibe prompt (single event)."""
 
     emotional_output: list[str] = Field(
         default_factory=lambda: ["enjoyment"],
@@ -48,12 +49,27 @@ class EmotionVibeOutput(BaseModel):
     )
 
 
+class EmotionVibeOutputItem(EmotionVibeOutput):
+    """Single-event result inside a batch, keyed by source_event_id."""
+
+    source_event_id: str = Field(
+        default="", description="Must match the source_event_id from the input"
+    )
+
+
+class EmotionVibeOutputBatch(BaseModel):
+    """Batch output from emotion_mapper agent (one item per input event)."""
+
+    items: list[EmotionVibeOutputItem] = Field(default_factory=list)
+
+
 class EmotionMapperAgent(BaseAgent):
     """
     Infers emotional outputs and practical access dimensions.
 
     Fills taxonomy.emotional_output plus practical fields
     (cost_level, environment, risk_level, age_accessibility, time_scale).
+    Processes events in configurable batches (default 8).
     """
 
     name = "emotion_mapper"
@@ -89,6 +105,7 @@ class EmotionMapperAgent(BaseAgent):
             )
 
         prompt_version = self._registry.get_active_version(self.prompt_name)
+        batch_size = self._config.get("batch_size", 8)
         start = time.monotonic()
         errors: list[str] = []
         total_tokens: dict[str, int] = {
@@ -97,63 +114,59 @@ class EmotionMapperAgent(BaseAgent):
             "total": 0,
         }
         enriched_events = list(task.events)
+        event_index = {
+            str(e.source.source_event_id): i for i, e in enumerate(enriched_events)
+        }
 
-        for i, event in enumerate(enriched_events):
-            ctx = self._build_event_context(event)
-            if not ctx.get("title"):
-                continue
-
-            ctx["price_raw_text"] = str(event.price.cost or "") if event.price else ""
-            ctx["artists"] = (
-                ", ".join(ctx.get("artists", []))
-                if isinstance(ctx.get("artists"), list)
-                else ""
-            )
-
+        for chunk in self._chunk(enriched_events, batch_size):
+            batch_ctx = self._build_batch_context(chunk)
+            chunk_ids = [str(e.source.source_event_id) for e in chunk]
             try:
                 system_prompt, user_prompt = self._registry.render(
                     self.prompt_name,
                     version=task.prompt_version,
-                    variables=ctx,
+                    variables=batch_ctx,
                     agent_name=self.name,
-                    event_id=str(event.source_event_id),
+                    batch=True,
                 )
-                result: EmotionVibeOutput = await self._llm.complete_structured(
+                result: EmotionVibeOutputBatch = await self._llm.complete_structured(
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
-                    output_schema=EmotionVibeOutput,
+                    output_schema=EmotionVibeOutputBatch,
                     temperature=self._config.get("temperature", 0.3),
                 )
 
-                # Apply emotional outputs to taxonomy
-                if event.taxonomy and result.emotional_output:
-                    enriched_events[i].taxonomy.emotional_output = result.emotional_output  # type: ignore[union-attr]
-                if event.taxonomy and result.environment:
-                    enriched_events[i].taxonomy.environment = result.environment  # type: ignore[union-attr]
-                if event.taxonomy and result.risk_level:
-                    enriched_events[i].taxonomy.risk_level = result.risk_level  # type: ignore[union-attr]
-                if event.taxonomy and result.age_accessibility:
-                    enriched_events[i].taxonomy.age_accessibility = result.age_accessibility  # type: ignore[union-attr]
-                if (
-                    event.taxonomy and result.repeatability
-                    if hasattr(result, "repeatability")
-                    else False
-                ):
-                    pass  # repeatability is on taxonomy; handled by taxonomy agent
+                for item in result.items:
+                    sid = item.source_event_id
+                    idx = event_index.get(sid)
+                    if idx is None:
+                        continue
 
-                # Apply cost_level and time_scale to taxonomy
-                if event.taxonomy and result.cost_level:
-                    enriched_events[i].taxonomy.cost_level = result.cost_level  # type: ignore[union-attr]
-                if event.taxonomy and result.time_scale:
-                    enriched_events[i].taxonomy.time_scale = result.time_scale  # type: ignore[union-attr]
+                    tax = enriched_events[idx].taxonomy_dimension
+                    if tax is None:
+                        continue
+
+                    if item.emotional_output:
+                        tax.emotional_output = item.emotional_output
+                    if item.environment:
+                        tax.environment = item.environment
+                    if item.risk_level:
+                        tax.risk_level = item.risk_level
+                    if item.age_accessibility:
+                        tax.age_accessibility = item.age_accessibility
+                    if item.cost_level:
+                        tax.cost_level = item.cost_level
+                    if item.time_scale:
+                        tax.time_scale = item.time_scale
+                    enriched_events[idx].taxonomy_dimension = tax
 
                 usage = self._llm.get_token_usage()
                 for k in total_tokens:
                     total_tokens[k] += usage.get(k, 0)
 
             except Exception as e:
-                msg = f"event={event.source_event_id}: {e}"
-                logger.warning(f"{self.name} error: {msg}")
+                msg = f"batch {chunk_ids}: {e}"
+                logger.warning(f"{self.name} batch error: {msg}")
                 errors.append(msg)
 
         return AgentResult(

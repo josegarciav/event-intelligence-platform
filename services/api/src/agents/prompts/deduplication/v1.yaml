@@ -56,8 +56,8 @@ user_prompt: |
   - group_id: a short slug (e.g. "techno-friday-razzmatazz")
   - group_type: "duplicate" | "recurring" | "near_duplicate"
   - primary_event_id: source_event_id of the most complete / authoritative event
-  - member_event_ids: all source_event_ids in this group (including primary)
-  - confidence: 0.0–1.0
-  - reason: one sentence explaining why these are grouped
+  - member_event_ids: all source_event_ids in this group (including primary), list format
+  - confidence: 0.0-1.0
+  - reason: one sentence explaining why these are grouped (e.g., Same show/location/title/source, different times, type "recurring")
 
   Only include groups with confidence >= 0.8. Ignore singleton events.
