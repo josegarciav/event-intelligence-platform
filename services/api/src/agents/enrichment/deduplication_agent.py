@@ -1,32 +1,36 @@
 """
 DeduplicationAgent — detects duplicates, groups recurring events, aligns cross-source events.
 
-Three deduplication modes (applied in order):
+Two deduplication passes (applied in order):
 
-  1. Rule-based pre-filter (fast, no LLM):
-     Exact same (title_slug, date, venue_slug) → immediate duplicate flag.
-     This catches 80%+ of duplicates without any LLM call.
+  1. Rule-based exact match (fast, no LLM):
+     Events sharing the same (title_slug, date, venue_slug) are immediately grouped.
+     Group IDs are deterministic UUID5s derived from the match key.
+     Catches the majority of duplicates without any LLM call.
 
-  2. LLM analysis on candidate groups (fuzzy matching):
-     Events that share title similarity (>0.6 Jaro-Winkler) but differ slightly
-     are passed to the 'deduplication' prompt for final judgement.
+  2. LLM fuzzy analysis (when Ollama is available):
+     Remaining events are passed to the 'deduplication' prompt.
+     Only groups with confidence >= 0.80 are accepted.
+     Detects near-duplicates and recurring series.
 
-  3. Recurring series detection:
-     Events with the same title pattern at the same venue across different dates
-     are grouped as a series with group_type="recurring".
-
-Output written to event.custom_fields:
-  duplicate_group_id   — shared UUID for events in the same group
-  duplicate_group_type — "duplicate" | "recurring" | "near_duplicate"
+Output written to event.custom_fields (consumed by the persistence layer to write to DB):
+  duplicate_group_id   — UUID matching event_groups.duplicate_group_id (PK)
+  group_type           — "duplicate" | "recurring" | "near_duplicate"
+                         maps to event_groups.group_type
   is_primary           — True for the canonical event in each group
   duplicate_of         — source_event_id of the primary (non-primaries only)
-  similarity_score     — confidence this grouping is correct
+  similarity_score     — confidence score (0–1), maps to event_groups.similarity_score
+  reason               — short LLM explanation, maps to event_groups.reason
+
+The persistence layer (not this agent) is responsible for:
+  - Inserting rows into event_groups
+  - Setting events.duplicate_group_id FK on all member events
 """
 
-import hashlib
 import json
 import logging
 import time
+import uuid
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -43,7 +47,7 @@ logger = logging.getLogger(__name__)
 
 
 class DuplicateGroup(BaseModel):
-    group_id: str = Field(description="Short slug identifying this group")
+    group_id: str = Field(description="UUID string identifying this group")
     group_type: str = Field(description="duplicate | recurring | near_duplicate")
     primary_event_id: str = Field(description="source_event_id of the canonical event")
     member_event_ids: list[str] = Field(description="All event IDs in this group")
@@ -72,11 +76,11 @@ class DeduplicationAgent(BaseAgent):
     """
 
     name = "deduplication"
-    prompt_name = "deduplication"
+    prompt_name = "deduplication" # rules_v1_llama3_threshold_0.8
 
     def __init__(self, config: dict[str, Any] | None = None):
         self._config = config or {}
-        self._min_confidence = self._config.get("min_confidence", 0.7)
+        self._min_confidence = self._config.get("min_confidence", 0.8)
 
         from src.agents.llm.provider_router import get_llm_client
         from src.agents.registry.prompt_registry import get_prompt_registry
@@ -129,7 +133,8 @@ class DeduplicationAgent(BaseAgent):
         # Pass 2: LLM fuzzy analysis on remaining candidates
         # ------------------------------------------------------------------
         remaining = [
-            e for e in enriched_events if str(e.source_event_id) not in already_grouped
+            e for e in enriched_events
+            if str(e.source.source_event_id) not in already_grouped
         ]
 
         if len(remaining) >= 2 and self._llm.is_available:
@@ -185,7 +190,7 @@ class DeduplicationAgent(BaseAgent):
 
         for event in events:
             key = self._exact_key(event)
-            event_id = str(event.source_event_id)
+            event_id = str(event.source.source_event_id)
             buckets.setdefault(key, []).append(event_id)
 
         groups = []
@@ -197,7 +202,7 @@ class DeduplicationAgent(BaseAgent):
             primary = self._pick_primary(events, event_ids)
             groups.append(
                 DuplicateGroup(
-                    group_id=f"exact-{hashlib.md5(key.encode()).hexdigest()[:8]}",
+                    group_id=str(uuid.uuid5(uuid.NAMESPACE_DNS, key)),
                     group_type="duplicate",
                     primary_event_id=primary,
                     member_event_ids=event_ids,
@@ -212,13 +217,13 @@ class DeduplicationAgent(BaseAgent):
         """Build a normalized key for exact duplicate detection."""
         title = _slugify(event.title or "")
         date = str(event.start_datetime)[:10] if event.start_datetime else ""
-        venue = _slugify(event.venue_name or event.city or "")
+        venue = _slugify(event.location.venue_name or event.location.city or "")
         return f"{title}|{date}|{venue}"
 
     def _pick_primary(self, events: list, event_ids: list[str]) -> str:
         """Pick the most complete event as the primary in a group."""
         scored: list[tuple[int, str]] = []
-        event_map = {str(e.source_event_id): e for e in events}
+        event_map = {str(e.source.source_event_id): e for e in events}
 
         for eid in event_ids:
             event = event_map.get(eid)
@@ -227,11 +232,11 @@ class DeduplicationAgent(BaseAgent):
             score = sum(
                 [
                     bool(event.description),
-                    bool(event.image_url),
-                    bool(event.venue_name),
-                    bool(event.price),
+                    bool(event.media_assets),
+                    bool(event.location.venue_name),
+                    bool(event.price and event.price.min_price is not None),
                     bool(event.tags),
-                    bool(event.taxonomy),
+                    bool(event.taxonomy_dimension),
                     bool(event.organizer),
                 ]
             )
@@ -256,17 +261,15 @@ class DeduplicationAgent(BaseAgent):
         for event in events:
             event_summaries.append(
                 {
-                    "source_event_id": str(event.source_event_id),
+                    "source_event_id": str(event.source.source_event_id),
                     "title": event.title or "",
                     "start_datetime": (
                         str(event.start_datetime)[:16] if event.start_datetime else ""
                     ),
-                    "venue_name": event.venue_name or "",
-                    "city": event.city or "",
+                    "venue_name": event.location.venue_name or "",
+                    "city": event.location.city or "",
                     "organizer": event.organizer.name if event.organizer else "",
-                    "source": (
-                        str(event.source_info.source_name) if event.source_info else ""
-                    ),
+                    "source": str(event.source.source_name) if event.source else "",
                 }
             )
 
@@ -307,7 +310,7 @@ class DeduplicationAgent(BaseAgent):
                 id_to_group[eid] = group
 
         for event in events:
-            event_id = str(event.source_event_id)
+            event_id = str(event.source.source_event_id)
             group = id_to_group.get(event_id)
             if not group:
                 continue
@@ -317,9 +320,10 @@ class DeduplicationAgent(BaseAgent):
 
             is_primary = event_id == group.primary_event_id
             event.custom_fields["duplicate_group_id"] = group.group_id
-            event.custom_fields["duplicate_group_type"] = group.group_type
+            event.custom_fields["group_type"] = group.group_type
             event.custom_fields["is_primary"] = is_primary
             event.custom_fields["similarity_score"] = group.confidence
+            event.custom_fields["reason"] = group.reason
 
             if not is_primary:
                 event.custom_fields["duplicate_of"] = group.primary_event_id

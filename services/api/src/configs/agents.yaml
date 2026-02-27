@@ -92,7 +92,7 @@ agents:
   # ---------------------------------------------------------------------------
   # DEDUPLICATION — detects duplicates, groups recurring events, aligns sources
   # Prompt: prompts/deduplication/
-  # Runs in two passes: rule-based (always) + LLM fuzzy (when Ollama is running)
+  # Runs in two passes: rule-based (always) + LLM fuzzy (if LLM is running)
   # ---------------------------------------------------------------------------
   deduplication:
     enabled: true
@@ -101,13 +101,14 @@ agents:
     provider: "ollama"
     model: "llama3.2:3b"
     temperature: 0.0    # always deterministic for deduplication
-    min_confidence: 0.7  # minimum confidence to flag a group
+    min_confidence: 0.8  # minimum confidence to flag a group
     target_fields:
       - "duplicate_group_id"
-      - "duplicate_group_type"
+      - "group_type"
       - "is_primary"
       - "duplicate_of"
       - "similarity_score"
+      - "reason"
 
   # ---------------------------------------------------------------------------
   # ARTIST ENRICHER — enriches artist genre via MusicBrainz API (no auth required)

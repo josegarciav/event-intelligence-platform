@@ -29,6 +29,15 @@ system_prompt: |
   - Same title, different city → separate events
   - Same title, same date, different venue → possibly same event touring (flag only)
 
+  **Example — intra-day recurring show (museum/venue time-slots):**
+  The same performance at a museum runs 10 times in a single day, each slot
+  lasting 1 hour, starting one hour after the previous (e.g. 10:00, 11:00, ...
+  19:00). All 10 entries are the same real-world show; they should be grouped
+  under one group_id with group_type="recurring", and the most complete entry
+  (typically the first/earliest) chosen as primary_event_id.
+  Rule: same title + same venue + same date + sequential 1-hour start times
+  that span the full operating day → recurring, NOT separate events.
+
   Return your analysis as a JSON object with `groups` array. Events NOT in any group
   are unique — do not include them.
 
@@ -51,4 +60,4 @@ user_prompt: |
   - confidence: 0.0–1.0
   - reason: one sentence explaining why these are grouped
 
-  Only include groups with confidence >= 0.7. Ignore singleton events.
+  Only include groups with confidence >= 0.8. Ignore singleton events.
