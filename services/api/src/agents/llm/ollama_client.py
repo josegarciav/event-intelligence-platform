@@ -34,8 +34,17 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 _DEFAULT_MODEL = "llama3.2:3b"
-_OLLAMA_BASE_URL = "http://localhost:11434/v1"
 _OLLAMA_API_KEY = "ollama"  # Ollama requires any non-empty string
+
+
+def _default_ollama_base_url() -> str:
+    """Read OLLAMA_BASE_URL from Settings (falls back to localhost default)."""
+    try:
+        from src.configs.settings import get_settings
+
+        return get_settings().OLLAMA_BASE_URL
+    except Exception:
+        return "http://localhost:11434/v1"
 
 
 class OllamaLLMClient(BaseLLMClient):
@@ -53,12 +62,12 @@ class OllamaLLMClient(BaseLLMClient):
     def __init__(
         self,
         model_name: str = _DEFAULT_MODEL,
-        base_url: str = _OLLAMA_BASE_URL,
+        base_url: str | None = None,
         temperature: float = 0.1,
         max_tokens: int = 2000,
     ):
         self.model_name = model_name
-        self.base_url = base_url
+        self.base_url = base_url if base_url is not None else _default_ollama_base_url()
         self.temperature = temperature
         self.max_tokens = max_tokens
 
@@ -97,7 +106,8 @@ class OllamaLLMClient(BaseLLMClient):
             return False
         except Exception:
             logger.warning(
-                "OllamaLLMClient: Ollama not reachable at localhost:11434. Start Ollama: https://ollama.com"
+                "OllamaLLMClient: Ollama not reachable at %s. Start Ollama: https://ollama.com",
+                self.base_url,
             )
             return False
 

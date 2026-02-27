@@ -27,6 +27,7 @@ erDiagram
         TIMESTAMP updated_at
         BOOLEAN is_deleted
         TIMESTAMP deleted_at
+        UUID duplicate_group_id FK
     }
 
     %% ============================================================
@@ -291,14 +292,32 @@ erDiagram
     }
 
     %% ============================================================
-    %% ERRORS
+    %% GROUPING EVENTS TABLE
     %% ============================================================
 
-    normalization_errors {
-        SERIAL error_id PK
+    event_groups {
+        UUID duplicate_group_id PK
+        TEXT group_type
+        UUID primary_event_id FK
+        FLOAT similarity_score
+        TEXT reason
+        INT event_count
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+
+    %% ============================================================
+    %% AUDITS
+    %% ============================================================
+
+    event_quality_audits {
+        INT audit_id PK
         UUID event_id FK
-        TEXT severity
-        TEXT error_message
+        FLOAT quality_score
+        JSONB missing_fields
+        JSONB normalization_errors
+        JSONB confidence_flags
+        JSONB recommendations
         TIMESTAMP created_at
     }
 
@@ -355,5 +374,9 @@ erDiagram
     event_artists }o--|| events : "performing at"
     event_artists }o--|| artists : "artist"
 
-    %% -- Errors --
-    normalization_errors }o--o| events : "error for"
+    %% -- Event groups (deduplication) --
+    events }o--o| event_groups : "belongs to"
+    event_groups |o--o| events : "canonical event"
+
+    %% -- Quality audits --
+    event_quality_audits }o--|| events : "audit for"

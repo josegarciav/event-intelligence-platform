@@ -2,11 +2,16 @@
 PostIngestionTrigger — called after pipeline.execute() completes.
 
 Cleanly separates enrichment from ingestion. The trigger receives the
-PipelineExecutionResult and kicks off BatchEnrichmentRunner on the events.
+PipelineExecutionResult, runs the enrichment agent chain, and optionally
+persists the enriched events to PostgreSQL.
 
-Usage in notebook:
+Usage without DB (notebook / testing):
     trigger = PostIngestionTrigger(agents_config)
-    enrichment_result = await trigger.on_pipeline_complete(gyg_result, agents_config)
+    result = await trigger.on_pipeline_complete(pipeline_result)
+
+Usage with DB persistence (production):
+    trigger = PostIngestionTrigger(agents_config)
+    result = await trigger.on_pipeline_complete(pipeline_result, db_connection=conn)
 """
 
 import logging
@@ -44,13 +49,18 @@ class PostIngestionTrigger:
         self,
         pipeline_result: "PipelineExecutionResult",
         prompt_version: str = "active",
+        db_connection=None,
     ) -> EnrichmentRunResult:
         """
-        Run enrichment on all successfully ingested events.
+        Run enrichment on all successfully ingested events, and optionally
+        persist the enriched events to PostgreSQL.
 
         Args:
             pipeline_result: Result from BasePipeline.execute()
-            prompt_version: "active" or explicit version string
+            prompt_version:  "active" or explicit version string
+            db_connection:   Optional psycopg2 connection. When provided, the
+                             enriched events are persisted via EventDataWriter.
+                             The caller is responsible for closing the connection.
 
         Returns:
             EnrichmentRunResult with enriched events and per-agent metadata
@@ -81,6 +91,16 @@ class PostIngestionTrigger:
             f"{result.total_duration_seconds:.1f}s, "
             f"{result.total_errors} errors"
         )
+
+        if db_connection is not None:
+            from src.ingestion.persist import EventDataWriter
+
+            writer = EventDataWriter(db_connection)
+            persist_count = writer.persist_batch(result.events)
+            logger.info(
+                f"PostIngestionTrigger: persisted {persist_count}/{len(result.events)} "
+                f"events to DB from '{source}'"
+            )
 
         return result
 

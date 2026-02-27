@@ -28,3 +28,21 @@ user_prompt: |
   - Free outdoor events with families → emotional: [joy, connection], age: all
   - Underground techno sets → emotional: [energy, release], age: adults
   - Art gallery opening → emotional: [inspiration, belonging, awe]
+
+batch_user_prompt: |
+  Analyze the emotional and practical profile of these {{ event_count }} events.
+  Apply the same LOGIC rules as single-event mode.
+
+  EVENTS:
+  {{ events_json }}
+
+  Return a JSON object with an `items` array — exactly {{ event_count }} entries, one per event.
+  Each entry must include:
+  - source_event_id   (copy exactly from input — required for matching)
+  - emotional_output: list of 2–4 emotions from [joy, excitement, connection, energy,
+    relaxation, inspiration, growth, belonging, awe, release, focus, nostalgia, pride, calm]
+  - cost_level:       free | low | medium | high  (infer from price field if present)
+  - environment:      indoor | outdoor | digital | mixed
+  - risk_level:       none | very_low | low | medium
+  - age_accessibility: all | teens+ | adults
+  - time_scale:       short | long | recurring

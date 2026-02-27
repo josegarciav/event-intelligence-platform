@@ -6,6 +6,7 @@ Handles the atomic upsert of EventSchema objects into the relational
 PostgreSQL schema, managing foreign key relationships and transactions.
 """
 
+import json
 import logging
 from datetime import date
 
@@ -53,13 +54,28 @@ class EventDataWriter:
         """
         Persist a list of events to the database.
 
-        Each event is persisted in its own transaction. If one event fails,
-        it is rolled back, but previously successful events remain committed
-        and the process continues for the rest of the batch.
+        Three-phase write order (required by circular FK between event_groups
+        and events):
+
+          Pre-pass  — Upsert event_groups rows (without primary_event_id yet,
+                      since events don't exist in DB yet).
+          Main pass — Persist each event including the duplicate_group_id FK.
+                      Each event is its own transaction so failures are isolated.
+          Post-pass — Set event_groups.primary_event_id and update event_count
+                      now that all events are in the DB.
 
         Returns:
             int: Number of successfully persisted events.
         """
+        # Pre-pass: upsert deduplication groups (primary_event_id left NULL for now)
+        try:
+            self._upsert_deduplication_groups(events)
+            self.conn.commit()
+        except Exception as e:
+            self.conn.rollback()
+            logger.error(f"Failed to upsert deduplication groups: {e}")
+
+        # Main pass: persist each event (sets duplicate_group_id FK on events)
         success_count = 0
         for event in events:
             try:
@@ -70,6 +86,14 @@ class EventDataWriter:
                 self.conn.rollback()
                 logger.error(f"Failed to persist event '{event.title}': {e}")
                 continue
+
+        # Post-pass: resolve primary_event_id FK and event_count
+        try:
+            self._finalize_deduplication_groups(events)
+            self.conn.commit()
+        except Exception as e:
+            self.conn.rollback()
+            logger.error(f"Failed to finalize deduplication groups: {e}")
 
         return success_count
 
@@ -99,8 +123,9 @@ class EventDataWriter:
             organizer_id = self._persist_organizer(cur, event)
 
             # 4. Event (central spine)
+            duplicate_group_id = (event.custom_fields or {}).get("duplicate_group_id")
             event_id = self._persist_event(
-                cur, event, location_id, source_id, organizer_id
+                cur, event, location_id, source_id, organizer_id, duplicate_group_id
             )
 
             # 5. Price snapshot
@@ -124,8 +149,8 @@ class EventDataWriter:
             # 11. Artists
             self._persist_artists(cur, event, event_id)
 
-            # 12. Normalization errors
-            self._persist_normalization_errors(cur, event, event_id)
+            # 12. Quality audit
+            self._persist_quality_audit(cur, event, event_id)
 
     # ------------------------------------------------------------------
     # 1. Location
@@ -293,7 +318,13 @@ class EventDataWriter:
     # ------------------------------------------------------------------
 
     def _persist_event(
-        self, cur, event: EventSchema, location_id, source_id, organizer_id
+        self,
+        cur,
+        event: EventSchema,
+        location_id,
+        source_id,
+        organizer_id,
+        duplicate_group_id=None,
     ):
         # Convert primary category value to taxonomy ID
         primary_cat_value = (
@@ -320,14 +351,14 @@ class EventDataWriter:
                 start_datetime, end_datetime, duration_minutes,
                 is_all_day, is_recurring, recurrence_pattern,
                 location_id, organizer_id, source_id,
-                data_quality_score, updated_at
+                data_quality_score, duplicate_group_id, updated_at
             ) VALUES (
                 %s, %s, %s, %s,
                 %s, %s, %s, %s,
                 %s, %s, %s,
                 %s, %s, %s,
                 %s, %s, %s,
-                %s, NOW()
+                %s, %s, NOW()
             )
             ON CONFLICT (event_id) DO UPDATE SET
                 title = EXCLUDED.title,
@@ -347,6 +378,7 @@ class EventDataWriter:
                 organizer_id = EXCLUDED.organizer_id,
                 source_id = EXCLUDED.source_id,
                 data_quality_score = EXCLUDED.data_quality_score,
+                duplicate_group_id = COALESCE(EXCLUDED.duplicate_group_id, events.duplicate_group_id),
                 updated_at = NOW()
             WHERE
                 events.title IS DISTINCT FROM EXCLUDED.title
@@ -363,6 +395,7 @@ class EventDataWriter:
                 OR events.organizer_id IS DISTINCT FROM EXCLUDED.organizer_id
                 OR events.source_id IS DISTINCT FROM EXCLUDED.source_id
                 OR events.data_quality_score IS DISTINCT FROM EXCLUDED.data_quality_score
+                OR events.duplicate_group_id IS DISTINCT FROM COALESCE(EXCLUDED.duplicate_group_id, events.duplicate_group_id)
             RETURNING event_id;
             """,
             (
@@ -384,6 +417,7 @@ class EventDataWriter:
                 organizer_id,
                 source_id,
                 event.data_quality_score,
+                duplicate_group_id,
             ),
         )
         res = cur.fetchone()
@@ -470,9 +504,9 @@ class EventDataWriter:
                     dim.risk_level,
                     dim.age_accessibility,
                     dim.repeatability,
-                    None,  # unconstrained_primary_category (future LLM)
-                    None,  # unconstrained_subcategory (future LLM)
-                    None,  # unconstrained_activity (future LLM)
+                    dim.unconstrained_primary_category,
+                    dim.unconstrained_subcategory,
+                    dim.unconstrained_activity,
                 )
             )
 
@@ -715,22 +749,144 @@ class EventDataWriter:
         )
 
     # ------------------------------------------------------------------
-    # 12. Normalization errors
+    # 12. Quality audit
     # ------------------------------------------------------------------
 
-    def _persist_normalization_errors(self, cur, event: EventSchema, event_id):
-        # 1. Cleanup existing records
-        cur.execute("DELETE FROM normalization_errors WHERE event_id = %s", (event_id,))
-
-        if not event.normalization_errors:
+    def _persist_quality_audit(self, cur, event: EventSchema, event_id):
+        audit = (event.custom_fields or {}).get("quality_audit")
+        if not audit:
             return
 
-        # 2. Bulk insert
-        error_data = [
-            (event_id, err.severity, err.message) for err in event.normalization_errors
-        ]
-        execute_values(
-            cur,
-            "INSERT INTO normalization_errors (event_id, severity, error_message) VALUES %s;",
-            error_data,
+        cur.execute("DELETE FROM event_quality_audits WHERE event_id = %s", (event_id,))
+        cur.execute(
+            """
+            INSERT INTO event_quality_audits
+                (event_id, quality_score, missing_fields,
+                 normalization_errors, confidence_flags, recommendations)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (
+                event_id,
+                audit["quality_score"],
+                json.dumps(audit.get("missing_fields", [])),
+                json.dumps(audit.get("normalization_errors", [])),
+                json.dumps(audit.get("confidence_flags", {})),
+                json.dumps(audit.get("recommendations", [])),
+            ),
+        )
+
+    # ------------------------------------------------------------------
+    # Deduplication group helpers (called by persist_batch)
+    # ------------------------------------------------------------------
+
+    def _upsert_deduplication_groups(self, events: list[EventSchema]) -> None:
+        """
+        Pre-pass: upsert event_groups rows for every unique duplicate_group_id
+        present in the batch's custom_fields.
+
+        primary_event_id is intentionally left NULL here — the circular FK
+        (event_groups.primary_event_id → events) can't be satisfied until
+        events are written.  _finalize_deduplication_groups sets it afterwards.
+        """
+        # Collect one representative entry per group_id from the batch
+        seen: dict[str, tuple] = {}  # group_id → (group_type, similarity_score, reason)
+        for event in events:
+            cf = event.custom_fields or {}
+            gid = cf.get("duplicate_group_id")
+            if not gid or gid in seen:
+                continue
+            seen[gid] = (
+                cf.get("group_type", "duplicate"),
+                float(cf.get("similarity_score", 1.0)),
+                cf.get("reason"),
+            )
+
+        if not seen:
+            return
+
+        with self.conn.cursor() as cur:
+            for gid, (group_type, similarity_score, reason) in seen.items():
+                cur.execute(
+                    """
+                    INSERT INTO event_groups (
+                        duplicate_group_id, group_type, similarity_score, reason
+                    ) VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (duplicate_group_id) DO UPDATE SET
+                        group_type = EXCLUDED.group_type,
+                        similarity_score = EXCLUDED.similarity_score,
+                        reason = COALESCE(EXCLUDED.reason, event_groups.reason),
+                        updated_at = NOW()
+                    WHERE
+                        event_groups.group_type IS DISTINCT FROM EXCLUDED.group_type
+                        OR event_groups.similarity_score IS DISTINCT FROM EXCLUDED.similarity_score
+                        OR (EXCLUDED.reason IS NOT NULL
+                            AND event_groups.reason IS DISTINCT FROM EXCLUDED.reason);
+                    """,
+                    (gid, group_type, similarity_score, reason),
+                )
+
+        logger.debug(f"EventDataWriter: upserted {len(seen)} deduplication group(s)")
+
+    def _finalize_deduplication_groups(self, events: list[EventSchema]) -> None:
+        """
+        Post-pass: now that events are in the DB, resolve the two fields that
+        couldn't be set in the pre-pass due to circular FK constraints:
+
+          - primary_event_id: looked up via event_id of the primary event
+          - event_count: recounted from events.duplicate_group_id in DB
+        """
+        # Build source_event_id → event_id (UUID) map from the batch
+        source_to_event_id: dict[str, str] = {
+            str(e.source.source_event_id): str(e.event_id) for e in events
+        }
+
+        # Find the primary event_id for each group
+        groups_to_update: dict[str, str] = {}  # group_id → primary event_id
+        for event in events:
+            cf = event.custom_fields or {}
+            gid = cf.get("duplicate_group_id")
+            if not gid or gid in groups_to_update:
+                continue
+            if cf.get("is_primary"):
+                primary_event_id = source_to_event_id.get(
+                    str(event.source.source_event_id)
+                )
+                if primary_event_id:
+                    groups_to_update[gid] = primary_event_id
+
+        if not groups_to_update:
+            return
+
+        group_ids = list(groups_to_update.keys())
+
+        with self.conn.cursor() as cur:
+            # Set primary_event_id
+            for gid, primary_event_id in groups_to_update.items():
+                cur.execute(
+                    """
+                    UPDATE event_groups
+                    SET primary_event_id = %s, updated_at = NOW()
+                    WHERE duplicate_group_id = %s
+                      AND primary_event_id IS DISTINCT FROM %s;
+                    """,
+                    (primary_event_id, gid, primary_event_id),
+                )
+
+            # Recount event_count from the events table (handles re-runs correctly)
+            cur.execute(
+                """
+                UPDATE event_groups eg
+                SET event_count = (
+                    SELECT COUNT(*)
+                    FROM events
+                    WHERE duplicate_group_id = eg.duplicate_group_id
+                ),
+                updated_at = NOW()
+                WHERE eg.duplicate_group_id = ANY(%s);
+                """,
+                (group_ids,),
+            )
+
+        logger.debug(
+            f"EventDataWriter: finalized {len(groups_to_update)} deduplication group(s)"
         )

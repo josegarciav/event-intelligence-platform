@@ -7,12 +7,27 @@ anti-bot protections, framework) and recommends scrapping engine config.
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import re
 from dataclasses import dataclass, field
 from urllib.parse import urljoin, urlparse
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# SSRF protection — private/loopback networks to block
+# ---------------------------------------------------------------------------
+
+_PRIVATE_NETWORKS: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = [
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+]
 
 # ---------------------------------------------------------------------------
 # SPA / framework markers in raw HTML
@@ -92,6 +107,22 @@ class SourceDetector:
     # Public API
     # ------------------------------------------------------------------
 
+    def _validate_url(self, url: str) -> None:
+        """Reject private/loopback IPs and disallowed URL schemes (SSRF guard)."""
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError(f"Disallowed URL scheme: {parsed.scheme!r}")
+        hostname = parsed.hostname or ""
+        try:
+            addr = ipaddress.ip_address(hostname)
+            for net in _PRIVATE_NETWORKS:
+                if addr in net:
+                    raise ValueError(f"Blocked private IP: {hostname}")
+        except ValueError as exc:
+            if "Blocked" in str(exc):
+                raise
+            # hostname is a domain name — allowed
+
     def probe(self, url: str) -> SourceDetection:
         """
         Probe *url* and return detection results with engine recommendation.
@@ -99,6 +130,7 @@ class SourceDetector:
         The probe uses a simple HTTP GET (no JS rendering) and analyses the
         raw response to infer whether a browser engine is required.
         """
+        self._validate_url(url)
         detection = SourceDetection(url=url)
 
         # --- HTTP probe ---

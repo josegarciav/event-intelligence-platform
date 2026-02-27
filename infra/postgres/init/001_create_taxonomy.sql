@@ -194,6 +194,40 @@ CREATE TABLE IF NOT EXISTS subcategories (
 
 
 -- ============================================================
+-- EVENT GROUPS
+-- Canonical clusters created by DeduplicationAgent
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS event_groups (
+    duplicate_group_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+    -- Group classification
+    group_type TEXT NOT NULL,
+    -- "duplicate" | "recurring" | "near_duplicate"
+
+    -- Canonical representative (only 1 main reference, all other references in the group to be found in the events table)
+    primary_event_id UUID
+        REFERENCES events(event_id)
+        ON DELETE SET NULL,
+
+    -- Confidence score from agent (0-1)
+    similarity_score FLOAT NOT NULL DEFAULT 0.0,
+
+    -- Optional short explanation from LLM (auditable but not operational)
+    -- Same show/location/title/source, different times, type "recurring"
+    reason TEXT,
+
+    event_count INT NOT NULL DEFAULT 1,
+
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT chk_similarity_score_range
+        CHECK (similarity_score BETWEEN 0 AND 1)
+);
+
+
+-- ============================================================
 -- EVENT (Central Spine)
 -- ============================================================
 
@@ -233,6 +267,8 @@ CREATE TABLE IF NOT EXISTS events (
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     is_deleted BOOLEAN DEFAULT FALSE,
     deleted_at TIMESTAMP,
+    duplicate_group_id UUID 
+        REFERENCES event_groups(duplicate_group_id),
 
     CONSTRAINT uq_event_source_identity
         UNIQUE (event_id, source_id),
@@ -585,21 +621,21 @@ CREATE TABLE IF NOT EXISTS event_artists (
 
 
 -- ============================================================
--- Data Normalization Errors
+-- Event Quality Audits (one row per event, mirrors DataQualityAudit)
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS normalization_errors (
-    error_id SERIAL PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS event_quality_audits (
+    audit_id             SERIAL PRIMARY KEY,
+    event_id             UUID NOT NULL,
+    quality_score        FLOAT NOT NULL CHECK (quality_score BETWEEN 0 AND 1),
+    missing_fields       JSONB NOT NULL DEFAULT '[]',
+    normalization_errors JSONB NOT NULL DEFAULT '[]',
+    confidence_flags     JSONB NOT NULL DEFAULT '{}',
+    recommendations      JSONB NOT NULL DEFAULT '[]',
+    created_at           TIMESTAMP NOT NULL DEFAULT NOW(),
 
-    event_id UUID,
-
-    severity TEXT NOT NULL DEFAULT 'error',
-    error_message TEXT NOT NULL,
-
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_error_event
+    CONSTRAINT fk_audit_event
         FOREIGN KEY (event_id)
         REFERENCES events (event_id)
-        ON DELETE SET NULL
+        ON DELETE CASCADE
 );

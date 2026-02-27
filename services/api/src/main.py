@@ -19,16 +19,24 @@ postgresql://user:password@host:port/event_intelligence
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Generator
 from contextlib import asynccontextmanager
 
 import psycopg2
 import psycopg2.pool
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from psycopg2.extensions import connection as _connection
 from pydantic import BaseModel
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.configs.settings import get_settings
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # GLOBAL SETTINGS
@@ -48,8 +56,7 @@ async def lifespan(app: FastAPI):
     try:
         get_pool()
     except Exception as e:
-        # Log error or handle as needed; for now, we let it fail startup if DB is required
-        print(f"Failed to initialize database pool: {e}")
+        logger.exception("Failed to initialize database pool: %s", e)
 
     yield
 
@@ -65,6 +72,43 @@ app = FastAPI(
     description="API for querying the Human Experience Taxonomy.",
     lifespan=lifespan,
 )
+
+# ---------------------------------------------------------------------------
+# RATE LIMITING
+# ---------------------------------------------------------------------------
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# ---------------------------------------------------------------------------
+# CORS MIDDLEWARE
+# ---------------------------------------------------------------------------
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+
+# ---------------------------------------------------------------------------
+# SECURITY HEADERS MIDDLEWARE
+# ---------------------------------------------------------------------------
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=()"
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 # ---------------------------------------------------------------------------
@@ -159,7 +203,9 @@ def health_check() -> dict[str, str]:
     response_model=list[Category],
     tags=["Taxonomy"],
 )
+@limiter.limit("60/minute")
 def list_categories(
+    request: Request,
     db: _connection = Depends(get_db),
 ) -> list[Category]:
     """
@@ -206,7 +252,5 @@ def list_categories(
         ]
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Database query failed: {str(e)}",
-        )
+        logger.exception("Database query failed: %s", e)
+        raise HTTPException(status_code=500, detail="An internal error occurred.")

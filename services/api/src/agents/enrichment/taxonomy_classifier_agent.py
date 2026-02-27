@@ -1,9 +1,9 @@
 """
 TaxonomyClassifierAgent — classifies events into the Human Experience Taxonomy.
 
-Uses the 'taxonomy_classification' prompt to fill:
-primary_category, subcategory, activity_id, energy_level, social_intensity,
-cognitive_load, physical_involvement, repeatability.
+Uses the 'taxonomy_classification' prompt in batch mode: events are chunked
+and sent together to reduce LLM round-trips.  Each chunk produces a single
+TaxonomyAttributesExtractionBatch response keyed by source_event_id.
 """
 
 import logging
@@ -11,7 +11,7 @@ import time
 from typing import Any
 
 from src.agents.base.base_agent import BaseAgent
-from src.agents.base.output_models import TaxonomyAttributesExtraction
+from src.agents.base.output_models import TaxonomyAttributesExtractionBatch
 from src.agents.base.task import AgentResult, AgentTask
 from src.agents.llm.provider_router import get_llm_client
 from src.agents.registry.prompt_registry import get_prompt_registry
@@ -23,9 +23,9 @@ class TaxonomyClassifierAgent(BaseAgent):
     """
     Classifies events into the Pulsecity Human Experience Taxonomy.
 
-    Fills taxonomy dimension fields: primary_category, subcategory,
-    energy_level, social_intensity, cognitive_load, physical_involvement,
-    repeatability.
+    Fills taxonomy dimension fields: energy_level, social_intensity,
+    cognitive_load, physical_involvement, repeatability, emotional_output, etc.
+    Processes events in configurable batches (default 8).
     """
 
     name = "taxonomy_classifier"
@@ -61,6 +61,7 @@ class TaxonomyClassifierAgent(BaseAgent):
             )
 
         prompt_version = self._registry.get_active_version(self.prompt_name)
+        batch_size = self._config.get("batch_size", 8)
         start = time.monotonic()
         errors: list[str] = []
         total_tokens: dict[str, int] = {
@@ -69,58 +70,64 @@ class TaxonomyClassifierAgent(BaseAgent):
             "total": 0,
         }
         enriched_events = list(task.events)
+        event_index = {
+            str(e.source.source_event_id): i for i, e in enumerate(enriched_events)
+        }
 
-        for i, event in enumerate(enriched_events):
-            ctx = self._build_event_context(event)
-            if not ctx.get("title"):
-                continue
-
+        for chunk in self._chunk(enriched_events, batch_size):
+            batch_ctx = self._build_batch_context(chunk)
+            chunk_ids = [str(e.source.source_event_id) for e in chunk]
             try:
                 system_prompt, user_prompt = self._registry.render(
                     self.prompt_name,
                     version=task.prompt_version,
-                    variables=ctx,
+                    variables=batch_ctx,
                     agent_name=self.name,
-                    event_id=str(event.source_event_id),
+                    batch=True,
                 )
-                result: TaxonomyAttributesExtraction = (
+                result: TaxonomyAttributesExtractionBatch = (
                     await self._llm.complete_structured(
                         system_prompt=system_prompt,
                         user_prompt=user_prompt,
-                        output_schema=TaxonomyAttributesExtraction,
+                        output_schema=TaxonomyAttributesExtractionBatch,
                         temperature=self._config.get("temperature", 0.1),
                     )
                 )
-                # Apply to taxonomy dimension
-                if event.taxonomy:
-                    tax = event.taxonomy
-                    if result.energy_level:
-                        tax.energy_level = result.energy_level
-                    if result.social_intensity:
-                        tax.social_intensity = result.social_intensity
-                    if result.cognitive_load:
-                        tax.cognitive_load = result.cognitive_load
-                    if result.physical_involvement:
-                        tax.physical_involvement = result.physical_involvement
-                    if result.environment:
-                        tax.environment = result.environment
-                    if result.risk_level:
-                        tax.risk_level = result.risk_level
-                    if result.age_accessibility:
-                        tax.age_accessibility = result.age_accessibility
-                    if result.repeatability:
-                        tax.repeatability = result.repeatability
-                    if result.emotional_output:
-                        tax.emotional_output = result.emotional_output
-                    enriched_events[i].taxonomy = tax
+
+                for item in result.items:
+                    sid = item.source_event_id
+                    idx = event_index.get(sid)
+                    if idx is None:
+                        continue
+
+                    tax = enriched_events[idx].taxonomy_dimension
+                    if tax is None:
+                        continue
+
+                    if item.energy_level:
+                        tax.energy_level = item.energy_level
+                    if item.social_intensity:
+                        tax.social_intensity = item.social_intensity
+                    if item.cognitive_load:
+                        tax.cognitive_load = item.cognitive_load
+                    if item.physical_involvement:
+                        tax.physical_involvement = item.physical_involvement
+                    if item.repeatability:
+                        tax.repeatability = item.repeatability
+                    tax.unconstrained_primary_category = (
+                        item.unconstrained_primary_category
+                    )
+                    tax.unconstrained_subcategory = item.unconstrained_subcategory
+                    tax.unconstrained_activity = item.unconstrained_activity
+                    enriched_events[idx].taxonomy_dimension = tax
 
                 usage = self._llm.get_token_usage()
                 for k in total_tokens:
                     total_tokens[k] += usage.get(k, 0)
 
             except Exception as e:
-                msg = f"event={event.source_event_id}: {e}"
-                logger.warning(f"{self.name} error: {msg}")
+                msg = f"batch {chunk_ids}: {e}"
+                logger.warning(f"{self.name} batch error: {msg}")
                 errors.append(msg)
 
         return AgentResult(

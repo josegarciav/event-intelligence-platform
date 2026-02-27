@@ -69,25 +69,32 @@ class TaxonomyAttributesExtraction(BaseModel):
         default="light",
         description="Physical activity: none=seated, light=standing, moderate=dancing/moving",
     )
-    environment: Literal["indoor", "outdoor", "digital", "mixed"] = Field(
-        default="indoor",
-        description="Venue type",
-    )
-    risk_level: Literal["none", "very_low", "low", "medium"] = Field(
-        default="very_low",
-        description="Physical or other risks",
-    )
-    age_accessibility: Literal["all", "teens+", "adults"] = Field(
-        default="adults",
-        description="Age appropriateness: all=family-friendly, teens+=13+, adults=18+",
-    )
     repeatability: Literal["high", "medium", "low"] = Field(
         default="medium",
         description="Repeat frequency: high=weekly, medium=monthly, low=unique/annual",
     )
-    emotional_output: list[str] = Field(
-        default_factory=lambda: ["enjoyment"],
-        description="Expected emotional outcomes (2-4 feelings)",
+
+    # Unconstrained taxonomy (taxonomy gap detection)
+    unconstrained_primary_category: str | None = Field(
+        default=None,
+        description=(
+            "Free-form primary category label to use if none of the predefined "
+            "categories is a good fit. Null when the predefined taxonomy fits well."
+        ),
+    )
+    unconstrained_subcategory: str | None = Field(
+        default=None,
+        description=(
+            "Free-form subcategory label to use if none of the predefined "
+            "subcategories is a good fit. Null when the predefined taxonomy fits well."
+        ),
+    )
+    unconstrained_activity: str | None = Field(
+        default=None,
+        description=(
+            "Free-form activity name to use if no predefined activity matches. "
+            "Null when the predefined taxonomy fits well."
+        ),
     )
 
 
@@ -160,3 +167,52 @@ class DataQualityAudit(BaseModel):
         default_factory=list,
         description="Human-readable remediation suggestions",
     )
+
+
+# =============================================================================
+# BATCH WRAPPERS
+# Each "Item" adds source_event_id so results can be matched back to events.
+# Each "Batch" wraps a list of Items — one per event in the chunk.
+# =============================================================================
+
+
+class MissingFieldsExtractionItem(MissingFieldsExtraction):
+    """Single-event result inside a batch, keyed by source_event_id."""
+
+    source_event_id: str = Field(
+        default="", description="Must match the source_event_id from the input"
+    )
+
+
+class MissingFieldsExtractionBatch(BaseModel):
+    """Batch output from feature_alignment agent (one item per input event)."""
+
+    items: list[MissingFieldsExtractionItem] = Field(default_factory=list)
+
+
+class TaxonomyAttributesExtractionItem(TaxonomyAttributesExtraction):
+    """Single-event result inside a batch, keyed by source_event_id."""
+
+    source_event_id: str = Field(
+        default="", description="Must match the source_event_id from the input"
+    )
+
+
+class TaxonomyAttributesExtractionBatch(BaseModel):
+    """Batch output from taxonomy_classifier agent (one item per input event)."""
+
+    items: list[TaxonomyAttributesExtractionItem] = Field(default_factory=list)
+
+
+class DataQualityAuditItem(DataQualityAudit):
+    """Single-event result inside a batch, keyed by source_event_id."""
+
+    source_event_id: str = Field(
+        default="", description="Must match the source_event_id from the input"
+    )
+
+
+class DataQualityAuditBatch(BaseModel):
+    """Batch output from data_quality agent (one item per input event)."""
+
+    items: list[DataQualityAuditItem] = Field(default_factory=list)

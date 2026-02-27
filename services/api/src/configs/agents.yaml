@@ -30,6 +30,7 @@ agents:
     provider: "ollama"
     model: "llama3.2:3b"
     temperature: 0.1
+    batch_size: 8      # events per LLM call (reduce for smaller/slower models)
     target_fields:
       - "event_type"
       - "tags"
@@ -47,6 +48,7 @@ agents:
     provider: "ollama"
     model: "llama3.2:3b"
     temperature: 0.1
+    batch_size: 8
     target_fields:
       - "primary_category"
       - "subcategory"
@@ -68,6 +70,7 @@ agents:
     provider: "ollama"
     model: "llama3.2:3b"
     temperature: 0.3
+    batch_size: 8
     target_fields:
       - "emotional_output"
       - "cost_level"
@@ -87,12 +90,13 @@ agents:
     provider: "ollama"
     model: "llama3.2:3b"
     temperature: 0.0    # always deterministic for quality audits
+    batch_size: 8
     target_fields: []   # audits all fields → writes to custom_fields
 
   # ---------------------------------------------------------------------------
   # DEDUPLICATION — detects duplicates, groups recurring events, aligns sources
   # Prompt: prompts/deduplication/
-  # Runs in two passes: rule-based (always) + LLM fuzzy (when Ollama is running)
+  # Runs in two passes: rule-based (always) + LLM fuzzy (if LLM is running)
   # ---------------------------------------------------------------------------
   deduplication:
     enabled: true
@@ -101,13 +105,14 @@ agents:
     provider: "ollama"
     model: "llama3.2:3b"
     temperature: 0.0    # always deterministic for deduplication
-    min_confidence: 0.7  # minimum confidence to flag a group
+    min_confidence: 0.8  # minimum confidence to flag a group
     target_fields:
       - "duplicate_group_id"
-      - "duplicate_group_type"
+      - "group_type"
       - "is_primary"
       - "duplicate_of"
       - "similarity_score"
+      - "reason"
 
   # ---------------------------------------------------------------------------
   # ARTIST ENRICHER — enriches artist genre via MusicBrainz API (no auth required)

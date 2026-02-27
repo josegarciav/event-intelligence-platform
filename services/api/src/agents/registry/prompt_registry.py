@@ -77,6 +77,7 @@ class PromptRegistry:
         variables: dict[str, Any] | None = None,
         agent_name: str | None = None,
         event_id: str | None = None,
+        batch: bool = False,
     ) -> tuple[str, str]:
         """
         Render a prompt template with the given variables.
@@ -87,6 +88,8 @@ class PromptRegistry:
             variables: Template variables for Jinja2 substitution
             agent_name: For audit logging
             event_id: For audit logging
+            batch: When True, use `batch_user_prompt` from the YAML instead of
+                   `user_prompt` (falls back to `user_prompt` if absent).
 
         Returns:
             Tuple of (system_prompt, user_prompt) as rendered strings
@@ -108,7 +111,13 @@ class PromptRegistry:
 
         variables = variables or {}
         system_raw = template_data.get("system_prompt", "")
-        user_raw = template_data.get("user_prompt", "")
+
+        if batch:
+            user_raw = template_data.get(
+                "batch_user_prompt", template_data.get("user_prompt", "")
+            )
+        else:
+            user_raw = template_data.get("user_prompt", "")
 
         if Template is not None:
             system_rendered = Template(system_raw, undefined=SilentUndefined).render(
@@ -133,6 +142,7 @@ class PromptRegistry:
                     "prompt_name": prompt_name,
                     "prompt_version": resolved_version,
                     "event_id": event_id,
+                    "batch": batch,
                 },
             )
 

@@ -14,6 +14,9 @@ ON events(primary_category_id);
 CREATE INDEX idx_events_organizer
 ON events(organizer_id);
 
+CREATE INDEX IF NOT EXISTS idx_events_duplicate_group_id
+ON events(duplicate_group_id);
+
 -- Ticket info join back to events
 CREATE INDEX idx_ticket_event
 ON ticket_info(event_id);
