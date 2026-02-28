@@ -5,14 +5,11 @@ Tests for ScraperAdapterConfig and ScraperAdapter classes.
 """
 
 import asyncio
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from src.ingestion.adapters.base_adapter import SourceType
 from src.ingestion.adapters.scraper_adapter import (
-    HtmlEnrichmentConfig,
-    HtmlEnrichmentScraper,
     ScraperAdapter,
     ScraperAdapterConfig,
 )
@@ -401,93 +398,3 @@ class TestScraperAdapterContextManager:
         asyncio.run(run())
         mock_close.assert_called_once()
 
-
-class TestHtmlEnrichmentScraper:
-    """Tests for HtmlEnrichmentScraper behavior."""
-
-    def test_loads_render_hints_from_generated_config(self, tmp_path):
-        """Should load wait_for/actions and engine hints from generated config."""
-        cfg_dir = tmp_path / "sources"
-        cfg_dir.mkdir(parents=True, exist_ok=True)
-        cfg_path = cfg_dir / "ra_co_scraper_auto.json"
-        cfg_path.write_text(
-            json.dumps(
-                {
-                    "engine": {"type": "browser"},
-                    "discovery": {"wait_for": ".event-content"},
-                    "actions": [{"type": "wait_for", "selector": "main"}],
-                }
-            ),
-            encoding="utf-8",
-        )
-
-        scraper = HtmlEnrichmentScraper(
-            HtmlEnrichmentConfig(
-                enabled=True,
-                engine_type="http",
-                source_name="ra_co",
-                generated_config_dir=str(cfg_dir),
-            )
-        )
-
-        assert scraper.config.engine_type == "browser"
-        assert scraper._wait_for == ".event-content"
-        assert scraper._actions == [{"type": "wait_for", "selector": "main"}]
-
-    def test_fetch_uses_rendered_path_for_hybrid_engine(self):
-        """Hybrid/browser enrichment should use rendered fetch with optional hints."""
-        scraper = HtmlEnrichmentScraper(
-            HtmlEnrichmentConfig(
-                enabled=True,
-                engine_type="hybrid",
-                min_text_len=10,
-                wait_for="main",
-                actions=[{"type": "wait_for", "selector": "main"}],
-            )
-        )
-        mock_engine = MagicMock()
-        mock_result = MagicMock()
-        mock_result.ok = True
-        mock_result.status_code = 200
-        mock_result.block_signals = []
-        mock_result.text = (
-            "<html><body><main>" + ("content " * 50) + "</main></body></html>"
-        )
-        mock_engine.get_rendered.return_value = mock_result
-        scraper._get_engine = MagicMock(return_value=mock_engine)
-
-        # Mock the scrapping imports that fetch_compressed_html uses
-        mock_doc = MagicMock()
-        mock_doc.ok = True
-        mock_doc.text = "content " * 50
-        mock_doc.title = "Test Event"
-        mock_html_to_structured = MagicMock(return_value=mock_doc)
-
-        mock_quality = MagicMock()
-        mock_quality.keep = True
-        mock_quality.errors.return_value = []
-        mock_evaluate_quality = MagicMock(return_value=mock_quality)
-
-        mock_scrapping_html = MagicMock()
-        mock_scrapping_html.html_to_structured = mock_html_to_structured
-        mock_scrapping_quality = MagicMock()
-        mock_scrapping_quality.evaluate_quality = mock_evaluate_quality
-
-        with patch.dict(
-            "sys.modules",
-            {
-                "scrapping": MagicMock(),
-                "scrapping.processing": MagicMock(),
-                "scrapping.processing.html_to_structured": mock_scrapping_html,
-                "scrapping.processing.quality_filters": mock_scrapping_quality,
-            },
-        ):
-            text = asyncio.run(
-                scraper.fetch_compressed_html("https://example.com/event/1")
-            )
-
-        assert text is not None
-        assert mock_engine.get_rendered.call_count >= 1
-        assert mock_engine.get_rendered.call_args_list[-1].args[0] == (
-            "https://example.com/event/1"
-        )

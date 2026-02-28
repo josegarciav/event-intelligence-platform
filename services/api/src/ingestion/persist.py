@@ -224,17 +224,15 @@ class EventDataWriter:
             """
             INSERT INTO sources (
                 source_name, source_event_id, source_url,
-                compressed_html, ingestion_timestamp, source_updated_at
-            ) VALUES (%s, %s, %s, %s, %s, %s)
+                ingestion_timestamp, source_updated_at
+            ) VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (source_name, source_event_id)
             DO UPDATE SET
-                compressed_html = COALESCE(EXCLUDED.compressed_html, sources.compressed_html),
                 source_url = COALESCE(EXCLUDED.source_url, sources.source_url),
                 source_updated_at = COALESCE(EXCLUDED.source_updated_at, sources.source_updated_at),
                 ingestion_timestamp = EXCLUDED.ingestion_timestamp
             WHERE
-                sources.compressed_html IS DISTINCT FROM COALESCE(EXCLUDED.compressed_html, sources.compressed_html)
-                OR sources.source_url IS DISTINCT FROM COALESCE(EXCLUDED.source_url, sources.source_url)
+                sources.source_url IS DISTINCT FROM COALESCE(EXCLUDED.source_url, sources.source_url)
                 OR sources.source_updated_at IS DISTINCT FROM COALESCE(EXCLUDED.source_updated_at, sources.source_updated_at)
                 OR sources.ingestion_timestamp IS DISTINCT FROM EXCLUDED.ingestion_timestamp
             RETURNING source_id;
@@ -243,7 +241,6 @@ class EventDataWriter:
                 src.source_name,
                 src.source_event_id,
                 src.source_url,
-                src.compressed_html,
                 src.ingestion_timestamp,
                 src.source_updated_at,
             ),

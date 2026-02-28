@@ -105,9 +105,6 @@ class APISourceConfig:
     # Validation
     validation: dict[str, Any] = field(default_factory=dict)
 
-    # HTML enrichment (compressed_html scraping)
-    html_enrichment: dict[str, Any] = field(default_factory=dict)
-
     # Location enrichment (geocoding)
     geocoding_enabled: bool = False
 
@@ -402,40 +399,6 @@ class BaseAPIPipeline(BasePipeline):
             transformations=source_config.transformations,
         )
         self.taxonomy_mapper = TaxonomyMapper(source_config.taxonomy_config)
-
-        # Create HTML enrichment scraper if enabled
-        self.html_enrichment_scraper = None
-        if source_config.html_enrichment.get("enabled"):
-            try:
-                from src.ingestion.adapters.scraper_adapter import (
-                    HtmlEnrichmentConfig,
-                    HtmlEnrichmentScraper,
-                )
-
-                enrichment_cfg = HtmlEnrichmentConfig(
-                    enabled=True,
-                    engine_type=source_config.html_enrichment.get(
-                        "engine_type", "hybrid"
-                    ),
-                    rate_limit_per_second=source_config.html_enrichment.get(
-                        "rate_limit_per_second", 2.0
-                    ),
-                    timeout_s=source_config.html_enrichment.get("timeout_s", 15.0),
-                    source_name=source_config.source_name,
-                    generated_config_path=source_config.html_enrichment.get(
-                        "generated_config_path"
-                    ),
-                    generated_config_dir=source_config.html_enrichment.get(
-                        "generated_config_dir"
-                    ),
-                    wait_for=source_config.html_enrichment.get("wait_for"),
-                    actions=source_config.html_enrichment.get("actions", []),
-                )
-                self.html_enrichment_scraper = HtmlEnrichmentScraper(enrichment_cfg)
-            except ImportError:
-                logger.warning(
-                    "Scrapping service not available; HTML enrichment disabled"
-                )
 
         # Location parser (lazy-initialized in enrich_event)
         self._location_parser = None
@@ -816,8 +779,8 @@ class BaseAPIPipeline(BasePipeline):
         source_event_id = str(parsed_event.get("source_event_id", ""))
         start_dt = self._parse_datetime(
             parsed_event.get("start_time") or parsed_event.get("date")
-        )
-        end_dt = self._parse_datetime(parsed_event.get("end_time"))
+        ) or datetime.now(UTC)
+        end_dt = self._parse_datetime(parsed_event.get("end_time"))  # None when absent
 
         # Get location defaults
         loc_defaults = self.source_config.defaults.get("location", {})
@@ -1071,7 +1034,8 @@ class BaseAPIPipeline(BasePipeline):
         )
 
         # Combine description + please_note when both present
-        description_raw = parsed_event.get("description") or None
+        # Fall back to `info` when `description` is absent (common for some Ticketmaster events)
+        description_raw = parsed_event.get("description") or parsed_event.get("info") or None
         please_note = parsed_event.get("please_note") or None
         if description_raw and please_note:
             combined_description = f"{description_raw}\n\n{please_note}"
@@ -1131,10 +1095,10 @@ class BaseAPIPipeline(BasePipeline):
 
         return None
 
-    def _parse_datetime(self, dt_value: Any) -> datetime:
-        """Parse datetime from various formats."""
+    def _parse_datetime(self, dt_value: Any) -> datetime | None:
+        """Parse datetime from various formats. Returns None when dt_value is absent."""
         if not dt_value:
-            return datetime.now(UTC)
+            return None
 
         if isinstance(dt_value, datetime):
             return dt_value
@@ -1160,7 +1124,7 @@ class BaseAPIPipeline(BasePipeline):
                     continue
 
         logger.warning(f"Could not parse datetime: {dt_value}")
-        return datetime.now(UTC)
+        return None
 
     def validate_event(
         self, event: EventSchema
@@ -1361,47 +1325,6 @@ class BaseAPIPipeline(BasePipeline):
 
     async def enrich_event(self, event: EventSchema) -> EventSchema:
         """Enrich event with additional computed data."""
-        # Fetch compressed HTML if enrichment scraper is configured
-        if (
-            getattr(self, "html_enrichment_scraper", None)
-            and event.source.source_url
-            and not event.source.compressed_html
-        ):
-            try:
-                compressed = await self.html_enrichment_scraper.fetch_compressed_html(
-                    event.source.source_url
-                )
-                # Retry once on failure — transient blocks/timeouts are common
-                if not compressed:
-                    await asyncio.sleep(1.0)
-                    compressed = (
-                        await self.html_enrichment_scraper.fetch_compressed_html(
-                            event.source.source_url
-                        )
-                    )
-                if compressed:
-                    event.source.compressed_html = compressed
-                else:
-                    logger.warning(
-                        f"HTML enrichment returned None for {event.source.source_url}"
-                    )
-                    event.normalization_errors.append(
-                        NormalizationError(
-                            message=f"HTML enrichment returned no content for {event.source.source_url}",
-                            severity=NormalizationSeverity.WARNING,
-                        )
-                    )
-            except Exception as e:
-                logger.warning(
-                    f"HTML enrichment failed for {event.source.source_url}: {e}"
-                )
-                event.normalization_errors.append(
-                    NormalizationError(
-                        message=f"HTML enrichment error: {e}",
-                        severity=NormalizationSeverity.WARNING,
-                    )
-                )
-
         # Location enrichment: parse address + geocode (if enabled)
         if getattr(self, "_location_parser", None) is None:
             from src.ingestion.normalization.location_parser import LocationParser
@@ -1410,12 +1333,6 @@ class BaseAPIPipeline(BasePipeline):
                 geocoding_enabled=self.source_config.geocoding_enabled,
             )
         self._location_parser.enrich_location(event.location)
-
-        # Try to extract source_updated_at from compressed HTML when not set
-        if event.source.compressed_html and not event.source.source_updated_at:
-            extracted_ts = self._extract_source_updated_at(event.source.compressed_html)
-            if extracted_ts:
-                event.source.source_updated_at = extracted_ts
 
         # Calculate duration
         if event.end_datetime and event.start_datetime:
@@ -1495,9 +1412,6 @@ def create_api_pipeline_from_config(
         event_type_rules=source_config_dict.get("event_type_rules", []),
         defaults=source_config_dict.get("defaults", {}),
         validation=source_config_dict.get("validation", {}),
-        html_enrichment=source_config_dict.get("enrichment", {}).get(
-            "compressed_html", {}
-        ),
         geocoding_enabled=source_config_dict.get("enrichment", {}).get(
             "geocoding", False
         ),
