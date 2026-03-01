@@ -53,7 +53,7 @@ event-intelligence-platform/
 ┌──────────────────────────────────────────────────────────┐
 │                     External Sources                      │
 │   GetYourGuide · RA.co · Ticketmaster · Eventbrite       │
-│   Civitatis · TripAdvisor  (+ scraped sources)           │
+│   Civitatis · TripAdvisor · Meetup  (+ scraped sources)  │
 └───────────────────────────┬──────────────────────────────┘
                             │
                             ▼
@@ -66,24 +66,27 @@ event-intelligence-platform/
 │       ↓                                                  │
 │  Normalization (field_mapper · location · currency · tax)│
 │       ↓                                                  │
-│  Deduplication (exact match by source_event_id)          │
+│  BatchWriter                                             │
 │       ↓                                                  │
-│  PostgreSQL 16 (port 5433)                               │
+│  JSONL Batches  (data/batches/{source}/)                 │
 └───────────────────────────┬──────────────────────────────┘
                             │
                             ▼
 ┌──────────────────────────────────────────────────────────┐
 │             PHASE 2 — Agent Enrichment Chain              │
+│                          (PostIngestionTrigger)           │
 │                                                          │
 │  MCP Layer  (local mode — in-process FastMCP)            │
 │       ↓                                                  │
 │  [1] FeatureAlignmentAgent   → event_type, tags          │
-│  [2] TaxonomyClassifierAgent → category, dimensions      │
+│  [2] TaxonomyClassifierAgent → category, activity (RAG)  │
 │  [3] EmotionMapperAgent      → vibe, energy, cost        │
 │  [4] DataQualityAgent        → quality_score             │
-│  [5] DeduplicationAgent      → fuzzy dedup               │
+│  [5] DeduplicationAgent      → fuzzy dedup + grouping    │
 │                                                          │
-│  LLM: Ollama llama3.2:3b (default) · Claude · GPT       │
+│  LLM: Ollama llama3.2:1b (default) · Claude · GPT       │
+│       ↓                                                  │
+│  PostgreSQL 16 (port 5433)                               │
 └───────────────────────────┬──────────────────────────────┘
                             │
                             ▼
@@ -114,7 +117,7 @@ source .venv/bin/activate
 
 **3. Install Ollama (default LLM provider)**
 ```bash
-brew install ollama && ollama pull llama3.2:3b
+brew install ollama && ollama pull llama3.2:1b
 # Ollama starts automatically on port 11434 — no API key needed
 ```
 

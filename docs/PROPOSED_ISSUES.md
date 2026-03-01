@@ -5,7 +5,7 @@ This document outlines 5 ranked improvements for the Event Intelligence Platform
 ---
 
 ## 1. Integrated Ingestion-to-Enrichment Triggering Architecture
-**Rank:** 1 | **Impact:** High | **Category:** Data Quality / Architecture
+**Rank:** 1 | **Impact:** High | **Category:** Data Quality / Architecture | **Status:** ✅ Implemented
 
 ### Description
 Currently, the ingestion pipeline and the enrichment layer (taxonomy mapping, emotional outputs, etc.) operate somewhat independently or in a tightly coupled sequential manner within the `orchestrator`. As the platform scales, we need a more robust, event-driven or batch-triggered architecture that ensures every ingested event undergoes a full enrichment cycle (e.g., LLM-based categorization, artist metadata fetching, etc.) before being marked as "ready" for the public API.
@@ -14,6 +14,9 @@ Currently, the ingestion pipeline and the enrichment layer (taxonomy mapping, em
 - Implement a post-persistence hook in `PipelineOrchestrator` or a separate `EnrichmentService`.
 - Introduce a status-tracking mechanism for events to manage the enrichment lifecycle.
 - Support "batch enrichment" to optimize LLM API calls and artist metadata lookups.
+
+### Implementation
+`PostIngestionTrigger` (`services/api/src/agents/orchestration/pipeline_triggers.py`) — call `trigger.on_pipeline_complete(pipeline_result)` after any `pipeline.execute()`. The ingestion pipeline writes JSONL batches to `data/batches/`; the trigger reads them, runs the full agent chain (`BatchEnrichmentRunner`), and persists enriched events to PostgreSQL. Batch size is configurable per agent in `agents.yaml`.
 
 ### Schema Changes
 ```sql
@@ -104,7 +107,7 @@ CREATE TABLE artist_media_assets (
 ---
 
 ## 4. Fuzzy Event Deduplication & Conflict Resolution
-**Rank:** 4 | **Impact:** Medium | **Category:** Data Quality / Technical Debt
+**Rank:** 4 | **Impact:** Medium | **Category:** Data Quality / Technical Debt | **Status:** ✅ Implemented
 
 ### Description
 The platform ingests data from multiple heterogeneous sources. While UUIDv5 provides deterministic IDs, events might still be duplicated across sources with slightly different titles or start times. We need a way to merge these into a single "Canonical Event" while preserving the source-specific details for auditing.
@@ -112,6 +115,9 @@ The platform ingests data from multiple heterogeneous sources. While UUIDv5 prov
 ### Proposed Solution
 - Upgrade `EventDeduplicator` to use fuzzy string matching (e.g., Levenshtein distance) on titles and location names.
 - Implement a "Master Record" pattern where one event is chosen as the canonical version and others are linked to it.
+
+### Implementation
+`DeduplicationAgent` (`services/api/src/agents/enrichment/deduplication_agent.py`) — two-pass architecture: (1) rule-based exact match on `(title_slug, date, venue_slug)` using deterministic UUID5 group IDs, always runs with no LLM; (2) LLM fuzzy analysis on remaining candidates for near-duplicates and recurring series, only accepts groups with confidence ≥ 0.80. Results written to `event.custom_fields` and persisted to the `event_groups` table.
 
 ### Schema Changes
 ```sql

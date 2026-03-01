@@ -172,34 +172,37 @@ Future OSS providers
 ```
 src/agents/
 ├── __init__.py
-├── taxonomy_retriever.py                 (singleton taxonomy context loader)
 │
 ├── base/
 │   ├── __init__.py
 │   ├── base_agent.py                     (abstract BaseAgent with async run() interface)
 │   ├── task.py                           (AgentTask + AgentResult dataclasses)
-│   └── output_models.py                  (Pydantic extraction schemas)
+│   └── output_models.py                  (Pydantic extraction schemas + ActivitySelectionBatch)
 │
 ├── llm/
 │   ├── __init__.py
 │   ├── base_llm_client.py                (abstract async interface)
-│   ├── openai_client.py                  (OpenAI via Instructor)
-│   ├── anthropic_client.py               (Claude via Anthropic SDK + tool_use)
+│   ├── openai_client.py                  (OpenAI via Instructor TOOLS)
+│   ├── anthropic_client.py               (Claude via Anthropic SDK tool_use)
+│   ├── ollama_client.py                  (Ollama local models via Instructor JSON mode)
 │   └── provider_router.py                (get_llm_client factory)
 │
-├── mcp/                                  (local — in-process FastMCP, default; server — production path; direct — legacy)
+├── mcp/                                  (local — in-process FastMCP, default; server — HTTP SSE; direct — legacy)
 │   ├── __init__.py
-│   ├── mcp_client.py                     (MCPClient abstract + DirectMCPClient)
-│   ├── readers.py                        (fetch_event_row, fetch_missing_features)
+│   ├── mcp_client.py                     (MCPClient abstract + DirectMCPClient + LocalMCPClient + ServerMCPClient)
+│   ├── fastmcp_client.py                 (FastMCP in-process and HTTP clients)
+│   ├── fastmcp_server.py                 (FastMCP server — run with: python -m src.agents.mcp.fastmcp_server)
+│   ├── readers.py                        (fetch_event_row, fetch_missing_features, list_events)
 │   └── writers.py                        (write_features, write_taxonomy, write_emotions, write_tags)
 │
 ├── enrichment/
 │   ├── __init__.py
 │   ├── feature_alignment_agent.py        (event_type, tags, format)
-│   ├── taxonomy_classifier_agent.py      (primary_category, subcategory, behavioral dims)
-│   ├── emotion_mapper_agent.py           (emotional_output, cost_level, environment, etc.)
-│   ├── data_quality_agent.py             (quality_score, normalization_errors)
-│   └── artist_enricher_agent.py          (STUB — requires external artist metadata API)
+│   ├── taxonomy_classifier_agent.py      (two-pass RAG: primary_category, subcategory, activity_id, activity_name, behavioral dims)
+│   ├── emotion_mapper_agent.py           (emotional_output, cost_level, environment, risk_level, age_accessibility, time_scale)
+│   ├── data_quality_agent.py             (quality_score, normalization_errors; rule-based fallback always runs)
+│   ├── deduplication_agent.py            (two-pass: rule-based exact match + LLM fuzzy grouping)
+│   └── artist_enricher_agent.py          (genre via MusicBrainz API — no auth required)
 │
 ├── validation/
 │   ├── __init__.py
@@ -208,16 +211,15 @@ src/agents/
 │
 ├── orchestration/
 │   ├── __init__.py
-│   ├── agent_runner.py                   (BatchEnrichmentRunner — ordered chain)
+│   ├── agent_runner.py                   (BatchEnrichmentRunner — ordered chain executor)
 │   └── pipeline_triggers.py              (PostIngestionTrigger + load_agents_config)
 │
 ├── prompts/
-│   ├── feature_alignment/                    (v1.yaml — event_type, tags, format)
-│   ├── experience_pulse/                 (v1.yaml — behavioral taxonomy dimensions)
-│   ├── logistics/                        (v1.yaml — environment, cost, risk, age)
-│   ├── taxonomy_classifier/          (v1.yaml — full taxonomy classification)
-│   ├── emotion_mapper/                     (v1.yaml — emotional outputs + vibe dims)
-│   └── data_quality/                     (v1.yaml — completeness audit)
+│   ├── feature_alignment/            (v1.yaml — event_type, tags, format)
+│   ├── taxonomy_classifier/          (v1.yaml — two-pass RAG: category + RAG activity selection)
+│   ├── emotion_mapper/               (v1.yaml — emotional outputs + practical dims)
+│   ├── data_quality/                 (v1.yaml — completeness audit + quality score)
+│   └── deduplication/                (v1.yaml — exact + fuzzy duplicate grouping)
 │
 └── registry/
     ├── __init__.py
@@ -232,13 +234,13 @@ src/agents/
 | Agent | File | Status | Prompt | Target Fields |
 |---|---|---|---|---|
 | FeatureAlignmentAgent | `enrichment/feature_alignment_agent.py` | **Live** | `feature_alignment` | event_type, tags, format |
-| TaxonomyClassifierAgent | `enrichment/taxonomy_classifier_agent.py` | **Live** | `taxonomy_classifier` | primary_category, subcategory, behavioral dims |
-| EmotionMapperAgent | `enrichment/emotion_mapper_agent.py` | **Live** | `emotion_mapper` | emotional_output, cost_level, environment, etc. |
-| DataQualityAgent | `enrichment/data_quality_agent.py` | **Live** | `data_quality` | quality_score, normalization_errors |
-| DeduplicationAgent | `enrichment/deduplication_agent.py` | **Live** | `deduplication` | duplicate_group_id, duplicate_group_type, is_primary, duplicate_of, similarity_score |
-| ArtistEnricherAgent | `enrichment/artist_enricher_agent.py` | **Stub** | — | artists (requires external API) |
-| MCP layer | `mcp/mcp_client.py` | **Stub** (in-memory) | — | All fields via DirectMCPClient |
-| FastMCP server | — | **Future** | — | Replace DirectMCPClient when deployed |
+| TaxonomyClassifierAgent | `enrichment/taxonomy_classifier_agent.py` | **Live** | `taxonomy_classifier` | primary_category, subcategory, subcategory_name, activity_id, activity_name, energy_level, social_intensity, cognitive_load, physical_involvement, repeatability, unconstrained_* — two-pass RAG |
+| EmotionMapperAgent | `enrichment/emotion_mapper_agent.py` | **Live** | `emotion_mapper` | emotional_output, cost_level, environment, risk_level, age_accessibility, time_scale |
+| DataQualityAgent | `enrichment/data_quality_agent.py` | **Live** | `data_quality` | data_quality_score, normalization_errors (rule-based fallback always runs) |
+| DeduplicationAgent | `enrichment/deduplication_agent.py` | **Live** | `deduplication` | duplicate_group_id, group_type, is_primary, duplicate_of, similarity_score, reason |
+| ArtistEnricherAgent | `enrichment/artist_enricher_agent.py` | **Live** | — | artists[*].genre (MusicBrainz API, no auth) |
+| MCP layer | `mcp/mcp_client.py` | **Live** | — | LocalMCPClient (in-process FastMCP, default) · ServerMCPClient (HTTP SSE) · DirectMCPClient (legacy) |
+| FastMCP server | `mcp/fastmcp_server.py` | **Live** | — | Production server mode: `python -m src.agents.mcp.fastmcp_server` |
 
 ---
 
@@ -345,8 +347,9 @@ Async-first. All providers implement `BaseLLMClient`:
 ```bash
 # 1. Install Ollama: https://ollama.com
 # 2. Pull a model
-ollama pull llama3.2:3b   # lightweight (DEFAULT)
-ollama pull llama3.1:8b   # higher quality
+ollama pull llama3.2:1b   # smallest, fastest (DEFAULT)
+ollama pull llama3.2:3b   # balanced lightweight
+ollama pull llama3.1:8b   # higher quality (~8GB VRAM)
 # 3. Ollama starts automatically on port 11434
 ```
 
@@ -414,7 +417,7 @@ Events below `global.confidence_threshold` (0.6) are flagged via `flag_low_confi
 
 `BatchEnrichmentRunner` executes the ordered agent chain:
 ```
-feature_alignment → taxonomy_classifier → emotion_mapper → data_quality
+feature_alignment → taxonomy_classifier → emotion_mapper → data_quality → deduplication
 ```
 
 `PostIngestionTrigger.on_pipeline_complete(pipeline_result)` is the production entry point — call it after any `pipeline.execute()`.
