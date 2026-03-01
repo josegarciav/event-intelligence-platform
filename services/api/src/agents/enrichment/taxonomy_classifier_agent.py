@@ -1,7 +1,7 @@
 """
 TaxonomyClassifierAgent — classifies events into the Human Experience Taxonomy.
 
-Uses the 'taxonomy_classification' prompt in batch mode: events are chunked
+Uses the 'taxonomy_classifier' prompt in batch mode: events are chunked
 and sent together to reduce LLM round-trips.  Each chunk produces a single
 TaxonomyAttributesExtractionBatch response keyed by source_event_id.
 """
@@ -29,7 +29,7 @@ class TaxonomyClassifierAgent(BaseAgent):
     """
 
     name = "taxonomy_classifier"
-    prompt_name = "taxonomy_classification"
+    prompt_name = "taxonomy_classifier"
 
     def __init__(self, config: dict[str, Any] | None = None):
         self._config = config or {}

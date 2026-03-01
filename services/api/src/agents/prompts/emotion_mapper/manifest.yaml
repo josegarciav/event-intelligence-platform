@@ -1,4 +1,4 @@
-prompt_name: "emotion_vibe"
+prompt_name: "emotion_mapper"
 active_version: "v1"
 versions:
   v1:

@@ -195,7 +195,7 @@ src/agents/
 │
 ├── enrichment/
 │   ├── __init__.py
-│   ├── feature_alignment_agent.py        (event_type, tags, event_format)
+│   ├── feature_alignment_agent.py        (event_type, tags, format)
 │   ├── taxonomy_classifier_agent.py      (primary_category, subcategory, behavioral dims)
 │   ├── emotion_mapper_agent.py           (emotional_output, cost_level, environment, etc.)
 │   ├── data_quality_agent.py             (quality_score, normalization_errors)
@@ -212,11 +212,11 @@ src/agents/
 │   └── pipeline_triggers.py              (PostIngestionTrigger + load_agents_config)
 │
 ├── prompts/
-│   ├── core_metadata/                    (v1.yaml — event_type, tags, event_format)
+│   ├── feature_alignment/                    (v1.yaml — event_type, tags, format)
 │   ├── experience_pulse/                 (v1.yaml — behavioral taxonomy dimensions)
 │   ├── logistics/                        (v1.yaml — environment, cost, risk, age)
-│   ├── taxonomy_classification/          (v1.yaml — full taxonomy classification)
-│   ├── emotion_vibe/                     (v1.yaml — emotional outputs + vibe dims)
+│   ├── taxonomy_classifier/          (v1.yaml — full taxonomy classification)
+│   ├── emotion_mapper/                     (v1.yaml — emotional outputs + vibe dims)
 │   └── data_quality/                     (v1.yaml — completeness audit)
 │
 └── registry/
@@ -231,9 +231,9 @@ src/agents/
 
 | Agent | File | Status | Prompt | Target Fields |
 |---|---|---|---|---|
-| FeatureAlignmentAgent | `enrichment/feature_alignment_agent.py` | **Live** | `core_metadata` | event_type, tags, event_format |
-| TaxonomyClassifierAgent | `enrichment/taxonomy_classifier_agent.py` | **Live** | `taxonomy_classification` | primary_category, subcategory, behavioral dims |
-| EmotionMapperAgent | `enrichment/emotion_mapper_agent.py` | **Live** | `emotion_vibe` | emotional_output, cost_level, environment, etc. |
+| FeatureAlignmentAgent | `enrichment/feature_alignment_agent.py` | **Live** | `feature_alignment` | event_type, tags, format |
+| TaxonomyClassifierAgent | `enrichment/taxonomy_classifier_agent.py` | **Live** | `taxonomy_classifier` | primary_category, subcategory, behavioral dims |
+| EmotionMapperAgent | `enrichment/emotion_mapper_agent.py` | **Live** | `emotion_mapper` | emotional_output, cost_level, environment, etc. |
 | DataQualityAgent | `enrichment/data_quality_agent.py` | **Live** | `data_quality` | quality_score, normalization_errors |
 | DeduplicationAgent | `enrichment/deduplication_agent.py` | **Live** | `deduplication` | duplicate_group_id, duplicate_group_type, is_primary, duplicate_of, similarity_score |
 | ArtistEnricherAgent | `enrichment/artist_enricher_agent.py` | **Stub** | — | artists (requires external API) |
@@ -248,7 +248,7 @@ Prompts live in `src/agents/prompts/{name}/`:
 - `manifest.yaml` — declares `active_version` + per-version metadata
 - `v1.yaml` — Jinja2 system + user prompt templates
 
-`PromptRegistry.render("core_metadata", version="active", variables={...})` resolves the active version and renders both prompts. All calls are logged with `{agent_name, prompt_name, version, event_id}`.
+`PromptRegistry.render("feature_alignment", version="active", variables={...})` resolves the active version and renders both prompts. All calls are logged with `{agent_name, prompt_name, version, event_id}`.
 
 ---
 
@@ -271,7 +271,7 @@ result = await runner.run(events, prompt_version="active")
 # Prompt testing
 from src.agents.registry.prompt_registry import get_prompt_registry
 registry = get_prompt_registry()
-system, user = registry.render("core_metadata", variables={"title": "Techno Night"})
+system, user = registry.render("feature_alignment", variables={"title": "Techno Night"})
 
 # MCP client — local mode (in-process FastMCP, no network)
 from src.agents.mcp import create_mcp_client

@@ -1,5 +1,5 @@
 name: "Taxonomy Classification"
-description: "Full taxonomy classification — primary_category, subcategory, and all behavioral dimensions."
+description: "Full taxonomy classification — primary_category, subcategory, all behavioral dimensions (energy_level, social_intensity, cognitive_load, physical_involvement, repeatability), and unconstrained gap-detection fields."
 
 system_prompt: |
   You are the Pulsecity Taxonomy Intelligence System.
@@ -112,6 +112,9 @@ user_prompt: |
   - cognitive_load
   - physical_involvement
   - repeatability
+  - unconstrained_primary_category (free-form experience-type label; null if predefined taxonomy fits well)
+  - unconstrained_subcategory      (free-form sub-type label; null if predefined taxonomy fits well)
+  - unconstrained_activity         (free-form activity description; null if predefined taxonomy fits well)
 
 batch_user_prompt: |
   Classify these {{ event_count }} events into the Pulsecity taxonomy.
@@ -123,11 +126,13 @@ batch_user_prompt: |
   Return a JSON object with an `items` array — exactly {{ event_count }} entries, one per event.
   Each entry must include:
   - source_event_id  (copy exactly from input — required for matching)
+  - primary_category:                integer ID 0-10
+  - subcategory:                     e.g. "1.4"
   - energy_level:                    low | medium | high
   - social_intensity:                solo | small_group | large_group
   - cognitive_load:                  low | medium | high
   - physical_involvement:            none | light | moderate
   - repeatability:                   high | medium | low
-  - unconstrained_primary_category:  free-form label (null if predefined taxonomy fits well)
-  - unconstrained_subcategory:       free-form label (null if predefined taxonomy fits well)
-  - unconstrained_activity:          free-form label (null if predefined taxonomy fits well)
+  - unconstrained_primary_category:  free-form experience-type label (null if predefined taxonomy fits well)
+  - unconstrained_subcategory:       free-form sub-type label (null if predefined taxonomy fits well)
+  - unconstrained_activity:          free-form activity description (null if predefined taxonomy fits well)

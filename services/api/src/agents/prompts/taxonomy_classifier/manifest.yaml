@@ -1,4 +1,4 @@
-prompt_name: "taxonomy_classification"
+prompt_name: "taxonomy_classifier"
 active_version: "v1"
 versions:
   v1:

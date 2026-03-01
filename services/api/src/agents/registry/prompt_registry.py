@@ -7,8 +7,8 @@ Prompts live in src/agents/prompts/{name}/:
 
 Usage:
     registry = PromptRegistry()
-    system, user = registry.render("core_metadata", variables={"title": "Techno Night"})
-    system, user = registry.render("core_metadata", version="v1", variables={...})
+    system, user = registry.render("feature_alignment", variables={"title": "Techno Night"})
+    system, user = registry.render("feature_alignment", version="v1", variables={...})
 """
 
 import logging
@@ -83,7 +83,7 @@ class PromptRegistry:
         Render a prompt template with the given variables.
 
         Args:
-            prompt_name: Prompt identifier (e.g., "core_metadata")
+            prompt_name: Prompt identifier (e.g., "feature_alignment")
             version: "active" or explicit version (e.g., "v1")
             variables: Template variables for Jinja2 substitution
             agent_name: For audit logging

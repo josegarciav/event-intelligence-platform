@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 _ENRICHMENT_FIELDS = [
     "event_type",
     "tags",
-    "event_format",
+    "format",
 ]
 
 _TAXONOMY_FIELDS = [
@@ -60,8 +60,8 @@ def compute_confidence_score(
     completeness_score = filled / len(_ENRICHMENT_FIELDS)
 
     # Taxonomy field completeness
-    if event.taxonomy:
-        tax_dict: dict[str, Any] = event.taxonomy.model_dump()
+    if event.taxonomy_dimension:
+        tax_dict: dict[str, Any] = event.taxonomy_dimension.model_dump()
         tax_filled = sum(1 for f in _TAXONOMY_FIELDS if tax_dict.get(f))
         taxonomy_completeness = tax_filled / len(_TAXONOMY_FIELDS)
     else:

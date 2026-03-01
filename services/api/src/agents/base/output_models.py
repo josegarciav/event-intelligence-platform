@@ -105,7 +105,7 @@ class TaxonomyAttributesExtraction(BaseModel):
 
 class MissingFieldsExtraction(BaseModel):
     """
-    Batch extraction for multiple missing fields (core_metadata prompt).
+    Batch extraction for multiple missing fields (feature_alignment prompt).
 
     Used by FeatureAlignmentAgent to fill event_type, tags, event_format.
     """

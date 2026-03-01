@@ -1,7 +1,7 @@
 """
 FeatureAlignmentAgent — fills event_type, tags, and event_format.
 
-Uses the 'core_metadata' prompt in batch mode: events are chunked and sent
+Uses the 'feature_alignment' prompt in batch mode: events are chunked and sent
 to the LLM together to save on round-trip latency.  Each chunk produces a
 single structured response (MissingFieldsExtractionBatch) with one item per
 event, keyed by source_event_id.
@@ -29,7 +29,7 @@ class FeatureAlignmentAgent(BaseAgent):
     """
 
     name = "feature_alignment"
-    prompt_name = "core_metadata"
+    prompt_name = "feature_alignment"
 
     def __init__(self, config: dict[str, Any] | None = None):
         self._config = config or {}
@@ -112,11 +112,11 @@ class FeatureAlignmentAgent(BaseAgent):
                     if item.tags:
                         existing = set(event.tags or [])
                         enriched_events[idx].tags = list(existing | set(item.tags))
-                    if item.event_format and not event.event_format:
+                    if item.event_format and not event.format:
                         from src.schemas.event import EventFormat
 
                         try:
-                            enriched_events[idx].event_format = EventFormat(
+                            enriched_events[idx].format = EventFormat(
                                 item.event_format
                             )
                         except ValueError:

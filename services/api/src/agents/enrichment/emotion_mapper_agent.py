@@ -1,7 +1,7 @@
 """
 EmotionMapperAgent — infers emotional outputs and practical access dimensions.
 
-Uses the 'emotion_vibe' prompt in batch mode: events are chunked and sent
+Uses the 'emotion_mapper' prompt in batch mode: events are chunked and sent
 together to reduce LLM round-trips.  Each chunk produces a single
 EmotionVibeOutputBatch response keyed by source_event_id.
 """
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class EmotionVibeOutput(BaseModel):
-    """Structured output from the emotion_vibe prompt (single event)."""
+    """Structured output from the emotion_mapper prompt (single event)."""
 
     emotional_output: list[str] = Field(
         default_factory=lambda: ["enjoyment"],
@@ -73,7 +73,7 @@ class EmotionMapperAgent(BaseAgent):
     """
 
     name = "emotion_mapper"
-    prompt_name = "emotion_vibe"
+    prompt_name = "emotion_mapper"
 
     def __init__(self, config: dict[str, Any] | None = None):
         self._config = config or {}

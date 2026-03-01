@@ -1,4 +1,4 @@
-prompt_name: "core_metadata"
+prompt_name: "feature_alignment"
 active_version: "v1"
 versions:
   v1:
