@@ -65,4 +65,4 @@ ON event_taxonomy_mappings(event_id);
 
 -- Fast lookup for events by a specific tag
 CREATE INDEX idx_event_tags_tag
-ON event_tags(tag_name);
+ON event_tags(tag_id);

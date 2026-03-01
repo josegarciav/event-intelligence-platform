@@ -106,7 +106,7 @@ user_prompt: |
 
   Return ONE value for each field:
   - primary_category (integer ID 0-10)
-  - subcategory (e.g. "1.4")
+  - subcategory
   - energy_level
   - social_intensity
   - cognitive_load
