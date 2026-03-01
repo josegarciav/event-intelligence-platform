@@ -2,6 +2,25 @@ prompt_name: "taxonomy_classifier"
 active_version: "v1"
 versions:
   v1:
-    description: "Full taxonomy classification — primary category, subcategory, activity mapping"
+    description: "Full taxonomy classification — two-pass RAG: (1) primary_category, subcategory, behavioral dimensions; (2) activity_id + activity_name via RAG activity lookup"
     created_at: "2026-02-18"
-    notes: "Used by TaxonomyClassifierAgent. Combines experience_pulse + logistics into a single structured output."
+    notes: |
+      Used by TaxonomyClassifierAgent (two-pass RAG architecture).
+
+      Pass 1 — batch_user_prompt:
+        LLM classifies primary_category (int 0-10), subcategory (e.g. "1.4"),
+        energy_level, social_intensity, cognitive_load, physical_involvement,
+        repeatability, and unconstrained gap-detection fields.
+
+      Pass 2 — activity_selection_system_prompt + activity_selection_batch_prompt:
+        Events are grouped by their resolved subcategory. Activities for each
+        subcategory are retrieved at runtime from human_experience_taxonomy_master.json
+        (the retrieval step of RAG) and injected into the prompt. The LLM selects
+        the best activity_id (UUID) and activity_name for each event in the group.
+
+      Output fields written to TaxonomyDimension:
+        primary_category, subcategory, subcategory_name, values,
+        activity_id, activity_name,
+        energy_level, social_intensity, cognitive_load, physical_involvement,
+        repeatability,
+        unconstrained_primary_category, unconstrained_subcategory, unconstrained_activity

@@ -38,9 +38,14 @@ agents:
 
   # ---------------------------------------------------------------------------
   # TAXONOMY CLASSIFIER — full taxonomy: primary_category, subcategory, all
-  #                        behavioral dimensions, and unconstrained gap fields
+  #                        behavioral dimensions, unconstrained gap fields,
+  #                        and RAG-based activity_id / activity_name.
   # Prompt: prompts/taxonomy_classifier/
-  # Taxonomy context is baked into the prompt YAML (no file dependency at runtime).
+  # Two-pass RAG architecture:
+  #   Pass 1 — LLM batch → primary_category, subcategory, behavioral dimensions
+  #   Pass 2 — Activities retrieved from human_experience_taxonomy_master.json
+  #             for the resolved subcategory and injected into a second LLM call
+  #             to select the best activity_id + activity_name per event.
   # ---------------------------------------------------------------------------
   taxonomy_classifier:
     enabled: true
@@ -53,6 +58,9 @@ agents:
     target_fields:
       - "primary_category"
       - "subcategory"
+      - "subcategory_name"
+      - "activity_id"
+      - "activity_name"
       - "energy_level"
       - "social_intensity"
       - "cognitive_load"

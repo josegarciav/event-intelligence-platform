@@ -53,6 +53,14 @@ class SubcategoryExtraction(BaseModel):
 class TaxonomyAttributesExtraction(BaseModel):
     """Activity-level taxonomy attributes for the experience pulse."""
 
+    primary_category: int | None = Field(
+        default=None,
+        description="Primary category integer ID (0-10)",
+    )
+    subcategory: str | None = Field(
+        default=None,
+        description="Subcategory ID (e.g., '1.4', '5.7')",
+    )
     energy_level: Literal["low", "medium", "high"] = Field(
         default="medium",
         description="Physical intensity: low=calm, medium=moderate, high=intense",
@@ -216,3 +224,30 @@ class DataQualityAuditBatch(BaseModel):
     """Batch output from data_quality agent (one item per input event)."""
 
     items: list[DataQualityAuditItem] = Field(default_factory=list)
+
+
+# =============================================================================
+# ACTIVITY SELECTION (RAG second pass in taxonomy_classifier)
+# =============================================================================
+
+
+class ActivitySelectionItem(BaseModel):
+    """Single-event activity match result, keyed by source_event_id."""
+
+    source_event_id: str = Field(
+        default="", description="Must match the source_event_id from the input"
+    )
+    activity_id: str | None = Field(
+        default=None,
+        description="UUID of the best matching activity from the provided list; null if none fits",
+    )
+    activity_name: str | None = Field(
+        default=None,
+        description="Name of the selected activity; null when activity_id is null",
+    )
+
+
+class ActivitySelectionBatch(BaseModel):
+    """Batch output from the RAG activity selection pass (one item per input event)."""
+
+    items: list[ActivitySelectionItem] = Field(default_factory=list)

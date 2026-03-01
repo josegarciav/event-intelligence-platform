@@ -127,7 +127,7 @@ batch_user_prompt: |
   Each entry must include:
   - source_event_id  (copy exactly from input — required for matching)
   - primary_category:                integer ID 0-10
-  - subcategory:                     e.g. "1.4"
+  - subcategory:                     e.g. "1.4" — must belong to the chosen primary_category
   - energy_level:                    low | medium | high
   - social_intensity:                solo | small_group | large_group
   - cognitive_load:                  low | medium | high
@@ -136,3 +136,25 @@ batch_user_prompt: |
   - unconstrained_primary_category:  free-form experience-type label (null if predefined taxonomy fits well)
   - unconstrained_subcategory:       free-form sub-type label (null if predefined taxonomy fits well)
   - unconstrained_activity:          free-form activity description (null if predefined taxonomy fits well)
+
+activity_selection_system_prompt: |
+  You are the Pulsecity Activity Matcher.
+  Events have already been classified into a taxonomy subcategory.
+  Your job is to select the single best matching activity from the provided list for each event.
+  Choose the activity that most precisely describes what people actually DO at the event.
+  Return null for activity_id only when no activity is a reasonable match.
+
+activity_selection_batch_prompt: |
+  Subcategory: {{ subcategory_id }} — {{ subcategory_name }}
+
+  AVAILABLE ACTIVITIES:
+  {{ activities_json }}
+
+  Match each event below to the best activity from the list above:
+  {{ events_json }}
+
+  Return a JSON object with an `items` array — exactly {{ event_count }} entries, one per event.
+  Each entry must include:
+  - source_event_id  (copy exactly from input — required for matching)
+  - activity_id      (UUID string from the activities list above; null if no activity fits)
+  - activity_name    (name of the selected activity; null when activity_id is null)
