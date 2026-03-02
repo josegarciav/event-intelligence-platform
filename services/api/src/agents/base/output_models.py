@@ -82,26 +82,28 @@ class TaxonomyAttributesExtraction(BaseModel):
         description="Repeat frequency: high=weekly, medium=monthly, low=unique/annual",
     )
 
-    # Unconstrained taxonomy (taxonomy gap detection)
+    # Unconstrained taxonomy (always required — richest possible free-form description)
     unconstrained_primary_category: str | None = Field(
         default=None,
         description=(
-            "Free-form primary category label to use if none of the predefined "
-            "categories is a good fit. Null when the predefined taxonomy fits well."
+            "Always required. Free-form experience-type label that best describes the event, "
+            "regardless of whether the predefined taxonomy fits. "
+            "E.g. 'Natural Wine Tasting', 'Silent Disco', 'Rooftop Jazz Night'."
         ),
     )
     unconstrained_subcategory: str | None = Field(
         default=None,
         description=(
-            "Free-form subcategory label to use if none of the predefined "
-            "subcategories is a good fit. Null when the predefined taxonomy fits well."
+            "Always required. Free-form sub-type label more specific than the primary category. "
+            "E.g. 'Organic Wine Education', 'After-Hours Electronic Dance Party'."
         ),
     )
     unconstrained_activity: str | None = Field(
         default=None,
         description=(
-            "Free-form activity name to use if no predefined activity matches. "
-            "Null when the predefined taxonomy fits well."
+            "Always required. The specific activity people actually do at the event — "
+            "more precise and vivid than the predefined activity when possible. "
+            "E.g. 'Natural wine tasting with sommelier', 'Live jazz listening in a rooftop bar'."
         ),
     )
 
@@ -237,13 +239,9 @@ class ActivitySelectionItem(BaseModel):
     source_event_id: str = Field(
         default="", description="Must match the source_event_id from the input"
     )
-    activity_id: str | None = Field(
-        default=None,
-        description="UUID of the best matching activity from the provided list; null if none fits",
-    )
     activity_name: str | None = Field(
         default=None,
-        description="Name of the selected activity; null when activity_id is null",
+        description="Name of the selected activity (must match exactly a name from the provided list); null if none fits",
     )
 
 

@@ -28,6 +28,7 @@ from src.agents.base.task import AgentResult, AgentTask
 from src.agents.llm.provider_router import get_llm_client
 from src.agents.registry.prompt_registry import get_prompt_registry
 from src.schemas.taxonomy import (
+    find_best_activity_match,
     get_activities_for_subcategory,
     get_subcategory_by_id,
     resolve_primary_category,
@@ -194,6 +195,34 @@ class TaxonomyClassifierAgent(BaseAgent):
             duration_seconds=time.monotonic() - start,
         )
 
+    def _resolve_activity_by_name(
+        self, name: str, activities: list[dict[str, Any]]
+    ) -> dict[str, Any] | None:
+        """Case-insensitive exact match of activity name against taxonomy activities list."""
+        if not name:
+            return None
+        name_lower = name.lower().strip()
+        for a in activities:
+            if a.get("name", "").lower().strip() == name_lower:
+                return a
+        return None
+
+    def _render_template(self, raw: str, variables: dict[str, Any]) -> str:
+        """Render a Jinja2 template string with silent undefined handling."""
+        try:
+            from jinja2 import Template, Undefined
+
+            class _Silent(Undefined):
+                def __str__(self) -> str:
+                    return f"[{self._undefined_name}]"
+
+            return Template(raw, undefined=_Silent).render(**variables)
+        except Exception:
+            result = raw
+            for k, v in variables.items():
+                result = result.replace(f"{{{{ {k} }}}}", str(v))
+            return result
+
     async def _run_activity_selection_pass(
         self,
         events: list,
@@ -201,19 +230,23 @@ class TaxonomyClassifierAgent(BaseAgent):
         total_tokens: dict[str, int],
     ) -> list[str]:
         """
-        RAG second pass: inject taxonomy activities per subcategory and ask the
-        LLM to select the best activity_id for each event in the group.
+        RAG second pass: inject taxonomy activity names per subcategory and ask
+        the LLM to pick the best matching name for each event.
 
-        Events are grouped by the subcategory resolved in pass 1.  For each
-        group the activities for that subcategory are retrieved from the
-        taxonomy index and included verbatim in the prompt — this is the
-        retrieval step of the RAG pattern.
+        After the LLM responds, activity_id is resolved automatically by
+        looking up the canonical activity in the taxonomy index via an exact
+        name match — the LLM never sees internal UUIDs.
+
+        If the LLM returns a name that is not in the available list for the
+        resolved subcategory, a retry call is made with a stricter prompt that
+        lists only the exact valid names.  Events still unresolved after the
+        retry fall through to a keyword-match fallback.
 
         Returns a list of error strings (empty on full success).
         """
         errors: list[str] = []
 
-        # Load the activity selection prompt sections from the YAML template
+        # Load prompt templates from YAML
         resolved_version = self._registry.get_active_version(self.prompt_name)
         try:
             from pathlib import Path
@@ -230,9 +263,13 @@ class TaxonomyClassifierAgent(BaseAgent):
                 template_data = yaml.safe_load(f)
             system_raw = template_data.get("activity_selection_system_prompt", "")
             user_raw = template_data.get("activity_selection_batch_prompt", "")
+            retry_system_raw = template_data.get("activity_selection_retry_system_prompt", "")
+            retry_user_raw = template_data.get("activity_selection_retry_prompt", "")
         except Exception as e:
             logger.warning(f"{self.name}: could not load activity selection prompt: {e}")
             return [f"activity selection prompt load error: {e}"]
+
+        batch_size = self._config.get("batch_size", 8)
 
         # Group events by subcategory
         subcat_groups: dict[str, list] = {}
@@ -252,75 +289,140 @@ class TaxonomyClassifierAgent(BaseAgent):
             sub = get_subcategory_by_id(subcategory_id)
             subcategory_name = sub["name"] if sub else subcategory_id
 
-            # Compact activity list: only id + name to keep prompt tight
-            compact_activities = [
-                {"activity_id": a["activity_id"], "name": a["name"]}
-                for a in activities
-                if a.get("activity_id")
-            ]
+            # Build name-only list — keep UUIDs out of the LLM prompt entirely
+            valid_names = [a["name"] for a in activities if a.get("name")]
+            activity_names_json = json.dumps(valid_names, ensure_ascii=False, indent=2)
 
-            # Event stubs for the prompt
-            event_items = []
-            for e in group_events:
-                stub: dict[str, Any] = {
-                    "source_event_id": str(e.source.source_event_id),
-                    "title": e.title or "",
+            # Chunk the subcategory group to avoid overwhelming small models
+            for chunk in self._chunk(group_events, batch_size):
+                event_items = []
+                for e in chunk:
+                    stub: dict[str, Any] = {
+                        "source_event_id": str(e.source.source_event_id),
+                        "title": e.title or "",
+                    }
+                    if e.description:
+                        stub["description"] = e.description[:200]
+                    event_items.append(stub)
+
+                variables = {
+                    "subcategory_id": subcategory_id,
+                    "subcategory_name": subcategory_name,
+                    "activity_names_json": activity_names_json,
+                    "events_json": json.dumps(event_items, ensure_ascii=False, indent=2),
+                    "event_count": len(chunk),
                 }
-                if e.description:
-                    stub["description"] = e.description[:200]
-                event_items.append(stub)
+                system_prompt = self._render_template(system_raw, variables)
+                user_prompt = self._render_template(user_raw, variables)
 
-            # Render the activity selection prompt via simple Jinja2 substitution
-            variables = {
-                "subcategory_id": subcategory_id,
-                "subcategory_name": subcategory_name,
-                "activities_json": json.dumps(compact_activities, ensure_ascii=False, indent=2),
-                "events_json": json.dumps(event_items, ensure_ascii=False, indent=2),
-                "event_count": len(group_events),
-            }
-            try:
-                from jinja2 import Template, Undefined
+                chunk_ids = [str(e.source.source_event_id) for e in chunk]
+                # Events whose LLM-returned name had no taxonomy match → retry
+                retry_events: list[tuple[int, dict[str, Any]]] = []  # (global_idx, event_stub)
 
-                class _Silent(Undefined):
-                    def __str__(self) -> str:
-                        return f"[{self._undefined_name}]"
+                try:
+                    result: ActivitySelectionBatch = await self._llm.complete_structured(
+                        system_prompt=system_prompt,
+                        user_prompt=user_prompt,
+                        output_schema=ActivitySelectionBatch,
+                        temperature=self._config.get("temperature", 0.1),
+                    )
 
-                system_prompt = Template(system_raw, undefined=_Silent).render(**variables)
-                user_prompt = Template(user_raw, undefined=_Silent).render(**variables)
-            except Exception:
-                # Fallback: simple str.replace
-                system_prompt = system_raw
-                user_prompt = user_raw
-                for k, v in variables.items():
-                    system_prompt = system_prompt.replace(f"{{{{ {k} }}}}", str(v))
-                    user_prompt = user_prompt.replace(f"{{{{ {k} }}}}", str(v))
+                    for item in result.items:
+                        idx = event_index.get(item.source_event_id)
+                        if idx is None or not item.activity_name:
+                            continue
+                        tax = events[idx].taxonomy_dimension
+                        if not tax:
+                            continue
 
-            chunk_ids = [str(e.source.source_event_id) for e in group_events]
-            try:
-                result: ActivitySelectionBatch = await self._llm.complete_structured(
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                    output_schema=ActivitySelectionBatch,
-                    temperature=self._config.get("temperature", 0.1),
-                )
+                        matched = self._resolve_activity_by_name(item.activity_name, activities)
+                        if matched:
+                            tax.activity_id = matched["activity_id"]
+                            tax.activity_name = matched["name"]
+                            events[idx].taxonomy_dimension = tax
+                        else:
+                            # LLM returned a name not in the taxonomy list — schedule retry
+                            logger.debug(
+                                f"{self.name}: activity name '{item.activity_name}' not in "
+                                f"taxonomy for subcategory {subcategory_id}; scheduling retry"
+                            )
+                            retry_events.append(
+                                (idx, next(s for s in event_items if s["source_event_id"] == item.source_event_id))
+                            )
 
-                for item in result.items:
-                    idx = event_index.get(item.source_event_id)
-                    if idx is None or not item.activity_id:
-                        continue
-                    tax = events[idx].taxonomy_dimension
-                    if tax:
-                        tax.activity_id = item.activity_id
-                        tax.activity_name = item.activity_name
-                        events[idx].taxonomy_dimension = tax
+                    usage = self._llm.get_token_usage()
+                    for k in total_tokens:
+                        total_tokens[k] += usage.get(k, 0)
 
-                usage = self._llm.get_token_usage()
-                for k in total_tokens:
-                    total_tokens[k] += usage.get(k, 0)
+                except Exception as e:
+                    msg = f"activity selection {subcategory_id} {chunk_ids}: {e}"
+                    logger.warning(f"{self.name} pass-2 error: {msg}")
+                    errors.append(msg)
+                    continue
 
-            except Exception as e:
-                msg = f"activity selection {subcategory_id} {chunk_ids}: {e}"
-                logger.warning(f"{self.name} pass-2 error: {msg}")
-                errors.append(msg)
+                # ----------------------------------------------------------
+                # Retry pass — events whose name wasn't in the taxonomy list
+                # ----------------------------------------------------------
+                if retry_events and retry_user_raw:
+                    retry_stubs = [stub for _, stub in retry_events]
+                    retry_variables = {
+                        **variables,
+                        "events_json": json.dumps(retry_stubs, ensure_ascii=False, indent=2),
+                        "event_count": len(retry_stubs),
+                    }
+                    retry_system = self._render_template(retry_system_raw, retry_variables)
+                    retry_user = self._render_template(retry_user_raw, retry_variables)
+                    try:
+                        retry_result: ActivitySelectionBatch = await self._llm.complete_structured(
+                            system_prompt=retry_system,
+                            user_prompt=retry_user,
+                            output_schema=ActivitySelectionBatch,
+                            temperature=0.0,  # greedy for constrained selection
+                        )
+
+                        for item in retry_result.items:
+                            idx = event_index.get(item.source_event_id)
+                            if idx is None or not item.activity_name:
+                                continue
+                            tax = events[idx].taxonomy_dimension
+                            if not tax:
+                                continue
+
+                            matched = self._resolve_activity_by_name(
+                                item.activity_name, activities
+                            )
+                            if matched:
+                                tax.activity_id = matched["activity_id"]
+                                tax.activity_name = matched["name"]
+                                events[idx].taxonomy_dimension = tax
+                            else:
+                                logger.debug(
+                                    f"{self.name}: retry still returned unmatched name "
+                                    f"'{item.activity_name}' for {item.source_event_id}"
+                                )
+
+                        usage = self._llm.get_token_usage()
+                        for k in total_tokens:
+                            total_tokens[k] += usage.get(k, 0)
+
+                    except Exception as e:
+                        msg = f"activity selection retry {subcategory_id}: {e}"
+                        logger.warning(f"{self.name} pass-2 retry error: {msg}")
+                        errors.append(msg)
+
+        # ------------------------------------------------------------------
+        # Keyword fallback — events that have a subcategory but no activity_id
+        # after both LLM passes (dropped by model or both passes failed).
+        # ------------------------------------------------------------------
+        for event in events:
+            tax = event.taxonomy_dimension
+            if not (tax and tax.subcategory and not tax.activity_id):
+                continue
+            event_context = f"{event.title or ''} {event.description or ''}"
+            match = find_best_activity_match(event_context, tax.subcategory, threshold=0.3)
+            if match:
+                tax.activity_id = match["activity_id"]
+                tax.activity_name = match.get("name")
+                event.taxonomy_dimension = tax
 
         return errors

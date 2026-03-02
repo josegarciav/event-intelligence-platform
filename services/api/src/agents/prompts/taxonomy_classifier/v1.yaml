@@ -78,22 +78,22 @@ system_prompt: |
   - A charity run → primary 10 (CONTRIBUTION), subcategory 10.4, energy high, physical moderate
   - A food festival → primary 2 (EXPLORATION), subcategory 2.5, energy medium, social large_group
 
-  ## UNCONSTRAINED CLASSIFICATION (taxonomy gap detection):
+  ## UNCONSTRAINED CLASSIFICATION (always required):
   After assigning the predefined category and subcategory, ask yourself:
-  "If our fixed taxonomy did not exist, what is the most natural way to describe
+  "If our fixed taxonomy did not exist, what is the most natural and precise way to describe
   this event's experience type, sub-type, and core activity?"
 
-  Return free-form labels in three additional fields:
-  - unconstrained_primary_category — a short experience-type label
-    (e.g. "Natural Wine Tasting", "Silent Disco", "Drag Brunch")
+  You MUST always fill all three fields — even when the predefined taxonomy fits well:
+  - unconstrained_primary_category — a short experience-type label that best describes the event
+    (e.g. "Natural Wine Tasting", "Silent Disco", "Drag Brunch", "Rooftop Jazz Night")
   - unconstrained_subcategory — a more specific sub-type within that experience
-    (e.g. "Organic Wine Education", "After-Hours Electronic Dance Party")
-  - unconstrained_activity — the specific activity people actually do
-    (e.g. "Natural wine tasting with sommelier", "Synchronized silent headphone dance")
+    (e.g. "Organic Wine Education", "After-Hours Electronic Dance Party", "Intimate Acoustic Session")
+  - unconstrained_activity — the specific activity people actually do at the event
+    (e.g. "Natural wine tasting with sommelier", "Synchronized silent headphone dance", "Live jazz listening")
 
-  Set all three to null when the predefined taxonomy already captures the event well.
-  These fields are used purely for taxonomy gap analysis — to discover real-world
-  experience types that our official taxonomy is missing, so we can extend it.
+  These fields capture the richest possible description of the event experience.
+  Even when a predefined activity fits, the unconstrained activity may be more precise or vivid.
+  Never leave these null — always provide your best free-form description.
 
 user_prompt: |
   Classify this event into the Pulsecity taxonomy:
@@ -112,9 +112,9 @@ user_prompt: |
   - cognitive_load
   - physical_involvement
   - repeatability
-  - unconstrained_primary_category (free-form experience-type label; null if predefined taxonomy fits well)
-  - unconstrained_subcategory      (free-form sub-type label; null if predefined taxonomy fits well)
-  - unconstrained_activity         (free-form activity description; null if predefined taxonomy fits well)
+  - unconstrained_primary_category (REQUIRED — free-form experience-type label, always filled)
+  - unconstrained_subcategory      (REQUIRED — free-form sub-type label, always filled)
+  - unconstrained_activity         (REQUIRED — free-form activity description, always filled)
 
 batch_user_prompt: |
   Classify these {{ event_count }} events into the Pulsecity taxonomy.
@@ -133,28 +133,47 @@ batch_user_prompt: |
   - cognitive_load:                  low | medium | high
   - physical_involvement:            none | light | moderate
   - repeatability:                   high | medium | low
-  - unconstrained_primary_category:  free-form experience-type label (null if predefined taxonomy fits well)
-  - unconstrained_subcategory:       free-form sub-type label (null if predefined taxonomy fits well)
-  - unconstrained_activity:          free-form activity description (null if predefined taxonomy fits well)
+  - unconstrained_primary_category:  REQUIRED — free-form experience-type label (always filled, never null)
+  - unconstrained_subcategory:       REQUIRED — free-form sub-type label (always filled, never null)
+  - unconstrained_activity:          REQUIRED — free-form activity description (always filled, never null)
 
 activity_selection_system_prompt: |
   You are the Pulsecity Activity Matcher.
   Events have already been classified into a taxonomy subcategory.
-  Your job is to select the single best matching activity from the provided list for each event.
+  Your job is to select the single best matching activity name from the provided list for each event.
   Choose the activity that most precisely describes what people actually DO at the event.
-  Return null for activity_id only when no activity is a reasonable match.
+  Return null for activity_name only when absolutely no activity in the list is a reasonable match.
 
 activity_selection_batch_prompt: |
   Subcategory: {{ subcategory_id }} — {{ subcategory_name }}
 
-  AVAILABLE ACTIVITIES:
-  {{ activities_json }}
+  AVAILABLE ACTIVITY NAMES:
+  {{ activity_names_json }}
 
-  Match each event below to the best activity from the list above:
+  Match each event below to the best activity name from the list above.
   {{ events_json }}
 
   Return a JSON object with an `items` array — exactly {{ event_count }} entries, one per event.
   Each entry must include:
   - source_event_id  (copy exactly from input — required for matching)
-  - activity_id      (UUID string from the activities list above; null if no activity fits)
-  - activity_name    (name of the selected activity; null when activity_id is null)
+  - activity_name    (must be EXACTLY one of the names listed above; null if no activity fits)
+
+activity_selection_retry_system_prompt: |
+  You are the Pulsecity Activity Matcher.
+  You MUST select exactly one activity name from the provided list for each event.
+  The list below is the ONLY valid source of activity names — do not invent or modify names.
+  Return null only if truly no listed activity fits the event.
+
+activity_selection_retry_prompt: |
+  Subcategory: {{ subcategory_id }} — {{ subcategory_name }}
+
+  VALID ACTIVITY NAMES — choose EXACTLY one of these or return null:
+  {{ activity_names_json }}
+
+  Events to match:
+  {{ events_json }}
+
+  Return a JSON object with an `items` array — exactly {{ event_count }} entries, one per event.
+  Each entry must include:
+  - source_event_id  (copy exactly from input — required for matching)
+  - activity_name    (MUST be copied verbatim from the list above; null if none fits)

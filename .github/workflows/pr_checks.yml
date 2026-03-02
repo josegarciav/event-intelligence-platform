@@ -5,6 +5,26 @@ on:
     branches: [ main ]
 
 jobs:
+  security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Scan dependencies for known CVEs (pip-audit)
+        run: uvx pip-audit --project services/api
+
+      - name: Static security analysis (bandit)
+        # -ll = medium severity and above (skip low-severity noise)
+        # -q  = quiet, show only findings
+        run: uvx bandit -r services/api/src -ll -q
+
   quality:
     runs-on: ubuntu-latest
 
@@ -33,16 +53,16 @@ jobs:
       - name: Run black (formatting check)
         run: uv run --project services/api black --check .
 
-      # - name: Run pydocstyle (docstrings check)
-      #   run: uv run --project services/api pydocstyle .
+      - name: Run pydocstyle (docstrings check)
+        run: uv run --project services/api pydocstyle .
 
-      # - name: Run mypy (type hints check)
-      #   run: uv run --project services/api mypy .
+      - name: Run mypy (type hints check)
+        run: uv run --project services/api mypy .
 
-      # - name: Run pytest with coverage
-      #   run: |
-      #     export PYTHONPATH=$PYTHONPATH:$(pwd)/services/api
-      #     uv run --project services/api pytest --cov=services/api/src --cov-fail-under=50
+      - name: Run pytest with coverage
+        run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/services/api
+          uv run --project services/api pytest --cov=services/api/src --cov-fail-under=50
 
       - name: Skip bot commits
         if: contains(github.event.head_commit.message, 'Jules')
