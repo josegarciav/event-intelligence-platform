@@ -1,0 +1,27 @@
+# Dev only — production uses RDS.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: pulsecity
+  labels:
+    app: postgres
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+# Shared PVC for ingestion batches (used by api + scrapping)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: batches-pvc
+  namespace: pulsecity
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 20Gi

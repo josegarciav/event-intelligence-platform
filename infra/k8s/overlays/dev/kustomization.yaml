@@ -1,0 +1,72 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: pulsecity
+
+resources:
+  - ../../base/api/configmap.yaml
+  - ../../base/api/deployment.yaml
+  - ../../base/api/service.yaml
+  - ../../base/api/hpa.yaml
+  - ../../base/admin/configmap.yaml
+  - ../../base/admin/deployment.yaml
+  - ../../base/admin/service.yaml
+  - ../../base/scrapping/configmap.yaml
+  - ../../base/scrapping/cronjob.yaml
+  - ../../base/postgres/pvc.yaml
+  - ../../base/postgres/service.yaml
+  - ../../base/postgres/statefulset.yaml
+  - ../../base/ingress.yaml
+
+patches:
+  # Switch api-config to development environment
+  - patch: |-
+      - op: replace
+        path: /data/ENV
+        value: "development"
+      - op: replace
+        path: /data/DEBUG
+        value: "true"
+      - op: replace
+        path: /data/CORS_ORIGINS
+        value: "http://localhost:3000"
+    target:
+      kind: ConfigMap
+      name: api-config
+
+  # Scale down to 1 replica for local dev
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+    target:
+      kind: Deployment
+      name: api
+  - patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 3
+    target:
+      kind: HorizontalPodAutoscaler
+      name: api
+  # Use local image tags (built with kind load docker-image)
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: pulsecity-api:dev
+    target:
+      kind: Deployment
+      name: api
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: pulsecity-admin:dev
+    target:
+      kind: Deployment
+      name: admin
+
+commonLabels:
+  environment: dev

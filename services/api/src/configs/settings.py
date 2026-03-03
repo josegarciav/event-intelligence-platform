@@ -24,6 +24,15 @@ class Settings(BaseSettings):
     ENV: str = "development"
     DEBUG: bool = False
 
+    @field_validator("ENV", mode="before")
+    @classmethod
+    def validate_env(cls, v: object) -> str:
+        """Restrict ENV to the two supported deployment environments."""
+        allowed = ("development", "production")
+        if str(v) not in allowed:
+            raise ValueError(f"ENV must be one of {allowed}, got {v!r}")
+        return str(v)
+
     @field_validator("DEBUG", mode="before")
     @classmethod
     def coerce_debug(cls, v: object) -> bool:
@@ -33,6 +42,14 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return v.lower() in ("1", "true", "yes", "on")
         return bool(v)
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENV == "production"
+
+    @property
+    def is_development(self) -> bool:
+        return self.ENV == "development"
 
     # -------------------------------------------------------------------------
     # DATABASE
@@ -61,6 +78,18 @@ class Settings(BaseSettings):
     # LOCAL LLM
     # -------------------------------------------------------------------------
     OLLAMA_BASE_URL: str = "http://localhost:11434/v1"
+
+    # -------------------------------------------------------------------------
+    # CORS
+    # -------------------------------------------------------------------------
+    # Comma-separated list of allowed origins.
+    # development default: localhost dev server.
+    # production: set this to your actual domain(s) in the K8s ConfigMap.
+    CORS_ORIGINS: str = "http://localhost:3000"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
 
     # -------------------------------------------------------------------------
     # MONITORING & ALERTING

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-config
+  namespace: pulsecity
+data:
+  # Base is always production. The dev overlay patches ENV and DEBUG below.
+  ENV: "production"
+  DEBUG: "false"
+  BATCH_DIR: "/app/data/batches"
+  OLLAMA_BASE_URL: "http://ollama:11434/v1"
+  # Set to your domain(s) in prod, e.g. "https://pulsecity.com"
+  CORS_ORIGINS: "https://pulsecity.com"

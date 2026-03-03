@@ -20,6 +20,7 @@ postgresql://user:password@host:port/event_intelligence
 from __future__ import annotations
 
 import logging
+import logging.config
 from collections.abc import Generator
 from contextlib import asynccontextmanager
 
@@ -36,13 +37,20 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.configs.settings import get_settings
 
-logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# GLOBAL SETTINGS
-# ---------------------------------------------------------------------------
-
 settings = get_settings()
+
+# ---------------------------------------------------------------------------
+# LOGGING
+# ---------------------------------------------------------------------------
+# development → DEBUG level; production → INFO level.
+# Controlled entirely by ENV + DEBUG in .env / K8s ConfigMap.
+
+logging.basicConfig(
+    level=logging.DEBUG if settings.DEBUG else logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+logger = logging.getLogger(__name__)
+logger.info("Starting API in %s mode (debug=%s)", settings.ENV, settings.DEBUG)
 
 # ---------------------------------------------------------------------------
 # APP INITIALIZATION
@@ -71,6 +79,10 @@ app = FastAPI(
     version="1.0.0",
     description="API for querying the Human Experience Taxonomy.",
     lifespan=lifespan,
+    # Disable interactive docs in production — they expose the API surface.
+    docs_url="/docs" if settings.is_development else None,
+    redoc_url="/redoc" if settings.is_development else None,
+    openapi_url="/openapi.json" if settings.is_development else None,
 )
 
 # ---------------------------------------------------------------------------
@@ -87,7 +99,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # ty
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["Authorization", "Content-Type"],

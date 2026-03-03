@@ -1,0 +1,61 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: pulsecity
+
+resources:
+  - ../../base/api/configmap.yaml
+  - ../../base/api/deployment.yaml
+  - ../../base/api/service.yaml
+  - ../../base/api/hpa.yaml
+  - ../../base/admin/configmap.yaml
+  - ../../base/admin/deployment.yaml
+  - ../../base/admin/service.yaml
+  - ../../base/scrapping/configmap.yaml
+  - ../../base/scrapping/cronjob.yaml
+  # NOTE: postgres StatefulSet omitted — prod uses RDS
+  - ../../base/postgres/pvc.yaml  # batches-pvc only
+  - ../../base/ingress.yaml
+
+patches:
+  # Prod: 2 replicas
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+    target:
+      kind: Deployment
+      name: api
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+    target:
+      kind: Deployment
+      name: admin
+  # Use ECR image tags — replace ACCOUNT_ID and REGION
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/pulsecity-prod-api:latest
+    target:
+      kind: Deployment
+      name: api
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/pulsecity-prod-admin:latest
+    target:
+      kind: Deployment
+      name: admin
+  # ConfigMap patches: override env for prod
+  - patch: |-
+      - op: replace
+        path: /data/ENV
+        value: "production"
+    target:
+      kind: ConfigMap
+      name: api-config
+
+commonLabels:
+  environment: prod

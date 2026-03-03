@@ -1,0 +1,66 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: scrapping
+  namespace: pulsecity
+  labels:
+    app: scrapping
+    app.kubernetes.io/part-of: pulsecity
+spec:
+  # Run ingestion every 6 hours
+  schedule: "0 */6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: scrapping
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: scrapping
+              image: pulsecity-scrapping:latest
+              imagePullPolicy: IfNotPresent
+              command: ["python", "-m", "src.run_ingestion"]
+              envFrom:
+                - configMapRef:
+                    name: scrapping-config
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: pulsecity-secrets
+                      key: DATABASE_URL
+                - name: TICKETMASTER_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: pulsecity-secrets
+                      key: TICKETMASTER_API_KEY
+                - name: MEETUP_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: pulsecity-secrets
+                      key: MEETUP_API_KEY
+                - name: EVENTBRITE_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: pulsecity-secrets
+                      key: EVENTBRITE_API_KEY
+              resources:
+                requests:
+                  cpu: "200m"
+                  memory: "512Mi"
+                limits:
+                  cpu: "1000m"
+                  memory: "1Gi"
+              volumeMounts:
+                - name: batches
+                  mountPath: /app/data/batches
+          volumes:
+            - name: batches
+              persistentVolumeClaim:
+                claimName: batches-pvc
