@@ -20,55 +20,66 @@
 agents:
 
   # ---------------------------------------------------------------------------
-  # FEATURE ALIGNMENT — fills event_type, tags, event_format
-  # Prompt: prompts/core_metadata/
+  # FEATURE ALIGNMENT — fills event_type, tags, format (core metadata)
+  # Prompt: prompts/feature_alignment/
   # ---------------------------------------------------------------------------
   feature_alignment:
     enabled: true
-    prompt_name: "core_metadata"
+    prompt_name: "feature_alignment"
     prompt_version: "active"
     provider: "ollama"
-    model: "llama3.2:3b"
+    model: "llama3.2:1b"
     temperature: 0.1
     batch_size: 8      # events per LLM call (reduce for smaller/slower models)
     target_fields:
       - "event_type"
       - "tags"
-      - "event_format"
+      - "format"
 
   # ---------------------------------------------------------------------------
-  # TAXONOMY CLASSIFIER — primary_category, subcategory, behavioral dimensions
-  # Prompt: prompts/taxonomy_classification/
-  # Taxonomy context is baked into the prompt YAML (no file dependency at runtime).
+  # TAXONOMY CLASSIFIER — full taxonomy: primary_category, subcategory, all
+  #                        behavioral dimensions, unconstrained gap fields,
+  #                        and RAG-based activity_id / activity_name.
+  # Prompt: prompts/taxonomy_classifier/
+  # Two-pass RAG architecture:
+  #   Pass 1 — LLM batch → primary_category, subcategory, behavioral dimensions
+  #   Pass 2 — Activities retrieved from human_experience_taxonomy_master.json
+  #             for the resolved subcategory and injected into a second LLM call
+  #             to select the best activity_id + activity_name per event.
   # ---------------------------------------------------------------------------
   taxonomy_classifier:
     enabled: true
-    prompt_name: "taxonomy_classification"
+    prompt_name: "taxonomy_classifier"
     prompt_version: "active"
     provider: "ollama"
-    model: "llama3.2:3b"
+    model: "llama3.2:1b"
     temperature: 0.1
     batch_size: 8
     target_fields:
       - "primary_category"
       - "subcategory"
+      - "subcategory_name"
       - "activity_id"
+      - "activity_name"
       - "energy_level"
       - "social_intensity"
       - "cognitive_load"
       - "physical_involvement"
       - "repeatability"
+      - "unconstrained_primary_category"
+      - "unconstrained_subcategory"
+      - "unconstrained_activity"
 
   # ---------------------------------------------------------------------------
   # EMOTION MAPPER — emotional outputs and practical access dimensions
-  # Prompt: prompts/emotion_vibe/
+  # Prompt: prompts/emotion_mapper/
   # ---------------------------------------------------------------------------
   emotion_mapper:
     enabled: true
-    prompt_name: "emotion_vibe"
+    prompt_name: "emotion_mapper"
     prompt_version: "active"
     provider: "ollama"
-    model: "llama3.2:3b"
+    model: "llama3.2:1b"
     temperature: 0.3
     batch_size: 8
     target_fields:
@@ -88,10 +99,11 @@ agents:
     prompt_name: "data_quality"
     prompt_version: "active"
     provider: "ollama"
-    model: "llama3.2:3b"
+    model: "llama3.2:1b"
     temperature: 0.0    # always deterministic for quality audits
     batch_size: 8
-    target_fields: []   # audits all fields → writes to custom_fields
+    target_fields:
+      - "data_quality_score"    # rule-based fallback always runs; audit details → custom_fields["quality_audit"]
 
   # ---------------------------------------------------------------------------
   # DEDUPLICATION — detects duplicates, groups recurring events, aligns sources
@@ -103,7 +115,7 @@ agents:
     prompt_name: "deduplication"
     prompt_version: "active"
     provider: "ollama"
-    model: "llama3.2:3b"
+    model: "llama3.2:1b"
     temperature: 0.0    # always deterministic for deduplication
     min_confidence: 0.8  # minimum confidence to flag a group
     target_fields:
@@ -122,7 +134,7 @@ agents:
     prompt_name: "artist_enrichment"
     prompt_version: "active"
     provider: "ollama"
-    model: "llama3.2:3b"
+    model: "llama3.2:1b"
     temperature: 0.1
     timeout_seconds: 5.0
     target_fields:
@@ -133,7 +145,7 @@ agents:
 # =============================================================================
 global:
   default_provider: "ollama"
-  default_model: "llama3.2:3b"
+  default_model: "llama3.2:1b"
 
   # Events with overall confidence below this threshold are flagged for review
   confidence_threshold: 0.6
@@ -161,7 +173,7 @@ global:
   # ---------------------------------------------------------------------------
   ollama:
     base_url: "http://localhost:11434/v1"
-    default_model: "llama3.2:3b"
+    default_model: "llama3.2:1b"
     # Recommended models (pull with: ollama pull <model>):
     #   llama3.2:1b  — smallest, fastest (CPU-only machines)
     #   llama3.2:3b  — balanced lightweight (DEFAULT — already installed)

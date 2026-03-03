@@ -31,6 +31,7 @@ class AgentRegistry:
     """
 
     def __init__(self):
+        """Initialize the AgentRegistry with an empty instance cache."""
         self._instances: dict[str, BaseAgent] = {}
 
     def get(self, agent_name: str, agent_config: dict[str, Any]) -> "BaseAgent":

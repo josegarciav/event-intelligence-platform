@@ -21,24 +21,28 @@ services/api/src/ingestion/factory.py  (PipelineFactory)
           (field_mapper · location_parser · currency · taxonomy_mapper)
                     │
                     ▼
-          Deduplication (exact match by source_event_id)
+          BatchWriter
                     │
                     ▼
-          PostgreSQL 16 (port 5433)
+          JSONL Batches  (data/batches/{source}/{date}_{batch_id}.jsonl)
+                    │
+                    ▼
+          PostIngestionTrigger  →  Agent Enrichment Chain  →  PostgreSQL 16
 ```
 
 ---
 
 ## Source Status
 
-| Source        | Type    | Enabled | Notes                                      |
-|---------------|---------|---------|--------------------------------------------|
-| GetYourGuide  | api     | true    | Primary active source                      |
-| Eventbrite    | api     | true    | Primary active source                      |
-| RA.co         | api     | false   | GraphQL; config complete, needs API access |
-| Ticketmaster  | api     | false   | REST; config complete, needs API key       |
-| Civitatis     | api     | false   | REST; config complete, needs API key       |
-| TripAdvisor   | api     | false   | REST; config complete, needs API key       |
+| Source        | Type    | Enabled | Notes                                                         |
+|---------------|---------|---------|---------------------------------------------------------------|
+| Ticketmaster  | api     | true    | REST; active — requires `TICKETMASTER_API_KEY`                |
+| RA.co         | api     | false   | GraphQL at api.ra.co/gql; config complete, needs API access   |
+| TripAdvisor   | api     | false   | REST; config complete, needs `TRIPADVISOR_API_KEY`            |
+| Civitatis     | api     | false   | REST; config complete, needs `CIVITATIS_API_KEY`              |
+| GetYourGuide  | api     | false   | REST; config complete, needs `GETYOURGUIDE_API_KEY`           |
+| Eventbrite    | api     | false   | REST; config complete, needs `EVENTBRITE_API_KEY`             |
+| Meetup        | api     | false   | GraphQL at api.meetup.com/gql; OAuth2 Bearer (`MEETUP_API_KEY`); uses city_coords for lat/lon lookup |
 
 ---
 

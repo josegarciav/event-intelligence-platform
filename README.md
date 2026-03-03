@@ -158,6 +158,12 @@ Opening Claude:
 claude --dangerously-skip-permissions
 ```
 
+
+Serving ollama model locally:
+```bash
+ollama serve
+```
+
 ## Contribution Guidelines
 
 This repository **strictly enforces the Conventional Commits specification**.

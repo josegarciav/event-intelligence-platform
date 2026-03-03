@@ -90,11 +90,6 @@ CREATE TABLE IF NOT EXISTS locations (
     timezone TEXT
 );
 
--- Unique index for locations that handles NULL venue_name
-CREATE UNIQUE INDEX uq_locations_identity
-ON locations (city, country_code, (COALESCE(venue_name, '')));
-
-
 -- ------------------------------------------------------------
 -- Organizer
 -- ------------------------------------------------------------
@@ -157,7 +152,6 @@ CREATE TABLE IF NOT EXISTS sources (
     source_name TEXT NOT NULL,
     source_event_id TEXT NOT NULL,
     source_url TEXT,
-    compressed_html TEXT,
     ingestion_timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
     source_updated_at TIMESTAMP,
     UNIQUE (source_name, source_event_id)
@@ -190,40 +184,6 @@ CREATE TABLE IF NOT EXISTS subcategories (
         ON DELETE CASCADE,
 
     name TEXT NOT NULL UNIQUE
-);
-
-
--- ============================================================
--- EVENT GROUPS
--- Canonical clusters created by DeduplicationAgent
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS event_groups (
-    duplicate_group_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-
-    -- Group classification
-    group_type TEXT NOT NULL,
-    -- "duplicate" | "recurring" | "near_duplicate"
-
-    -- Canonical representative (only 1 main reference, all other references in the group to be found in the events table)
-    primary_event_id UUID
-        REFERENCES events(event_id)
-        ON DELETE SET NULL,
-
-    -- Confidence score from agent (0-1)
-    similarity_score FLOAT NOT NULL DEFAULT 0.0,
-
-    -- Optional short explanation from LLM (auditable but not operational)
-    -- Same show/location/title/source, different times, type "recurring"
-    reason TEXT,
-
-    event_count INT NOT NULL DEFAULT 1,
-
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT chk_similarity_score_range
-        CHECK (similarity_score BETWEEN 0 AND 1)
 );
 
 
@@ -267,8 +227,7 @@ CREATE TABLE IF NOT EXISTS events (
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     is_deleted BOOLEAN DEFAULT FALSE,
     deleted_at TIMESTAMP,
-    duplicate_group_id UUID 
-        REFERENCES event_groups(duplicate_group_id),
+    duplicate_group_id UUID,
 
     CONSTRAINT uq_event_source_identity
         UNIQUE (event_id, source_id),
@@ -278,6 +237,55 @@ CREATE TABLE IF NOT EXISTS events (
     CONSTRAINT chk_capacity_non_negative
         CHECK (capacity >= 0)
 );
+
+
+-- ============================================================
+-- EVENT GROUPS
+-- Canonical clusters created by DeduplicationAgent
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS event_groups (
+    duplicate_group_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+    -- Group classification
+    group_type TEXT NOT NULL,
+    -- "duplicate" | "recurring" | "near_duplicate"
+
+    -- Canonical representative (only 1 main reference, all other references in the group to be found in the events table)
+    primary_event_id UUID
+        REFERENCES events(event_id)
+        ON DELETE SET NULL,
+
+    -- Confidence score from agent (0-1)
+    similarity_score FLOAT NOT NULL DEFAULT 0.0,
+
+    -- Optional short explanation from LLM (auditable but not operational)
+    -- Same show/location/title/source, different times, type "recurring"
+    reason TEXT,
+
+    event_count INT NOT NULL DEFAULT 1,
+
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT chk_similarity_score_range
+        CHECK (similarity_score BETWEEN 0 AND 1)
+);
+
+-- Add the FK from events back to event_groups (deferred to avoid circular dependency)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_events_duplicate_group'
+    ) THEN
+        ALTER TABLE events
+            ADD CONSTRAINT fk_events_duplicate_group
+            FOREIGN KEY (duplicate_group_id)
+            REFERENCES event_groups(duplicate_group_id)
+            ON DELETE SET NULL;
+    END IF;
+END
+$$;
 
 
 -- ============================================================

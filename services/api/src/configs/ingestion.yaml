@@ -218,11 +218,6 @@ sources:
     # Enrichment options
     enrichment:
       geocoding: true
-      compressed_html:
-        enabled: false
-        engine_type: hybrid
-        rate_limit_per_second: 2.0
-        timeout_s: 15.0
 
     # Scheduling
     schedule:
@@ -235,7 +230,7 @@ sources:
   # TICKETMASTER - REST API-based ingestion
   # =========================================================================
   ticketmaster:
-    enabled: false
+    enabled: true
     pipeline_type: "api"
 
     # Connection settings
@@ -258,15 +253,17 @@ sources:
         size: "{{page_size}}"
         page: "{{page}}"
         sort: "date,asc"
+      includePriceRanges: "yes"
       response_path: "_embedded.events"
       total_results_path: "page.totalElements"
 
     # Pagination
     # NOTE: Ticketmaster Discovery API is 0-indexed (page=0 is first page)
+    # Max page size supported by Ticketmaster Discovery API is 200.
     pagination:
       type: "page_number"
       max_pages: 5
-      default_page_size: 50
+      default_page_size: 200
       start_page: 0
 
     # Field mappings: target_field -> source_path
@@ -274,7 +271,8 @@ sources:
       # Core identifiers
       source_event_id: "id"
       title: "name"
-      description: "info"
+      description: "description"
+      info: "info"
       please_note: "pleaseNote"
 
       # Datetime
@@ -357,7 +355,11 @@ sources:
         type: "uppercase"
 
     # Custom fields: source-specific context for LLM enrichment
+    # description and info often contain pricing text — exposed here so the
+    # LLM enrichment layer can infer price when priceRanges is absent (common for ES market).
     custom_fields_mapping:
+      info: "info"
+      description: "description"
       event_status: "event_status"
       sale_start: "sale_start"
       sale_end: "sale_end"
@@ -412,8 +414,8 @@ sources:
 
     # Default values
     defaults:
-      page_size: 50
-      days_ahead: 1
+      page_size: 200
+      days_ahead: 120
       country_code: "ES"
       cities: ["Barcelona", "Madrid"]
       location:
@@ -429,11 +431,6 @@ sources:
     # Enrichment options
     enrichment:
       geocoding: true
-      compressed_html:
-        enabled: false
-        engine_type: hybrid
-        rate_limit_per_second: 2.0
-        timeout_s: 15.0
 
     # Scheduling
     schedule:
@@ -570,11 +567,6 @@ sources:
 
     enrichment:
       geocoding: true
-      compressed_html:
-        enabled: true
-        engine_type: hybrid
-        rate_limit_per_second: 1.0
-        timeout_s: 20.0
 
     schedule:
       type: "cron"
@@ -718,11 +710,6 @@ sources:
 
     enrichment:
       geocoding: true
-      compressed_html:
-        enabled: false
-        engine_type: hybrid
-        rate_limit_per_second: 1.0
-        timeout_s: 20.0
 
     schedule:
       type: "cron"
@@ -733,7 +720,7 @@ sources:
   # GETYOURGUIDE - Partner API (tours, activities, experiences)
   # =========================================================================
   getyourguide:
-    enabled: true
+    enabled: false
     pipeline_type: "api"
 
     connection:
@@ -865,11 +852,6 @@ sources:
 
     enrichment:
       geocoding: true
-      compressed_html:
-        enabled: false
-        engine_type: hybrid
-        rate_limit_per_second: 1.0
-        timeout_s: 20.0
 
     schedule:
       type: "cron"
@@ -880,7 +862,7 @@ sources:
   # EVENTBRITE - Partner REST API (ticketed events, concerts, workshops, etc.)
   # =========================================================================
   eventbrite:
-    enabled: true
+    enabled: false
     pipeline_type: "api"
 
     connection:
@@ -1054,8 +1036,6 @@ sources:
 
     enrichment:
       geocoding: false
-      compressed_html:
-        enabled: false
 
     schedule:
       type: "cron"
@@ -1308,8 +1288,6 @@ sources:
 
     enrichment:
       geocoding: false
-      compressed_html:
-        enabled: false
 
     schedule:
       type: "cron"

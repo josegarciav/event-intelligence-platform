@@ -1,3 +1,5 @@
+"""MCP (Model Context Protocol) client and server implementations."""
+
 from src.agents.mcp.fastmcp_client import LocalMCPClient, ServerMCPClient
 from src.agents.mcp.fastmcp_server import get_server, load_events, run_server
 from src.agents.mcp.mcp_client import (

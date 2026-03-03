@@ -50,6 +50,7 @@ class LocalMCPClient(MCPClient):
     """
 
     def __init__(self, events: list["EventSchema"] | None = None):
+        """Initialize LocalMCPClient and optionally pre-load events into the in-process server."""
         from src.agents.mcp.fastmcp_server import get_server, load_events
 
         self._server = get_server()
@@ -130,6 +131,7 @@ class ServerMCPClient(MCPClient):
         server_url: str = "http://localhost:8001",
         events: list["EventSchema"] | None = None,
     ):
+        """Initialize ServerMCPClient with the remote server URL."""
         self._server_url = server_url
         if events:
             # In server mode, events must be loaded into the remote server

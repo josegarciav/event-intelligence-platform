@@ -7,8 +7,8 @@ Prompts live in src/agents/prompts/{name}/:
 
 Usage:
     registry = PromptRegistry()
-    system, user = registry.render("core_metadata", variables={"title": "Techno Night"})
-    system, user = registry.render("core_metadata", version="v1", variables={...})
+    system, user = registry.render("feature_alignment", variables={"title": "Techno Night"})
+    system, user = registry.render("feature_alignment", version="v1", variables={...})
 """
 
 import logging
@@ -30,6 +30,7 @@ class PromptRegistry:
     """
 
     def __init__(self, prompts_dir: Path | None = None):
+        """Initialize the PromptRegistry, optionally pointing to a custom prompts directory."""
         self._dir = prompts_dir or _PROMPTS_DIR
         self._manifests: dict[str, dict[str, Any]] = {}
         self._templates: dict[str, dict[str, Any]] = {}  # key = "name/version"
@@ -83,7 +84,7 @@ class PromptRegistry:
         Render a prompt template with the given variables.
 
         Args:
-            prompt_name: Prompt identifier (e.g., "core_metadata")
+            prompt_name: Prompt identifier (e.g., "feature_alignment")
             version: "active" or explicit version (e.g., "v1")
             variables: Template variables for Jinja2 substitution
             agent_name: For audit logging
@@ -103,8 +104,8 @@ class PromptRegistry:
 
         except ImportError:
             # Fallback: simple str.replace substitution
-            Template = None  # type: ignore[assignment]
-            SilentUndefined = None  # type: ignore[assignment]
+            Template = None  # type: ignore[misc, assignment]
+            SilentUndefined = None  # type: ignore[misc, assignment]
 
         resolved_version = self._resolve_version(prompt_name, version)
         template_data = self._load_template(prompt_name, resolved_version)
@@ -168,6 +169,7 @@ _registry: PromptRegistry | None = None
 
 
 def get_prompt_registry() -> PromptRegistry:
+    """Return the global PromptRegistry singleton, creating it on first call."""
     global _registry
     if _registry is None:
         _registry = PromptRegistry()

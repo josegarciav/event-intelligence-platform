@@ -30,9 +30,9 @@ class EventDataWriter:
         """Initialize with an active psycopg2 connection."""
         self.conn = db_connection
         # Metadata cache for foreign key verification (issue #8)
-        self._valid_primary_categories = set()
-        self._valid_subcategories = set()
-        self._valid_activities = set()
+        self._valid_primary_categories: set[str] = set()
+        self._valid_subcategories: set[str] = set()
+        self._valid_activities: set[str] = set()
         self._load_metadata_cache()
 
     def _load_metadata_cache(self) -> None:
@@ -224,17 +224,15 @@ class EventDataWriter:
             """
             INSERT INTO sources (
                 source_name, source_event_id, source_url,
-                compressed_html, ingestion_timestamp, source_updated_at
-            ) VALUES (%s, %s, %s, %s, %s, %s)
+                ingestion_timestamp, source_updated_at
+            ) VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (source_name, source_event_id)
             DO UPDATE SET
-                compressed_html = COALESCE(EXCLUDED.compressed_html, sources.compressed_html),
                 source_url = COALESCE(EXCLUDED.source_url, sources.source_url),
                 source_updated_at = COALESCE(EXCLUDED.source_updated_at, sources.source_updated_at),
                 ingestion_timestamp = EXCLUDED.ingestion_timestamp
             WHERE
-                sources.compressed_html IS DISTINCT FROM COALESCE(EXCLUDED.compressed_html, sources.compressed_html)
-                OR sources.source_url IS DISTINCT FROM COALESCE(EXCLUDED.source_url, sources.source_url)
+                sources.source_url IS DISTINCT FROM COALESCE(EXCLUDED.source_url, sources.source_url)
                 OR sources.source_updated_at IS DISTINCT FROM COALESCE(EXCLUDED.source_updated_at, sources.source_updated_at)
                 OR sources.ingestion_timestamp IS DISTINCT FROM EXCLUDED.ingestion_timestamp
             RETURNING source_id;
@@ -243,7 +241,6 @@ class EventDataWriter:
                 src.source_name,
                 src.source_event_id,
                 src.source_url,
-                src.compressed_html,
                 src.ingestion_timestamp,
                 src.source_updated_at,
             ),
@@ -532,40 +529,79 @@ class EventDataWriter:
         mapping_ids = [row[0] for row in cur.fetchall()]
 
         # 4. Handle Emotional Outputs
-        # Collect all unique (activity_id, emotion) pairs to upsert into metadata
-        emotion_metadata_pairs = set()
+        # Split into activity-linked (act_id is not None) and unlinked (act_id is None).
+        # ON CONFLICT (activity_id, emotion_name) only fires for non-NULL values in
+        # PostgreSQL — NULLs are treated as distinct, so the two cases need separate paths.
+        act_emotion_pairs: set[tuple] = set()
+        null_emotions: set[str] = set()
         for dim, act_id in valid_dims_with_act:
-            if act_id:
-                for emotion in dim.emotional_output:
-                    emotion_metadata_pairs.add((act_id, emotion))
+            for emotion in dim.emotional_output:
+                if act_id:
+                    act_emotion_pairs.add((act_id, emotion))
+                else:
+                    null_emotions.add(emotion)
 
-        if not emotion_metadata_pairs:
+        if not act_emotion_pairs and not null_emotions:
             return
 
-        # Bulk upsert emotional outputs metadata
-        emotion_metadata_rows = list(emotion_metadata_pairs)
-        execute_values(
-            cur,
-            """
-            INSERT INTO activity_emotional_outputs (activity_id, emotion_name)
-            VALUES %s
-            ON CONFLICT (activity_id, emotion_name) DO UPDATE SET emotion_name = EXCLUDED.emotion_name
-            RETURNING emotional_output_id, activity_id, emotion_name;
-            """,
-            emotion_metadata_rows,
-        )
-        # Create map of (str(activity_id), emotion_name) -> emotional_output_id
-        emo_id_map = {(str(row[1]), row[2]): row[0] for row in cur.fetchall()}
+        # emo_id_map: (str(act_id) | None, emotion_name) -> emotional_output_id
+        emo_id_map: dict[tuple, object] = {}
+
+        # 4a. Upsert activity-linked emotional outputs
+        if act_emotion_pairs:
+            execute_values(
+                cur,
+                """
+                INSERT INTO activity_emotional_outputs (activity_id, emotion_name)
+                VALUES %s
+                ON CONFLICT (activity_id, emotion_name) DO UPDATE SET emotion_name = EXCLUDED.emotion_name
+                RETURNING emotional_output_id, activity_id, emotion_name;
+                """,
+                list(act_emotion_pairs),
+            )
+            for row in cur.fetchall():
+                emo_id_map[(str(row[1]), row[2])] = row[0]
+
+        # 4b. Fetch-or-insert null-activity emotional outputs
+        # Cannot use ON CONFLICT for NULLs; SELECT first then INSERT missing ones.
+        if null_emotions:
+            emotion_list = list(null_emotions)
+            cur.execute(
+                """
+                SELECT emotional_output_id, emotion_name
+                FROM activity_emotional_outputs
+                WHERE activity_id IS NULL AND emotion_name = ANY(%s)
+                """,
+                (emotion_list,),
+            )
+            existing_null: dict[str, object] = {
+                row[1]: row[0] for row in cur.fetchall()
+            }
+            to_insert = [e for e in emotion_list if e not in existing_null]
+            if to_insert:
+                execute_values(
+                    cur,
+                    """
+                    INSERT INTO activity_emotional_outputs (activity_id, emotion_name)
+                    VALUES %s
+                    RETURNING emotional_output_id, emotion_name;
+                    """,
+                    [(None, e) for e in to_insert],
+                )
+                for row in cur.fetchall():
+                    existing_null[row[1]] = row[0]
+            for emotion_name, emo_id in existing_null.items():
+                emo_id_map[(None, emotion_name)] = emo_id
 
         # 5. Bulk insert event_emotional_outputs associations
         event_emo_rows = []
         for i, (dim, act_id) in enumerate(valid_dims_with_act):
-            if act_id:
-                mapping_id = mapping_ids[i]
-                for emotion in dim.emotional_output:
-                    emo_id = emo_id_map.get((str(act_id), emotion))
-                    if emo_id:
-                        event_emo_rows.append((mapping_id, emo_id))
+            mapping_id = mapping_ids[i]
+            key_prefix = str(act_id) if act_id else None
+            for emotion in dim.emotional_output:
+                emo_id = emo_id_map.get((key_prefix, emotion))
+                if emo_id:
+                    event_emo_rows.append((mapping_id, emo_id))
 
         if event_emo_rows:
             execute_values(

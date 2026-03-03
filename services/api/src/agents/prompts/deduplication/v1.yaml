@@ -53,7 +53,7 @@ user_prompt: |
   3. Near-duplicates (same event, minor variation)
 
   For each group found, specify:
-  - group_id: a short slug (e.g. "techno-friday-razzmatazz")
+  - group_id: a UUID v4 string (generate a random UUID, e.g. "a3f2c1d0-1234-4abc-8def-000000000001")
   - group_type: "duplicate" | "recurring" | "near_duplicate"
   - primary_event_id: source_event_id of the most complete / authoritative event
   - member_event_ids: all source_event_ids in this group (including primary), list format

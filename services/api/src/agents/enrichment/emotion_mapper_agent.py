@@ -1,7 +1,7 @@
 """
 EmotionMapperAgent — infers emotional outputs and practical access dimensions.
 
-Uses the 'emotion_vibe' prompt in batch mode: events are chunked and sent
+Uses the 'emotion_mapper' prompt in batch mode: events are chunked and sent
 together to reduce LLM round-trips.  Each chunk produces a single
 EmotionVibeOutputBatch response keyed by source_event_id.
 """
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class EmotionVibeOutput(BaseModel):
-    """Structured output from the emotion_vibe prompt (single event)."""
+    """Structured output from the emotion_mapper prompt (single event)."""
 
     emotional_output: list[str] = Field(
         default_factory=lambda: ["enjoyment"],
@@ -73,9 +73,10 @@ class EmotionMapperAgent(BaseAgent):
     """
 
     name = "emotion_mapper"
-    prompt_name = "emotion_vibe"
+    prompt_name = "emotion_mapper"
 
     def __init__(self, config: dict[str, Any] | None = None):
+        """Initialize the EmotionMapperAgent with optional config overrides."""
         self._config = config or {}
         self._llm = get_llm_client(
             provider=self._config.get("provider", "anthropic"),
@@ -85,6 +86,7 @@ class EmotionMapperAgent(BaseAgent):
         self._registry = get_prompt_registry()
 
     async def run(self, task: AgentTask) -> AgentResult:
+        """Run emotion mapping on the task's event batch and return enriched results."""
         if not self._config.get("enabled", True):
             return AgentResult(
                 agent_name=self.name,

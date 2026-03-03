@@ -107,6 +107,7 @@ class LocationParser:
     """
 
     def __init__(self, geocoding_enabled: bool = False) -> None:
+        """Initialize LocationParser with optional Nominatim geocoding support."""
         self.geocoding_enabled = geocoding_enabled
         self._geocoder = None
         self._rate_limiter = None
@@ -244,7 +245,7 @@ class LocationParser:
 
             kwargs = {"exactly_one": True}
             if country_code:
-                kwargs["country_codes"] = country_code.upper()
+                kwargs["country_codes"] = country_code.upper()  # type: ignore[assignment]
 
             location = self._get_rate_limiter()(query, **kwargs)
             if location is None:

@@ -24,6 +24,7 @@ class PrimaryCategoryExtraction(BaseModel):
     @field_validator("category_id")
     @classmethod
     def validate_category_id(cls, v: str) -> str:
+        """Validate category_id against known taxonomy IDs; defaults to '0' if invalid."""
         from src.schemas.taxonomy import get_primary_category_id_map
 
         valid_ids = get_primary_category_id_map()
@@ -53,6 +54,14 @@ class SubcategoryExtraction(BaseModel):
 class TaxonomyAttributesExtraction(BaseModel):
     """Activity-level taxonomy attributes for the experience pulse."""
 
+    primary_category: int | None = Field(
+        default=None,
+        description="Primary category integer ID (0-10)",
+    )
+    subcategory: str | None = Field(
+        default=None,
+        description="Subcategory ID (e.g., '1.4', '5.7')",
+    )
     energy_level: Literal["low", "medium", "high"] = Field(
         default="medium",
         description="Physical intensity: low=calm, medium=moderate, high=intense",
@@ -74,26 +83,28 @@ class TaxonomyAttributesExtraction(BaseModel):
         description="Repeat frequency: high=weekly, medium=monthly, low=unique/annual",
     )
 
-    # Unconstrained taxonomy (taxonomy gap detection)
+    # Unconstrained taxonomy (always required — richest possible free-form description)
     unconstrained_primary_category: str | None = Field(
         default=None,
         description=(
-            "Free-form primary category label to use if none of the predefined "
-            "categories is a good fit. Null when the predefined taxonomy fits well."
+            "Always required. Free-form experience-type label that best describes the event, "
+            "regardless of whether the predefined taxonomy fits. "
+            "E.g. 'Natural Wine Tasting', 'Silent Disco', 'Rooftop Jazz Night'."
         ),
     )
     unconstrained_subcategory: str | None = Field(
         default=None,
         description=(
-            "Free-form subcategory label to use if none of the predefined "
-            "subcategories is a good fit. Null when the predefined taxonomy fits well."
+            "Always required. Free-form sub-type label more specific than the primary category. "
+            "E.g. 'Organic Wine Education', 'After-Hours Electronic Dance Party'."
         ),
     )
     unconstrained_activity: str | None = Field(
         default=None,
         description=(
-            "Free-form activity name to use if no predefined activity matches. "
-            "Null when the predefined taxonomy fits well."
+            "Always required. The specific activity people actually do at the event — "
+            "more precise and vivid than the predefined activity when possible. "
+            "E.g. 'Natural wine tasting with sommelier', 'Live jazz listening in a rooftop bar'."
         ),
     )
 
@@ -105,7 +116,7 @@ class TaxonomyAttributesExtraction(BaseModel):
 
 class MissingFieldsExtraction(BaseModel):
     """
-    Batch extraction for multiple missing fields (core_metadata prompt).
+    Batch extraction for multiple missing fields (feature_alignment prompt).
 
     Used by FeatureAlignmentAgent to fill event_type, tags, event_format.
     """
@@ -216,3 +227,26 @@ class DataQualityAuditBatch(BaseModel):
     """Batch output from data_quality agent (one item per input event)."""
 
     items: list[DataQualityAuditItem] = Field(default_factory=list)
+
+
+# =============================================================================
+# ACTIVITY SELECTION (RAG second pass in taxonomy_classifier)
+# =============================================================================
+
+
+class ActivitySelectionItem(BaseModel):
+    """Single-event activity match result, keyed by source_event_id."""
+
+    source_event_id: str = Field(
+        default="", description="Must match the source_event_id from the input"
+    )
+    activity_name: str | None = Field(
+        default=None,
+        description="Name of the selected activity (must match exactly a name from the provided list); null if none fits",
+    )
+
+
+class ActivitySelectionBatch(BaseModel):
+    """Batch output from the RAG activity selection pass (one item per input event)."""
+
+    items: list[ActivitySelectionItem] = Field(default_factory=list)

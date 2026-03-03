@@ -1,3 +1,5 @@
+"""Enrichment agents for the event intelligence pipeline."""
+
 from src.agents.enrichment.data_quality_agent import DataQualityAgent
 from src.agents.enrichment.deduplication_agent import DeduplicationAgent
 from src.agents.enrichment.emotion_mapper_agent import EmotionMapperAgent

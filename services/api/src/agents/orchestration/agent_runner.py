@@ -37,10 +37,12 @@ class EnrichmentRunResult:
 
     @property
     def total_errors(self) -> int:
+        """Return the total number of errors across all agents."""
         return sum(len(errs) for errs in self.errors_by_agent.values())
 
     @property
     def success(self) -> bool:
+        """Return True if the enrichment run produced at least one event."""
         return len(self.events) > 0
 
 

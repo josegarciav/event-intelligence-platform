@@ -452,16 +452,15 @@ class TestBaseAPIPipelineParseDatetime:
 
         assert result == dt
 
-    def test_parse_none_returns_now(self, sample_source_config):
-        """Should return current time for None."""
+    def test_parse_none_returns_none(self, sample_source_config):
+        """Should return None for absent input; callers apply defaults (e.g. `or datetime.now`)."""
         pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
         pipeline.source_config = sample_source_config
         pipeline.logger = MagicMock()
 
         result = pipeline._parse_datetime(None)
 
-        # Should be within last few seconds
-        assert (datetime.now(UTC) - result).total_seconds() < 5
+        assert result is None
 
 
 class TestBaseAPIPipelineValidateEvent:
@@ -565,32 +564,6 @@ class TestBaseAPIPipelineEnrichEvent:
         result = asyncio.run(pipeline.enrich_event(event))
 
         assert result.location.timezone == "Europe/Madrid"
-
-    def test_enrich_records_error_when_compressed_html_unavailable(
-        self, sample_source_config, create_event
-    ):
-        """Should not synthesize compressed_html when scraper returns None."""
-        pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
-        pipeline.source_config = sample_source_config
-        pipeline.html_enrichment_scraper = MagicMock()
-        pipeline.html_enrichment_scraper.fetch_compressed_html = AsyncMock(
-            return_value=None
-        )
-
-        event = create_event(
-            title="Fallback Title",
-            description="Fallback description text",
-        )
-        # Ensure source URL exists to trigger enrichment path.
-        event.source.source_url = "https://example.com/event/1"
-
-        result = asyncio.run(pipeline.enrich_event(event))
-
-        assert result.source.compressed_html is None
-        assert any(
-            "HTML enrichment returned no content" in e.message
-            for e in result.normalization_errors
-        )
 
 
 class TestBaseAPIPipelineNormalizeToSchema:

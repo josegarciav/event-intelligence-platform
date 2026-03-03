@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import make_url
 
@@ -23,6 +23,16 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     ENV: str = "development"
     DEBUG: bool = False
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def coerce_debug(cls, v: object) -> bool:
+        """Accept boolean strings and ignore non-boolean env vars (e.g. macOS DEBUG=release)."""
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            return v.lower() in ("1", "true", "yes", "on")
+        return bool(v)
 
     # -------------------------------------------------------------------------
     # DATABASE
@@ -111,4 +121,4 @@ def get_settings() -> Settings:
     Settings
         The singleton settings instance.
     """
-    return Settings()
+    return Settings()  # type: ignore[call-arg]

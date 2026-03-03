@@ -36,6 +36,11 @@ T = TypeVar("T", bound=BaseModel)
 _DEFAULT_MODEL = "llama3.2:3b"
 _OLLAMA_API_KEY = "ollama"  # Ollama requires any non-empty string
 
+# Module-level availability cache: (base_url, model_name) → bool
+# Shared across all OllamaLLMClient instances so the /api/tags ping
+# is made once per (endpoint, model) pair per process, not once per agent.
+_availability_cache: dict[tuple[str, str], bool] = {}
+
 
 def _default_ollama_base_url() -> str:
     """Read OLLAMA_BASE_URL from Settings (falls back to localhost default)."""
@@ -66,6 +71,7 @@ class OllamaLLMClient(BaseLLMClient):
         temperature: float = 0.1,
         max_tokens: int = 2000,
     ):
+        """Initialize the OllamaLLMClient with model and connection settings."""
         self.model_name = model_name
         self.base_url = base_url if base_url is not None else _default_ollama_base_url()
         self.temperature = temperature
@@ -85,7 +91,17 @@ class OllamaLLMClient(BaseLLMClient):
         return self._available
 
     def _check_ollama(self) -> bool:
-        """Ping Ollama to verify it's running."""
+        """Ping Ollama once per (base_url, model_name) pair; subsequent calls use cache."""
+        cache_key = (self.base_url, self.model_name)
+        if cache_key in _availability_cache:
+            return _availability_cache[cache_key]
+
+        result = self._probe_ollama()
+        _availability_cache[cache_key] = result
+        return result
+
+    def _probe_ollama(self) -> bool:
+        """Single HTTP probe — only called on cache miss."""
         try:
             import httpx
 
@@ -93,7 +109,6 @@ class OllamaLLMClient(BaseLLMClient):
             if resp.status_code == 200:
                 tags = resp.json()
                 model_names = [m.get("name", "") for m in tags.get("models", [])]
-                # Check if our model (or a variant) is installed
                 base_model = self.model_name.split(":")[0]
                 installed = any(base_model in m for m in model_names)
                 if not installed:
@@ -101,7 +116,7 @@ class OllamaLLMClient(BaseLLMClient):
                         f"OllamaLLMClient: model '{self.model_name}' not found in Ollama. "
                         f"Install with: ollama pull {self.model_name}"
                     )
-                    # Still return True — the model might be pullable on demand
+                    return False
                 return True
             return False
         except Exception:
@@ -146,6 +161,7 @@ class OllamaLLMClient(BaseLLMClient):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> str:
+        """Send a plain-text completion request to the Ollama model."""
         client = self._get_raw_client()
         if not client:
             return ""
@@ -188,7 +204,10 @@ class OllamaLLMClient(BaseLLMClient):
         """
         client = self._get_instructor_client()
         if not client:
-            return output_schema()
+            raise RuntimeError(
+                "instructor and openai packages are required for structured output. "
+                "Install with: pip install instructor openai"
+            )
 
         # Enrich system prompt with schema hint for better JSON adherence
         schema_hint = _build_schema_hint(output_schema)
@@ -219,6 +238,7 @@ class OllamaLLMClient(BaseLLMClient):
             return output_schema()
 
     def get_token_usage(self) -> dict[str, int]:
+        """Return the token usage from the most recent LLM call."""
         return self._last_usage
 
 

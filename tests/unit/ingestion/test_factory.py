@@ -444,7 +444,7 @@ class TestRealConfigPipelineCreation:
         assert sources["ra_co"]["type"] == "api"
 
         assert "ticketmaster" in sources
-        assert sources["ticketmaster"]["enabled"] is False
+        assert sources["ticketmaster"]["enabled"] is True
 
     def test_factory_creates_ra_co_pipeline(self):
         """Should create a working pipeline from ra_co config (via direct creation)."""
@@ -522,7 +522,7 @@ class TestRealConfigPipelineCreation:
         factory = PipelineFactory()
 
         with pytest.raises(ValueError, match="not enabled"):
-            factory.create_pipeline("ticketmaster")
+            factory.create_pipeline("ra_co")
 
     def test_create_all_enabled_skips_disabled(self):
         """create_all_enabled_pipelines should skip disabled sources."""
@@ -536,8 +536,8 @@ class TestRealConfigPipelineCreation:
         for source in enabled_sources:
             assert source in pipelines
         # Disabled sources should not be included
-        assert "ticketmaster" not in pipelines
         assert "ra_co" not in pipelines
+        assert "tripadvisor" not in pipelines
 
 
 class TestRESTAPIPipelineConfig:

@@ -47,11 +47,11 @@ Configuration lives in `services/api/src/configs/agents.yaml`.
 
 | # | Agent                   | Config key            | Prompt                  | Target Fields                                                                                     |
 |---|-------------------------|-----------------------|-------------------------|---------------------------------------------------------------------------------------------------|
-| 1 | FeatureAlignmentAgent   | `feature_alignment`   | `core_metadata`         | event_type, tags, event_format                                                                    |
-| 2 | TaxonomyClassifierAgent | `taxonomy_classifier` | `taxonomy_classification` | primary_category, subcategory, activity_id, energy_level, social_intensity, cognitive_load, physical_involvement, repeatability |
-| 3 | EmotionMapperAgent      | `emotion_mapper`      | `emotion_vibe`          | emotional_output, cost_level, environment, risk_level, age_accessibility, time_scale              |
-| 4 | DataQualityAgent        | `data_quality`        | `data_quality`          | quality_score, normalization_errors (audits all fields)                                           |
-| 5 | DeduplicationAgent      | `deduplication`       | `deduplication`         | duplicate_group_id, duplicate_group_type, is_primary, duplicate_of, similarity_score              |
+| 1 | FeatureAlignmentAgent   | `feature_alignment`   | `feature_alignment`     | event_type, tags, format                                                                          |
+| 2 | TaxonomyClassifierAgent | `taxonomy_classifier` | `taxonomy_classifier`   | primary_category, subcategory, subcategory_name, activity_id, activity_name, energy_level, social_intensity, cognitive_load, physical_involvement, repeatability, unconstrained_primary_category, unconstrained_subcategory, unconstrained_activity — **two-pass RAG**: pass 1 classifies category/subcategory/dims; pass 2 retrieves activities from taxonomy JSON and picks best activity_id per event |
+| 3 | EmotionMapperAgent      | `emotion_mapper`      | `emotion_mapper`        | emotional_output, cost_level, environment, risk_level, age_accessibility, time_scale              |
+| 4 | DataQualityAgent        | `data_quality`        | `data_quality`          | data_quality_score                                                                                |
+| 5 | DeduplicationAgent      | `deduplication`       | `deduplication`         | duplicate_group_id, group_type, is_primary, duplicate_of, similarity_score, reason — **two-pass**: rule-based exact match (always) + LLM fuzzy grouping (when available) |
 
 ---
 
@@ -86,11 +86,11 @@ python -m src.agents.mcp.fastmcp_server --host localhost --port 8001
 
 | Provider    | Config key    | Structured Output   | Setup                                    |
 |-------------|---------------|---------------------|------------------------------------------|
-| `ollama`    | `"ollama"`    | Instructor JSON     | `brew install ollama && ollama pull llama3.2:3b` |
+| `ollama`    | `"ollama"`    | Instructor JSON     | `brew install ollama && ollama pull llama3.2:1b` |
 | `anthropic` | `"anthropic"` | tool_use            | `ANTHROPIC_API_KEY` env var              |
 | `openai`    | `"openai"`    | Instructor TOOLS    | `OPENAI_API_KEY` env var                 |
 
-Default is `ollama` with `llama3.2:3b` — no API key or network required.
+Default is `ollama` with `llama3.2:1b` — no API key or network required.
 
 Switch any agent by editing `provider` and `model` in `services/api/src/configs/agents.yaml`:
 
@@ -98,7 +98,7 @@ Switch any agent by editing `provider` and `model` in `services/api/src/configs/
 agents:
   feature_alignment:
     provider: "anthropic"
-    model: "claude-opus-4-6"
+    model: "claude-sonnet-4-6"
 ```
 
 ---
@@ -132,11 +132,11 @@ Each agent uses a named prompt loaded from `services/api/src/agents/prompts/{nam
 
 ```
 prompts/
-├── core_metadata/
+├── feature_alignment/
 │   ├── manifest.yaml    # declares active_version + per-version metadata
 │   └── v1.yaml          # Jinja2 system + user prompt templates
-├── taxonomy_classification/
-├── emotion_vibe/
+├── taxonomy_classifier/
+├── emotion_mapper/
 ├── data_quality/
 └── deduplication/
 ```
@@ -147,7 +147,7 @@ prompts/
 from src.agents.registry.prompt_registry import get_prompt_registry
 
 registry = get_prompt_registry()
-system, user = registry.render("core_metadata", variables={"title": "Techno Night"})
+system, user = registry.render("feature_alignment", variables={"title": "Techno Night"})
 ```
 
 All calls are logged with `{agent_name, prompt_name, version, event_id}` for auditability.
@@ -168,12 +168,12 @@ Events below `global.confidence_threshold` (0.6, set in `agents.yaml`) are flagg
 
 | Agent                   | File                                          | Status  | Prompt                  |
 |-------------------------|-----------------------------------------------|---------|-------------------------|
-| FeatureAlignmentAgent   | `enrichment/feature_alignment_agent.py`       | Live    | `core_metadata`         |
-| TaxonomyClassifierAgent | `enrichment/taxonomy_classifier_agent.py`     | Live    | `taxonomy_classification`|
-| EmotionMapperAgent      | `enrichment/emotion_mapper_agent.py`          | Live    | `emotion_vibe`          |
+| FeatureAlignmentAgent   | `enrichment/feature_alignment_agent.py`       | Live    | `feature_alignment`     |
+| TaxonomyClassifierAgent | `enrichment/taxonomy_classifier_agent.py`     | Live    | `taxonomy_classifier`   |
+| EmotionMapperAgent      | `enrichment/emotion_mapper_agent.py`          | Live    | `emotion_mapper`        |
 | DataQualityAgent        | `enrichment/data_quality_agent.py`            | Live    | `data_quality`          |
 | DeduplicationAgent      | `enrichment/deduplication_agent.py`           | Live    | `deduplication`         |
-| ArtistEnricherAgent     | `enrichment/artist_enricher_agent.py`         | Stub    | — (external API needed) |
+| ArtistEnricherAgent     | `enrichment/artist_enricher_agent.py`         | Live    | — (MusicBrainz API, no auth required) |
 
 ---
 

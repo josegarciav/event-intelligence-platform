@@ -451,10 +451,6 @@ class SourceInfo(BaseModel):
     )
     source_event_id: str = Field(description="Event ID from the original source")
     source_url: str = Field(description="Direct URL to event on source platform")
-    compressed_html: str | None = Field(
-        default=None,
-        description="Parsed HTML or JSON data from source for debugging/validation",
-    )
     source_updated_at: datetime | None = Field(
         default=None,
         description="Timestamp of last update at the source platform (None = unknown)",

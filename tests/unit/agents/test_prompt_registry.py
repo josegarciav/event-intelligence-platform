@@ -47,7 +47,7 @@ user_prompt: |
 @pytest.fixture
 def tmp_prompts_dir(tmp_path: Path) -> Path:
     """Create a temporary prompts directory with a test prompt."""
-    prompt_dir = tmp_path / "core_metadata"
+    prompt_dir = tmp_path / "feature_alignment"
     prompt_dir.mkdir()
 
     (prompt_dir / "manifest.yaml").write_text(MOCK_MANIFEST)
@@ -93,16 +93,16 @@ class TestGetActiveVersion:
 
     def test_returns_active_version_from_manifest(self, registry: PromptRegistry):
         """Should parse active_version from manifest.yaml."""
-        version = registry.get_active_version("core_metadata")
+        version = registry.get_active_version("feature_alignment")
         assert version == "v1"
 
     def test_caches_manifest_on_second_call(self, registry: PromptRegistry):
         """Manifest should be loaded once and cached."""
-        _ = registry.get_active_version("core_metadata")
-        assert "core_metadata" in registry._manifests
+        _ = registry.get_active_version("feature_alignment")
+        assert "feature_alignment" in registry._manifests
         # Second call should not re-read disk (manifest already in cache)
-        _ = registry.get_active_version("core_metadata")
-        assert registry._manifests["core_metadata"]["active_version"] == "v1"
+        _ = registry.get_active_version("feature_alignment")
+        assert registry._manifests["feature_alignment"]["active_version"] == "v1"
 
 
 class TestRender:
@@ -111,7 +111,7 @@ class TestRender:
     def test_render_returns_tuple(self, registry: PromptRegistry):
         """render() should return (system_prompt, user_prompt) tuple."""
         system, user = registry.render(
-            "core_metadata",
+            "feature_alignment",
             version="v1",
             variables={"title": "Techno Night", "description": "Electronic music"},
         )
@@ -121,7 +121,7 @@ class TestRender:
     def test_render_injects_variables(self, registry: PromptRegistry):
         """render() should substitute Jinja2 variables."""
         system, user = registry.render(
-            "core_metadata",
+            "feature_alignment",
             version="v1",
             variables={"title": "Jazz Evening", "description": "Live jazz"},
         )
@@ -131,7 +131,7 @@ class TestRender:
     def test_render_active_version_resolves(self, registry: PromptRegistry):
         """render() with version='active' should resolve to active_version."""
         system, user = registry.render(
-            "core_metadata",
+            "feature_alignment",
             version="active",
             variables={"title": "Test", "description": "Test desc"},
         )
@@ -141,11 +141,11 @@ class TestRender:
     def test_render_caches_template(self, registry: PromptRegistry):
         """Template should be cached after first render."""
         registry.render(
-            "core_metadata",
+            "feature_alignment",
             version="v1",
             variables={"title": "X", "description": "Y"},
         )
-        assert "core_metadata/v1" in registry._templates
+        assert "feature_alignment/v1" in registry._templates
 
     def test_render_missing_prompt_raises(self, tmp_path: Path):
         """render() for a non-existent prompt should raise an error."""

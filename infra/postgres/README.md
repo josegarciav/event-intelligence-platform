@@ -1,3 +1,4 @@
+
 # Postgres Infrastructure
 
 Local PostgreSQL instance for the Event Intelligence Platform.
@@ -16,23 +17,27 @@ Initialized automatically via SQL scripts in `/init`.
 
 ## Usage
 
+All commands can be run from the repo root or from `infra/postgres/`.
+
 ### Start database
 
 ```bash
-docker compose up -d
+docker compose -f infra/postgres/docker-compose.yml up -d
 ```
 
 ### Stop database
 
 ```bash
-docker compose down
+docker compose -f infra/postgres/docker-compose.yml down
 ```
 
 ### Reset database (destructive)
 
+Destroys the volume so all `init/` scripts re-run from scratch on next start:
+
 ```bash
-docker compose down -v
-docker compose up -d
+docker compose -f infra/postgres/docker-compose.yml down -v
+docker compose -f infra/postgres/docker-compose.yml up -d
 ```
 
 
@@ -55,7 +60,7 @@ When there is a new version of the taxonomy:
 
 ```bash
 # Start DB
-docker compose up -d
+docker compose -f infra/postgres/docker-compose.yml up -d
 # Export env (if running locally)
 export $(grep -v '^#' services/api/.env | xargs)
 # Run ETL

@@ -84,6 +84,8 @@ class BaseAgent(ABC):
                 if hasattr(event.event_type, "value")
                 else str(event.event_type)
             )
+        if event.custom_fields:
+            ctx["source_context"] = event.custom_fields
 
         return ctx
 
@@ -129,6 +131,8 @@ class BaseAgent(ABC):
                 item["existing_tags"] = event.tags[:5]
             if event.start_datetime:
                 item["start_datetime"] = str(event.start_datetime)[:16]
+            if event.custom_fields:
+                item["source_context"] = event.custom_fields
             items.append(item)
 
         return {

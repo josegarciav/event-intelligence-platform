@@ -1,3 +1,5 @@
+"""Schema validation and confidence scoring utilities for enrichment agents."""
+
 from src.agents.validation.confidence import compute_confidence_score
 from src.agents.validation.schema_validator import SchemaValidator
 
