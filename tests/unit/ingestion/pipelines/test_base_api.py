@@ -452,16 +452,15 @@ class TestBaseAPIPipelineParseDatetime:
 
         assert result == dt
 
-    def test_parse_none_returns_now(self, sample_source_config):
-        """Should return current time for None."""
+    def test_parse_none_returns_none(self, sample_source_config):
+        """Should return None for absent input; callers apply defaults (e.g. `or datetime.now`)."""
         pipeline = BaseAPIPipeline.__new__(BaseAPIPipeline)
         pipeline.source_config = sample_source_config
         pipeline.logger = MagicMock()
 
         result = pipeline._parse_datetime(None)
 
-        # Should be within last few seconds
-        assert (datetime.now(UTC) - result).total_seconds() < 5
+        assert result is None
 
 
 class TestBaseAPIPipelineValidateEvent:

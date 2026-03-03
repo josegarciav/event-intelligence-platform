@@ -210,6 +210,7 @@ class TestBaseSourceAdapter:
 
     def test_close_default_implementation(self):
         """Should have default close that does nothing."""
+        import asyncio
 
         class ConcreteAdapter(BaseSourceAdapter):
             def fetch(self, **kwargs):
@@ -225,4 +226,4 @@ class TestBaseSourceAdapter:
         adapter = ConcreteAdapter(config)
 
         # Should not raise
-        adapter.close()
+        asyncio.run(adapter.close())

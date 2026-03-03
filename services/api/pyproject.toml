@@ -62,6 +62,13 @@ convention = "google"
 # D2xx/D4xx: existing style inconsistencies, enforce incrementally.
 add_ignore = ["D202", "D205", "D212", "D400", "D401", "D415", "D417"]
 
+[tool.uv]
+# Security: CVE-2026-25990 fixed in pillow 12.1.1 (transitive via matplotlib).
+# Constrained here without promoting pillow to a direct dependency.
+constraint-dependencies = [
+    "pillow>=12.1.1",
+]
+
 [tool.ruff]
 exclude = [
     "notebooks",

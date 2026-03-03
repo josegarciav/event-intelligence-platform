@@ -97,7 +97,7 @@ def flag_low_confidence(
     """
     flagged = []
     for event in events:
-        event_id = str(event.source_event_id)
+        event_id = str(event.source.source_event_id)
         scores = (agent_scores or {}).get(event_id)
         score = compute_confidence_score(event, scores)
         if score < threshold:

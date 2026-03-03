@@ -236,55 +236,29 @@ class PipelineFactory:
             )
             load_sources_fn = load_sources
         except ImportError:
-            # Fallback template keeps onboarding unblocked even when scrapping is
-            # not installed in the current runtime environment.
-            # Run source detection to pick the right engine automatically.
-            from src.ingestion.source_detector import SourceDetector
-
-            detection = SourceDetector().probe(seed_urls[0])
-            logger.info(
-                "Source detection for '%s': engine=%s, framework=%s, js=%s",
-                source_name,
-                detection.recommended_engine,
-                detection.detected_framework,
-                detection.needs_javascript,
-            )
-
-            engine_cfg: dict[str, Any] = {
-                "type": detection.recommended_engine,
-                "timeout_s": scraper_cfg.get("timeout_s", 15),
-                "verify_ssl": True,
-            }
-
-            discovery_cfg: dict[str, Any] = {
-                "link_extract": {
-                    "method": "regex",
-                    "pattern": ".*",
-                    "identifier": "",
-                },
-            }
-            if detection.wait_for_selector:
-                discovery_cfg["wait_for"] = detection.wait_for_selector
-
+            # Fallback: static template when scrapping package is not installed.
             generated_config = {
                 "config_version": "1.0",
                 "source_id": source_name,
                 "enabled": bool(source_config.get("enabled", True)),
-                "engine": engine_cfg,
-                "entrypoints": [{"url": url} for url in seed_urls],
-                "discovery": discovery_cfg,
-                "actions": detection.requires_actions or [],
-                "storage": {"items_format": "jsonl"},
-                "_detection": {
-                    "framework": detection.detected_framework,
-                    "needs_javascript": detection.needs_javascript,
-                    "has_anti_bot": detection.has_anti_bot,
-                    "robots_policy": detection.robots_policy,
-                    "notes": detection.detection_notes,
+                "engine": {
+                    "type": "requests",
+                    "timeout_s": scraper_cfg.get("timeout_s", 15),
+                    "verify_ssl": True,
                 },
+                "entrypoints": [{"url": url} for url in seed_urls],
+                "discovery": {
+                    "link_extract": {
+                        "method": "regex",
+                        "pattern": ".*",
+                        "identifier": "",
+                    },
+                },
+                "actions": [],
+                "storage": {"items_format": "jsonl"},
             }
             logger.warning(
-                "scrapping package not importable; wrote detection-enhanced fallback config for '%s'",
+                "scrapping package not importable; wrote static fallback config for '%s'",
                 source_name,
             )
 

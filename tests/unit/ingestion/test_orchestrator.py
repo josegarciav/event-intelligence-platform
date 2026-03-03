@@ -633,7 +633,7 @@ class TestLoadOrchestratorFromConfig:
 
         orchestrator = load_orchestrator_from_config(str(DEFAULT_CONFIG_PATH))
 
-        assert "ticketmaster" not in orchestrator.pipelines
+        assert "ra_co" not in orchestrator.pipelines
 
     def test_schedules_enabled_pipelines(self):
         """Should schedule pipelines with enabled schedules."""
