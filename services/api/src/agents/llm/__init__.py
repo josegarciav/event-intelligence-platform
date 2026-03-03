@@ -1,3 +1,5 @@
+"""LLM client implementations and provider routing for enrichment agents."""
+
 from src.agents.llm.base_llm_client import BaseLLMClient
 from src.agents.llm.ollama_client import OllamaLLMClient
 from src.agents.llm.provider_router import get_llm_client

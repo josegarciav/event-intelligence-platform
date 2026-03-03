@@ -9,7 +9,6 @@ The pipeline uses:
 - TaxonomyMapper for rule-based taxonomy assignment
 """
 
-import asyncio
 import logging
 import uuid
 from dataclasses import dataclass, field
@@ -290,7 +289,7 @@ class ConfigDrivenAPIAdapter(APIAdapter):
         value = response
         for part in path.split("."):
             if isinstance(value, dict):
-                value = value.get(part)
+                value = value.get(part)  # type: ignore[assignment]
             else:
                 return len(data)
 
@@ -1035,12 +1034,14 @@ class BaseAPIPipeline(BasePipeline):
 
         # Combine description + please_note when both present
         # Fall back to `info` when `description` is absent (common for some Ticketmaster events)
-        description_raw = parsed_event.get("description") or parsed_event.get("info") or None
+        description_raw = (
+            parsed_event.get("description") or parsed_event.get("info") or None
+        )
         please_note = parsed_event.get("please_note") or None
         if description_raw and please_note:
             combined_description = f"{description_raw}\n\n{please_note}"
         else:
-            combined_description = description_raw or please_note
+            combined_description = description_raw or please_note  # type: ignore[assignment]
 
         # Add seatmap URL as a media asset if provided
         seatmap_url = parsed_event.get("seatmap_url")
@@ -1332,7 +1333,7 @@ class BaseAPIPipeline(BasePipeline):
             self._location_parser = LocationParser(
                 geocoding_enabled=self.source_config.geocoding_enabled,
             )
-        self._location_parser.enrich_location(event.location)
+        self._location_parser.enrich_location(event.location)  # type: ignore[attr-defined]
 
         # Calculate duration
         if event.end_datetime and event.start_datetime:

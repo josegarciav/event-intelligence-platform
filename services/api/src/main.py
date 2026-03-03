@@ -79,7 +79,7 @@ app = FastAPI(
 
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
 # ---------------------------------------------------------------------------
 # CORS MIDDLEWARE
@@ -99,7 +99,10 @@ app.add_middleware(
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Middleware that injects security-related HTTP response headers on every request."""
+
     async def dispatch(self, request: Request, call_next):
+        """Add security headers to the response and pass through to the next handler."""
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"

@@ -71,6 +71,7 @@ class OllamaLLMClient(BaseLLMClient):
         temperature: float = 0.1,
         max_tokens: int = 2000,
     ):
+        """Initialize the OllamaLLMClient with model and connection settings."""
         self.model_name = model_name
         self.base_url = base_url if base_url is not None else _default_ollama_base_url()
         self.temperature = temperature
@@ -160,6 +161,7 @@ class OllamaLLMClient(BaseLLMClient):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> str:
+        """Send a plain-text completion request to the Ollama model."""
         client = self._get_raw_client()
         if not client:
             return ""
@@ -236,6 +238,7 @@ class OllamaLLMClient(BaseLLMClient):
             return output_schema()
 
     def get_token_usage(self) -> dict[str, int]:
+        """Return the token usage from the most recent LLM call."""
         return self._last_usage
 
 

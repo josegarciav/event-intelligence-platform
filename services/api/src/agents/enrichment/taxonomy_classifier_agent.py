@@ -52,6 +52,7 @@ class TaxonomyClassifierAgent(BaseAgent):
     prompt_name = "taxonomy_classifier"
 
     def __init__(self, config: dict[str, Any] | None = None):
+        """Initialize the TaxonomyClassifierAgent with optional config overrides."""
         self._config = config or {}
         self._llm = get_llm_client(
             provider=self._config.get("provider", "anthropic"),
@@ -61,6 +62,7 @@ class TaxonomyClassifierAgent(BaseAgent):
         self._registry = get_prompt_registry()
 
     async def run(self, task: AgentTask) -> AgentResult:
+        """Run taxonomy classification on the task's event batch and return enriched results."""
         if not self._config.get("enabled", True):
             return AgentResult(
                 agent_name=self.name,
@@ -134,7 +136,11 @@ class TaxonomyClassifierAgent(BaseAgent):
 
                     # --- subcategory (validate it belongs to the primary) ---
                     if item.subcategory:
-                        primary_id = str(item.primary_category) if item.primary_category is not None else None
+                        primary_id = (
+                            str(item.primary_category)
+                            if item.primary_category is not None
+                            else None
+                        )
                         if primary_id and validate_subcategory_for_primary(
                             item.subcategory, primary_id
                         ):
@@ -263,10 +269,14 @@ class TaxonomyClassifierAgent(BaseAgent):
                 template_data = yaml.safe_load(f)
             system_raw = template_data.get("activity_selection_system_prompt", "")
             user_raw = template_data.get("activity_selection_batch_prompt", "")
-            retry_system_raw = template_data.get("activity_selection_retry_system_prompt", "")
+            retry_system_raw = template_data.get(
+                "activity_selection_retry_system_prompt", ""
+            )
             retry_user_raw = template_data.get("activity_selection_retry_prompt", "")
         except Exception as e:
-            logger.warning(f"{self.name}: could not load activity selection prompt: {e}")
+            logger.warning(
+                f"{self.name}: could not load activity selection prompt: {e}"
+            )
             return [f"activity selection prompt load error: {e}"]
 
         batch_size = self._config.get("batch_size", 8)
@@ -296,20 +306,22 @@ class TaxonomyClassifierAgent(BaseAgent):
             # Chunk the subcategory group to avoid overwhelming small models
             for chunk in self._chunk(group_events, batch_size):
                 event_items = []
-                for e in chunk:
+                for ev in chunk:
                     stub: dict[str, Any] = {
-                        "source_event_id": str(e.source.source_event_id),
-                        "title": e.title or "",
+                        "source_event_id": str(ev.source.source_event_id),
+                        "title": ev.title or "",
                     }
-                    if e.description:
-                        stub["description"] = e.description[:200]
+                    if ev.description:
+                        stub["description"] = ev.description[:200]
                     event_items.append(stub)
 
                 variables = {
                     "subcategory_id": subcategory_id,
                     "subcategory_name": subcategory_name,
                     "activity_names_json": activity_names_json,
-                    "events_json": json.dumps(event_items, ensure_ascii=False, indent=2),
+                    "events_json": json.dumps(
+                        event_items, ensure_ascii=False, indent=2
+                    ),
                     "event_count": len(chunk),
                 }
                 system_prompt = self._render_template(system_raw, variables)
@@ -317,14 +329,18 @@ class TaxonomyClassifierAgent(BaseAgent):
 
                 chunk_ids = [str(e.source.source_event_id) for e in chunk]
                 # Events whose LLM-returned name had no taxonomy match → retry
-                retry_events: list[tuple[int, dict[str, Any]]] = []  # (global_idx, event_stub)
+                retry_events: list[tuple[int, dict[str, Any]]] = (
+                    []
+                )  # (global_idx, event_stub)
 
                 try:
-                    result: ActivitySelectionBatch = await self._llm.complete_structured(
-                        system_prompt=system_prompt,
-                        user_prompt=user_prompt,
-                        output_schema=ActivitySelectionBatch,
-                        temperature=self._config.get("temperature", 0.1),
+                    result: ActivitySelectionBatch = (
+                        await self._llm.complete_structured(
+                            system_prompt=system_prompt,
+                            user_prompt=user_prompt,
+                            output_schema=ActivitySelectionBatch,
+                            temperature=self._config.get("temperature", 0.1),
+                        )
                     )
 
                     for item in result.items:
@@ -335,7 +351,9 @@ class TaxonomyClassifierAgent(BaseAgent):
                         if not tax:
                             continue
 
-                        matched = self._resolve_activity_by_name(item.activity_name, activities)
+                        matched = self._resolve_activity_by_name(
+                            item.activity_name, activities
+                        )
                         if matched:
                             tax.activity_id = matched["activity_id"]
                             tax.activity_name = matched["name"]
@@ -347,7 +365,14 @@ class TaxonomyClassifierAgent(BaseAgent):
                                 f"taxonomy for subcategory {subcategory_id}; scheduling retry"
                             )
                             retry_events.append(
-                                (idx, next(s for s in event_items if s["source_event_id"] == item.source_event_id))
+                                (
+                                    idx,
+                                    next(
+                                        s
+                                        for s in event_items
+                                        if s["source_event_id"] == item.source_event_id
+                                    ),
+                                )
                             )
 
                     usage = self._llm.get_token_usage()
@@ -367,17 +392,23 @@ class TaxonomyClassifierAgent(BaseAgent):
                     retry_stubs = [stub for _, stub in retry_events]
                     retry_variables = {
                         **variables,
-                        "events_json": json.dumps(retry_stubs, ensure_ascii=False, indent=2),
+                        "events_json": json.dumps(
+                            retry_stubs, ensure_ascii=False, indent=2
+                        ),
                         "event_count": len(retry_stubs),
                     }
-                    retry_system = self._render_template(retry_system_raw, retry_variables)
+                    retry_system = self._render_template(
+                        retry_system_raw, retry_variables
+                    )
                     retry_user = self._render_template(retry_user_raw, retry_variables)
                     try:
-                        retry_result: ActivitySelectionBatch = await self._llm.complete_structured(
-                            system_prompt=retry_system,
-                            user_prompt=retry_user,
-                            output_schema=ActivitySelectionBatch,
-                            temperature=0.0,  # greedy for constrained selection
+                        retry_result: ActivitySelectionBatch = (
+                            await self._llm.complete_structured(
+                                system_prompt=retry_system,
+                                user_prompt=retry_user,
+                                output_schema=ActivitySelectionBatch,
+                                temperature=0.0,  # greedy for constrained selection
+                            )
                         )
 
                         for item in retry_result.items:
@@ -419,7 +450,9 @@ class TaxonomyClassifierAgent(BaseAgent):
             if not (tax and tax.subcategory and not tax.activity_id):
                 continue
             event_context = f"{event.title or ''} {event.description or ''}"
-            match = find_best_activity_match(event_context, tax.subcategory, threshold=0.3)
+            match = find_best_activity_match(
+                event_context, tax.subcategory, threshold=0.3
+            )
             if match:
                 tax.activity_id = match["activity_id"]
                 tax.activity_name = match.get("name")

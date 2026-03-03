@@ -34,6 +34,7 @@ class DataQualityAgent(BaseAgent):
     prompt_name = "data_quality"
 
     def __init__(self, config: dict[str, Any] | None = None):
+        """Initialize the DataQualityAgent with optional config overrides."""
         self._config = config or {}
         self._llm = get_llm_client(
             provider=self._config.get("provider", "anthropic"),
@@ -43,6 +44,7 @@ class DataQualityAgent(BaseAgent):
         self._registry = get_prompt_registry()
 
     async def run(self, task: AgentTask) -> AgentResult:
+        """Run data quality audit on the task's event batch and return scored results."""
         if not self._config.get("enabled", True):
             return AgentResult(
                 agent_name=self.name,

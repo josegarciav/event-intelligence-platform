@@ -397,4 +397,3 @@ class TestScraperAdapterContextManager:
 
         asyncio.run(run())
         mock_close.assert_called_once()
-

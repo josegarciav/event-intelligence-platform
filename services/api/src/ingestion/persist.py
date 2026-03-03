@@ -30,9 +30,9 @@ class EventDataWriter:
         """Initialize with an active psycopg2 connection."""
         self.conn = db_connection
         # Metadata cache for foreign key verification (issue #8)
-        self._valid_primary_categories = set()
-        self._valid_subcategories = set()
-        self._valid_activities = set()
+        self._valid_primary_categories: set[str] = set()
+        self._valid_subcategories: set[str] = set()
+        self._valid_activities: set[str] = set()
         self._load_metadata_cache()
 
     def _load_metadata_cache(self) -> None:
@@ -574,7 +574,9 @@ class EventDataWriter:
                 """,
                 (emotion_list,),
             )
-            existing_null: dict[str, object] = {row[1]: row[0] for row in cur.fetchall()}
+            existing_null: dict[str, object] = {
+                row[1]: row[0] for row in cur.fetchall()
+            }
             to_insert = [e for e in emotion_list if e not in existing_null]
             if to_insert:
                 execute_values(

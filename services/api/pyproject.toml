@@ -50,6 +50,18 @@ dev = [
 ]
 
 
+[tool.mypy]
+ignore_missing_imports = true
+explicit_package_bases = true
+# mypy 1.8 separates import-untyped from import-not-found; suppress both.
+disable_error_code = ["import-untyped"]
+
+[tool.pydocstyle]
+convention = "google"
+# D212: codebase uses second-line summary style (D213) — flip when convenient.
+# D2xx/D4xx: existing style inconsistencies, enforce incrementally.
+add_ignore = ["D202", "D205", "D212", "D400", "D401", "D415", "D417"]
+
 [tool.ruff]
 exclude = [
     "notebooks",

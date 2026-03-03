@@ -186,4 +186,3 @@ class ScraperAdapter(BaseSourceAdapter):
         if self._scraper:
             await self._scraper.close()
             self._scraper = None
-

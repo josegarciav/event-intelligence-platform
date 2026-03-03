@@ -1,3 +1,5 @@
+"""Base classes and shared data models for enrichment agents."""
+
 from src.agents.base.base_agent import BaseAgent
 from src.agents.base.output_models import (
     MissingFieldsExtraction,

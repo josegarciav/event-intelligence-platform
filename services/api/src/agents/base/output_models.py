@@ -24,6 +24,7 @@ class PrimaryCategoryExtraction(BaseModel):
     @field_validator("category_id")
     @classmethod
     def validate_category_id(cls, v: str) -> str:
+        """Validate category_id against known taxonomy IDs; defaults to '0' if invalid."""
         from src.schemas.taxonomy import get_primary_category_id_map
 
         valid_ids = get_primary_category_id_map()

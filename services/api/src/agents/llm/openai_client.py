@@ -33,6 +33,7 @@ class OpenAILLMClient(BaseLLMClient):
         temperature: float = 0.1,
         max_tokens: int = 2000,
     ):
+        """Initialize the OpenAILLMClient with model and API key settings."""
         self.model_name = model_name
         self.temperature = temperature
         self.max_tokens = max_tokens
@@ -48,6 +49,7 @@ class OpenAILLMClient(BaseLLMClient):
 
     @property
     def is_available(self) -> bool:
+        """Return True if an OpenAI API key is configured."""
         return bool(self._api_key)
 
     def _get_client(self):
@@ -75,6 +77,7 @@ class OpenAILLMClient(BaseLLMClient):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> str:
+        """Send a plain-text completion request to the OpenAI model."""
         client = self._get_client()
         if not client:
             return ""
@@ -107,6 +110,7 @@ class OpenAILLMClient(BaseLLMClient):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> T:
+        """Send a structured completion request and parse the response into the given schema."""
         client = self._get_client()
         if not client:
             return output_schema()
@@ -135,4 +139,5 @@ class OpenAILLMClient(BaseLLMClient):
             return output_schema()
 
     def get_token_usage(self) -> dict[str, int]:
+        """Return the token usage from the most recent LLM call."""
         return self._last_usage

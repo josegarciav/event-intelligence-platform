@@ -47,6 +47,8 @@ logger = logging.getLogger(__name__)
 
 
 class DuplicateGroup(BaseModel):
+    """A group of events identified as duplicates or a recurring series."""
+
     group_id: str = Field(description="UUID string identifying this group")
     group_type: str = Field(description="duplicate | recurring | near_duplicate")
     primary_event_id: str = Field(description="source_event_id of the canonical event")
@@ -58,6 +60,8 @@ class DuplicateGroup(BaseModel):
 
 
 class DeduplicationOutput(BaseModel):
+    """Structured LLM output containing all detected duplicate groups."""
+
     groups: list[DuplicateGroup] = Field(default_factory=list)
 
 
@@ -79,6 +83,7 @@ class DeduplicationAgent(BaseAgent):
     prompt_name = "deduplication"  # rules_v1_llama3_threshold_0.8
 
     def __init__(self, config: dict[str, Any] | None = None):
+        """Initialize the DeduplicationAgent with optional config overrides."""
         self._config = config or {}
         self._min_confidence = self._config.get("min_confidence", 0.8)
 
@@ -93,6 +98,7 @@ class DeduplicationAgent(BaseAgent):
         self._registry = get_prompt_registry()
 
     async def run(self, task: AgentTask) -> AgentResult:
+        """Run deduplication on the task's event batch and return enriched results."""
         if not self._config.get("enabled", True):
             return AgentResult(
                 agent_name=self.name,
@@ -312,7 +318,7 @@ class DeduplicationAgent(BaseAgent):
 
         for event in events:
             event_id = str(event.source.source_event_id)
-            group = id_to_group.get(event_id)
+            group = id_to_group.get(event_id)  # type: ignore[assignment]
             if not group:
                 continue
 

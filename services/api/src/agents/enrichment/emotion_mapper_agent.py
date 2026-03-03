@@ -76,6 +76,7 @@ class EmotionMapperAgent(BaseAgent):
     prompt_name = "emotion_mapper"
 
     def __init__(self, config: dict[str, Any] | None = None):
+        """Initialize the EmotionMapperAgent with optional config overrides."""
         self._config = config or {}
         self._llm = get_llm_client(
             provider=self._config.get("provider", "anthropic"),
@@ -85,6 +86,7 @@ class EmotionMapperAgent(BaseAgent):
         self._registry = get_prompt_registry()
 
     async def run(self, task: AgentTask) -> AgentResult:
+        """Run emotion mapping on the task's event batch and return enriched results."""
         if not self._config.get("enabled", True):
             return AgentResult(
                 agent_name=self.name,

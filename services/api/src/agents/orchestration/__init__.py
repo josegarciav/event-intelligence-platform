@@ -1,3 +1,5 @@
+"""Orchestration layer for running enrichment agent pipelines."""
+
 from src.agents.orchestration.agent_runner import (
     BatchEnrichmentRunner,
     EnrichmentRunResult,

@@ -46,10 +46,12 @@ class ArtistEnricherAgent(BaseAgent):
     prompt_name = "artist_enrichment"
 
     def __init__(self, config: dict[str, Any] | None = None):
+        """Initialize the ArtistEnricherAgent with optional config overrides."""
         self._config = config or {}
         self._timeout: float = float(self._config.get("timeout_seconds", 5.0))
 
     async def run(self, task: AgentTask) -> AgentResult:
+        """Run artist enrichment via MusicBrainz and return events with updated artist metadata."""
         if not self._config.get("enabled", True):
             return AgentResult(
                 agent_name=self.name,

@@ -30,6 +30,7 @@ class PromptRegistry:
     """
 
     def __init__(self, prompts_dir: Path | None = None):
+        """Initialize the PromptRegistry, optionally pointing to a custom prompts directory."""
         self._dir = prompts_dir or _PROMPTS_DIR
         self._manifests: dict[str, dict[str, Any]] = {}
         self._templates: dict[str, dict[str, Any]] = {}  # key = "name/version"
@@ -103,8 +104,8 @@ class PromptRegistry:
 
         except ImportError:
             # Fallback: simple str.replace substitution
-            Template = None  # type: ignore[assignment]
-            SilentUndefined = None  # type: ignore[assignment]
+            Template = None  # type: ignore[misc, assignment]
+            SilentUndefined = None  # type: ignore[misc, assignment]
 
         resolved_version = self._resolve_version(prompt_name, version)
         template_data = self._load_template(prompt_name, resolved_version)
@@ -168,6 +169,7 @@ _registry: PromptRegistry | None = None
 
 
 def get_prompt_registry() -> PromptRegistry:
+    """Return the global PromptRegistry singleton, creating it on first call."""
     global _registry
     if _registry is None:
         _registry = PromptRegistry()

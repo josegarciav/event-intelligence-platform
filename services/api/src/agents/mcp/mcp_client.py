@@ -82,6 +82,7 @@ class DirectMCPClient(MCPClient):
     """
 
     def __init__(self, events: list["EventSchema"] | None = None):
+        """Initialize DirectMCPClient with an optional list of pre-loaded events."""
         self._events: dict[str, EventSchema] = {}
         if events:
             for event in events:

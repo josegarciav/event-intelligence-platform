@@ -32,6 +32,7 @@ class FeatureAlignmentAgent(BaseAgent):
     prompt_name = "feature_alignment"
 
     def __init__(self, config: dict[str, Any] | None = None):
+        """Initialize the FeatureAlignmentAgent with optional config overrides."""
         self._config = config or {}
         self._llm = get_llm_client(
             provider=self._config.get("provider", "anthropic"),
@@ -41,6 +42,7 @@ class FeatureAlignmentAgent(BaseAgent):
         self._registry = get_prompt_registry()
 
     async def run(self, task: AgentTask) -> AgentResult:
+        """Run feature alignment on the task's event batch and return enriched results."""
         if not self._config.get("enabled", True):
             return AgentResult(
                 agent_name=self.name,
@@ -116,9 +118,7 @@ class FeatureAlignmentAgent(BaseAgent):
                         from src.schemas.event import EventFormat
 
                         try:
-                            enriched_events[idx].format = EventFormat(
-                                item.event_format
-                            )
+                            enriched_events[idx].format = EventFormat(item.event_format)
                         except ValueError:
                             pass
 

@@ -121,4 +121,4 @@ def get_settings() -> Settings:
     Settings
         The singleton settings instance.
     """
-    return Settings()
+    return Settings()  # type: ignore[call-arg]
