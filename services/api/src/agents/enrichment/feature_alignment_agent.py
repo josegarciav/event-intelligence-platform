@@ -1,10 +1,14 @@
 """
-FeatureAlignmentAgent — fills event_type, tags, and event_format.
+FeatureAlignmentAgent — fills event_type, tags, event_format, and pricing fields.
 
 Uses the 'feature_alignment' prompt in batch mode: events are chunked and sent
 to the LLM together to save on round-trip latency.  Each chunk produces a
 single structured response (MissingFieldsExtractionBatch) with one item per
 event, keyed by source_event_id.
+
+Pricing extraction (v2+): fills null PriceInfo fields from description /
+price_raw_text using a fill-null-only strategy — ingestion values are never
+overwritten.
 """
 
 import logging
@@ -22,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 class FeatureAlignmentAgent(BaseAgent):
     """
-    Fills core metadata fields: event_type, tags, event_format.
+    Fills core metadata fields: event_type, tags, event_format, and pricing.
 
     Processes events in configurable batches (default 8) to reduce LLM
     round-trips.  Gracefully skips if LLM is unavailable.
@@ -121,6 +125,27 @@ class FeatureAlignmentAgent(BaseAgent):
                             enriched_events[idx].format = EventFormat(item.event_format)
                         except ValueError:
                             pass
+
+                    if item.pricing:
+                        from decimal import Decimal
+
+                        p = item.pricing
+                        price = enriched_events[idx].price
+                        if p.is_free is not None and price.is_free is None:
+                            price.is_free = p.is_free
+                        if p.currency_code and price.currency_code == "USD":
+                            price.currency_code = p.currency_code
+                        for field in (
+                            "minimum_price",
+                            "maximum_price",
+                            "early_bird_price",
+                            "standard_price",
+                            "vip_price",
+                        ):
+                            if getattr(p, field) is not None and getattr(price, field) is None:
+                                setattr(price, field, Decimal(str(getattr(p, field))))
+                        if p.price_raw_text and not price.price_raw_text:
+                            price.price_raw_text = p.price_raw_text
 
                 usage = self._llm.get_token_usage()
                 for k in total_tokens:

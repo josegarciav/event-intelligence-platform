@@ -35,6 +35,13 @@ agents:
       - "event_type"
       - "tags"
       - "format"
+      - "price.is_free"
+      - "price.currency_code"
+      - "price.minimum_price"
+      - "price.maximum_price"
+      - "price.early_bird_price"
+      - "price.standard_price"
+      - "price.vip_price"
 
   # ---------------------------------------------------------------------------
   # TAXONOMY CLASSIFIER — full taxonomy: primary_category, subcategory, all

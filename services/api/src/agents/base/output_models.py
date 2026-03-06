@@ -114,11 +114,24 @@ class TaxonomyAttributesExtraction(BaseModel):
 # =============================================================================
 
 
+class PricingExtraction(BaseModel):
+    """Structured pricing extracted from event description / price_raw_text."""
+
+    is_free: bool | None = None
+    currency_code: str | None = Field(default=None, description="ISO 4217, e.g. USD, EUR, GBP")
+    minimum_price: float | None = Field(default=None, ge=0)
+    maximum_price: float | None = Field(default=None, ge=0)
+    early_bird_price: float | None = Field(default=None, ge=0)
+    standard_price: float | None = Field(default=None, ge=0)
+    vip_price: float | None = Field(default=None, ge=0)
+    price_raw_text: str | None = None
+
+
 class MissingFieldsExtraction(BaseModel):
     """
     Batch extraction for multiple missing fields (feature_alignment prompt).
 
-    Used by FeatureAlignmentAgent to fill event_type, tags, event_format.
+    Used by FeatureAlignmentAgent to fill event_type, tags, event_format, and pricing.
     """
 
     event_type: (
@@ -147,6 +160,7 @@ class MissingFieldsExtraction(BaseModel):
     tags: list[str] = Field(
         default_factory=list, description="5-8 relevant search/filter tags"
     )
+    pricing: PricingExtraction | None = None
 
 
 # =============================================================================

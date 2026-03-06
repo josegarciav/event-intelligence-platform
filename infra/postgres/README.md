@@ -43,6 +43,7 @@ docker compose -f infra/postgres/docker-compose.yml up -d
 
 ### List DBs
 
+
 ```bash
 docker exec -it experience_postgres psql -U experience -l
 ```

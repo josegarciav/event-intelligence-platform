@@ -1,7 +1,11 @@
 prompt_name: "feature_alignment"
-active_version: "v1"
+active_version: "v2"
 versions:
   v1:
     description: "Initial core metadata classification prompt"
     created_at: "2026-02-18"
     notes: "Covers event_type (15 types), event_format, and tag generation. Used by FeatureAlignmentAgent."
+  v2:
+    description: "Core metadata classification with structured pricing extraction"
+    created_at: "2026-03-06"
+    notes: "Extends v1 with pricing block: is_free, currency_code, min/max/early_bird/standard/vip prices, price_raw_text. Fill-null-only strategy."
