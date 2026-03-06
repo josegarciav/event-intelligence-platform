@@ -78,11 +78,12 @@ event-intelligence-platform/
 │                                                          │
 │  MCP Layer  (local mode — in-process FastMCP)            │
 │       ↓                                                  │
-│  [1] FeatureAlignmentAgent   → event_type, tags          │
+│  [1] FeatureAlignmentAgent   → event_type, tags, pricing  │
+│  [1]  (cont.)                → artists.genre (MusicBrainz)│
 │  [2] TaxonomyClassifierAgent → category, activity (RAG)  │
 │  [3] EmotionMapperAgent      → vibe, energy, cost        │
 │  [4] DataQualityAgent        → quality_score             │
-│  [5] DeduplicationAgent      → fuzzy dedup + grouping    │
+│  [5] DeduplicationAgent      → dedup + is_recurring      │
 │                                                          │
 │  LLM: Ollama llama3.2:1b (default) · Claude · GPT       │
 │       ↓                                                  │

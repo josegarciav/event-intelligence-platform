@@ -81,7 +81,8 @@ ON events FOR EACH ROW EXECUTE FUNCTION events_search_trigger();
 As noted in the README "Brainstorming" section, users should get a feel for an artist's style directly on the platform. The current `artists` table has placeholders for URLs but lacks the metadata needed for a rich UI (e.g., profile images, popular tracks, genres).
 
 ### Proposed Solution
-- Create an `ArtistEnricher` that uses SoundCloud, Spotify, or Instagram APIs to fetch multimedia assets.
+- **Genre enrichment (done):** `FeatureAlignmentAgent` already runs a MusicBrainz HTTP pass after its LLM batch to fill `artists[*].genre` (fill-null-only, no auth required).
+- **Multimedia enrichment (open):** Extend with SoundCloud, Spotify, or Instagram APIs to fetch profile images, popular tracks, and follower counts.
 - Cache artist-level metadata to avoid redundant external API calls during event ingestion.
 
 ### Schema Changes
@@ -117,7 +118,7 @@ The platform ingests data from multiple heterogeneous sources. While UUIDv5 prov
 - Implement a "Master Record" pattern where one event is chosen as the canonical version and others are linked to it.
 
 ### Implementation
-`DeduplicationAgent` (`services/api/src/agents/enrichment/deduplication_agent.py`) — two-pass architecture: (1) rule-based exact match on `(title_slug, date, venue_slug)` using deterministic UUID5 group IDs, always runs with no LLM; (2) LLM fuzzy analysis on remaining candidates for near-duplicates and recurring series, only accepts groups with confidence ≥ 0.80. Results written to `event.custom_fields` and persisted to the `event_groups` table.
+`DeduplicationAgent` (`services/api/src/agents/enrichment/deduplication_agent.py`) — two-pass architecture: (1) rule-based exact match on `(title_slug, date, venue_slug)` using deterministic UUID5 group IDs, always runs with no LLM; (2) LLM fuzzy analysis on remaining candidates for near-duplicates and recurring series, only accepts groups with confidence ≥ 0.80. Results written to `event.custom_fields` and persisted to the `event_groups` table. Recurring groups additionally set `event.is_recurring = True` and `event.recurrence_pattern` (one of `intraday | daily | weekly | monthly | annual`) directly on the EventSchema, which the persistence layer writes to `events.is_recurring` and `events.recurrence_pattern`.
 
 ### Schema Changes
 ```sql

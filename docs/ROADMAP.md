@@ -197,12 +197,11 @@ src/agents/
 │
 ├── enrichment/
 │   ├── __init__.py
-│   ├── feature_alignment_agent.py        (event_type, tags, format)
+│   ├── feature_alignment_agent.py        (event_type, tags, format, pricing; + MusicBrainz pass for artists[*].genre)
 │   ├── taxonomy_classifier_agent.py      (two-pass RAG: primary_category, subcategory, activity_id, activity_name, behavioral dims)
 │   ├── emotion_mapper_agent.py           (emotional_output, cost_level, environment, risk_level, age_accessibility, time_scale)
 │   ├── data_quality_agent.py             (quality_score, normalization_errors; rule-based fallback always runs)
-│   ├── deduplication_agent.py            (two-pass: rule-based exact match + LLM fuzzy grouping)
-│   └── artist_enricher_agent.py          (genre via MusicBrainz API — no auth required)
+│   └── deduplication_agent.py            (two-pass: rule-based exact match + LLM fuzzy grouping; sets is_recurring + recurrence_pattern)
 │
 ├── validation/
 │   ├── __init__.py
@@ -233,12 +232,11 @@ src/agents/
 
 | Agent | File | Status | Prompt | Target Fields |
 |---|---|---|---|---|
-| FeatureAlignmentAgent | `enrichment/feature_alignment_agent.py` | **Live** | `feature_alignment` | event_type, tags, format |
+| FeatureAlignmentAgent | `enrichment/feature_alignment_agent.py` | **Live** | `feature_alignment` | event_type, tags, format, pricing fields; + MusicBrainz HTTP pass for artists[*].genre (fill-null-only, no LLM) |
 | TaxonomyClassifierAgent | `enrichment/taxonomy_classifier_agent.py` | **Live** | `taxonomy_classifier` | primary_category, subcategory, subcategory_name, activity_id, activity_name, energy_level, social_intensity, cognitive_load, physical_involvement, repeatability, unconstrained_* — two-pass RAG |
 | EmotionMapperAgent | `enrichment/emotion_mapper_agent.py` | **Live** | `emotion_mapper` | emotional_output, cost_level, environment, risk_level, age_accessibility, time_scale |
 | DataQualityAgent | `enrichment/data_quality_agent.py` | **Live** | `data_quality` | data_quality_score, normalization_errors (rule-based fallback always runs) |
-| DeduplicationAgent | `enrichment/deduplication_agent.py` | **Live** | `deduplication` | duplicate_group_id, group_type, is_primary, duplicate_of, similarity_score, reason |
-| ArtistEnricherAgent | `enrichment/artist_enricher_agent.py` | **Live** | — | artists[*].genre (MusicBrainz API, no auth) |
+| DeduplicationAgent | `enrichment/deduplication_agent.py` | **Live** | `deduplication` | duplicate_group_id, group_type, is_primary, duplicate_of, similarity_score, reason, is_recurring, recurrence_pattern |
 | MCP layer | `mcp/mcp_client.py` | **Live** | — | LocalMCPClient (in-process FastMCP, default) · ServerMCPClient (HTTP SSE) · DirectMCPClient (legacy) |
 | FastMCP server | `mcp/fastmcp_server.py` | **Live** | — | Production server mode: `python -m src.agents.mcp.fastmcp_server` |
 

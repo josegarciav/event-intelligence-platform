@@ -8,6 +8,7 @@ Pulsecity uses LLMs as data operators, not assistants.
 After ingestion, a sequential chain of five specialized agents reads each event through MCP, reasons over its fields, and writes structured intelligence back into the event record.
 All reads and writes are mediated by the MCP layer — agents never touch the database directly.
 All outputs are schema-constrained; free-text hallucinations cannot enter production data.
+Non-LLM enrichment (e.g. MusicBrainz artist genre lookup) runs as a post-LLM phase inside the relevant agent rather than as a separate chain entry.
 
 ---
 
@@ -47,11 +48,11 @@ Configuration lives in `services/api/src/configs/agents.yaml`.
 
 | # | Agent                   | Config key            | Prompt                  | Target Fields                                                                                     |
 |---|-------------------------|-----------------------|-------------------------|---------------------------------------------------------------------------------------------------|
-| 1 | FeatureAlignmentAgent   | `feature_alignment`   | `feature_alignment`     | event_type, tags, format                                                                          |
+| 1 | FeatureAlignmentAgent   | `feature_alignment`   | `feature_alignment`     | event_type, tags, format, price.{is_free, currency_code, minimum_price, maximum_price, early_bird_price, standard_price, vip_price, price_raw_text}, artists[*].genre — LLM batch pass; then MusicBrainz HTTP pass for artist genre (fill-null-only, no LLM) |
 | 2 | TaxonomyClassifierAgent | `taxonomy_classifier` | `taxonomy_classifier`   | primary_category, subcategory, subcategory_name, activity_id, activity_name, energy_level, social_intensity, cognitive_load, physical_involvement, repeatability, unconstrained_primary_category, unconstrained_subcategory, unconstrained_activity — **two-pass RAG**: pass 1 classifies category/subcategory/dims; pass 2 retrieves activities from taxonomy JSON and picks best activity_id per event |
 | 3 | EmotionMapperAgent      | `emotion_mapper`      | `emotion_mapper`        | emotional_output, cost_level, environment, risk_level, age_accessibility, time_scale              |
 | 4 | DataQualityAgent        | `data_quality`        | `data_quality`          | data_quality_score                                                                                |
-| 5 | DeduplicationAgent      | `deduplication`       | `deduplication`         | duplicate_group_id, group_type, is_primary, duplicate_of, similarity_score, reason — **two-pass**: rule-based exact match (always) + LLM fuzzy grouping (when available) |
+| 5 | DeduplicationAgent      | `deduplication`       | `deduplication`         | duplicate_group_id, group_type, is_primary, duplicate_of, similarity_score, reason, is_recurring, recurrence_pattern — **two-pass**: rule-based exact match (always) + LLM fuzzy grouping (when available); recurring groups set `is_recurring=True` and `recurrence_pattern` directly on EventSchema |
 
 ---
 
@@ -166,14 +167,13 @@ Events below `global.confidence_threshold` (0.6, set in `agents.yaml`) are flagg
 
 ## Agent Status
 
-| Agent                   | File                                          | Status  | Prompt                  |
-|-------------------------|-----------------------------------------------|---------|-------------------------|
-| FeatureAlignmentAgent   | `enrichment/feature_alignment_agent.py`       | Live    | `feature_alignment`     |
-| TaxonomyClassifierAgent | `enrichment/taxonomy_classifier_agent.py`     | Live    | `taxonomy_classifier`   |
-| EmotionMapperAgent      | `enrichment/emotion_mapper_agent.py`          | Live    | `emotion_mapper`        |
-| DataQualityAgent        | `enrichment/data_quality_agent.py`            | Live    | `data_quality`          |
-| DeduplicationAgent      | `enrichment/deduplication_agent.py`           | Live    | `deduplication`         |
-| ArtistEnricherAgent     | `enrichment/artist_enricher_agent.py`         | Live    | — (MusicBrainz API, no auth required) |
+| Agent                   | File                                          | Status  | Prompt                  | Notes |
+|-------------------------|-----------------------------------------------|---------|-------------------------|-------|
+| FeatureAlignmentAgent   | `enrichment/feature_alignment_agent.py`       | Live    | `feature_alignment`     | LLM fills event_type/tags/format/pricing; MusicBrainz pass fills artists[*].genre |
+| TaxonomyClassifierAgent | `enrichment/taxonomy_classifier_agent.py`     | Live    | `taxonomy_classifier`   | |
+| EmotionMapperAgent      | `enrichment/emotion_mapper_agent.py`          | Live    | `emotion_mapper`        | |
+| DataQualityAgent        | `enrichment/data_quality_agent.py`            | Live    | `data_quality`          | |
+| DeduplicationAgent      | `enrichment/deduplication_agent.py`           | Live    | `deduplication`         | Sets is_recurring + recurrence_pattern on recurring groups |
 
 ---
 
