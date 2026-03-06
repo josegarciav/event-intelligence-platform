@@ -19,7 +19,6 @@ _AGENT_MAP: dict[str, str] = {
     "emotion_mapper": "src.agents.enrichment.emotion_mapper_agent.EmotionMapperAgent",
     "data_quality": "src.agents.enrichment.data_quality_agent.DataQualityAgent",
     "deduplication": "src.agents.enrichment.deduplication_agent.DeduplicationAgent",
-    "artist_enricher": "src.agents.enrichment.artist_enricher_agent.ArtistEnricherAgent",
 }
 
 

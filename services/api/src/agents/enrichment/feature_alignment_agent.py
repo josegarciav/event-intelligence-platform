@@ -1,35 +1,106 @@
 """
-FeatureAlignmentAgent — fills event_type, tags, event_format, and pricing fields.
+FeatureAlignmentAgent — fills core metadata, pricing, and artist genre fields.
 
-Uses the 'feature_alignment' prompt in batch mode: events are chunked and sent
-to the LLM together to save on round-trip latency.  Each chunk produces a
-single structured response (MissingFieldsExtractionBatch) with one item per
-event, keyed by source_event_id.
+Target fields
+─────────────
+Core metadata (EventSchema):
+  event_type      — one of 15 types (concert, nightlife, festival, …, other)
+  format          — in_person | virtual | hybrid | streamed
+  tags            — 5–8 lowercase search/filter tags; merged with existing tags
 
-Pricing extraction (v2+): fills null PriceInfo fields from description /
-price_raw_text using a fill-null-only strategy — ingestion values are never
-overwritten.
+Pricing (EventSchema.price — PriceInfo):
+  is_free         — bool; detected from "free" / "gratis" keywords
+  currency_code   — ISO 4217 (USD, EUR, GBP, …); inferred from symbol or text
+  minimum_price   — lowest advertised ticket price
+  maximum_price   — highest advertised ticket price
+  early_bird_price — discounted advance price
+  standard_price  — regular admission price
+  vip_price       — premium/VIP price
+  price_raw_text  — verbatim price string from event context
+
+Artists (EventSchema.artists — ArtistInfo):
+  genre  — single-word genre label from MusicBrainz top tag (fill-null-only)
+
+Strategy
+────────
+All fields are fill-null-only: ingestion values are never overwritten.
+For currency_code the sentinel is the default "USD" — if ingestion already
+set a non-USD currency the agent skips it.
+
+Implementation
+──────────────
+Events are processed in configurable batches (default 8) to reduce LLM
+round-trips. Each chunk produces a single MissingFieldsExtractionBatch
+response keyed by source_event_id. Gracefully skips if LLM is unavailable.
+
+After the LLM batch loop, a synchronous MusicBrainz pass fills artist.genre
+for any artist missing it (fill-null-only, no LLM, runs via asyncio.to_thread).
+Rate-limiting: MusicBrainz requests a max of 1 req/s per user-agent. Sequential
+lookups per batch naturally keep the rate low.
 """
 
+import asyncio
 import logging
 import time
 from typing import Any
+
+import requests
 
 from src.agents.base.base_agent import BaseAgent
 from src.agents.base.output_models import MissingFieldsExtractionBatch
 from src.agents.base.task import AgentResult, AgentTask
 from src.agents.llm.provider_router import get_llm_client
 from src.agents.registry.prompt_registry import get_prompt_registry
+from src.schemas.event import ArtistInfo
 
 logger = logging.getLogger(__name__)
+
+_MUSICBRAINZ_API = "https://musicbrainz.org/ws/2/artist/"
+_MUSICBRAINZ_HEADERS = {
+    "User-Agent": "PulsecityEventPlatform/1.0 (contact@pulsecity.ai)",
+    "Accept": "application/json",
+}
+_CONFIDENCE_THRESHOLD = 70  # MusicBrainz match score (0–100); below this we skip
+
+# Multi-word genre names that map to a single canonical word.
+_GENRE_MAP: dict[str, str] = {
+    "hip hop": "hiphop",
+    "hip-hop": "hiphop",
+    "rhythm and blues": "rnb",
+    "r&b": "rnb",
+    "drum and bass": "dnb",
+    "drum & bass": "dnb",
+    "electronic dance music": "electronic",
+    "hard rock": "rock",
+    "soft rock": "rock",
+    "indie rock": "indie",
+    "indie pop": "indie",
+    "heavy metal": "metal",
+    "death metal": "metal",
+    "black metal": "metal",
+    "nu metal": "metal",
+    "pop music": "pop",
+    "folk music": "folk",
+    "country music": "country",
+    "trap music": "trap",
+    "house music": "house",
+}
+
+
+def _normalize_genre(tag: str) -> str:
+    """Return a single-word genre label from a MusicBrainz tag string."""
+    normalized = tag.lower().strip()
+    if normalized in _GENRE_MAP:
+        return _GENRE_MAP[normalized]
+    # Fall back to first word only
+    return normalized.split()[0] if normalized else normalized
 
 
 class FeatureAlignmentAgent(BaseAgent):
     """
-    Fills core metadata fields: event_type, tags, event_format, and pricing.
+    Fills event_type, format, tags, and all PriceInfo fields (prompt v2).
 
-    Processes events in configurable batches (default 8) to reduce LLM
-    round-trips.  Gracefully skips if LLM is unavailable.
+    See module docstring for the full field list and fill strategy.
     """
 
     name = "feature_alignment"
@@ -44,6 +115,7 @@ class FeatureAlignmentAgent(BaseAgent):
             temperature=self._config.get("temperature", 0.1),
         )
         self._registry = get_prompt_registry()
+        self._timeout: float = float(self._config.get("timeout_seconds", 5.0))
 
     async def run(self, task: AgentTask) -> AgentResult:
         """Run feature alignment on the task's event batch and return enriched results."""
@@ -156,6 +228,21 @@ class FeatureAlignmentAgent(BaseAgent):
                 logger.warning(f"{self.name} batch error: {msg}")
                 errors.append(msg)
 
+        # MusicBrainz artist genre enrichment (fill-null-only, no LLM)
+        for i, event in enumerate(enriched_events):
+            if not event.artists:
+                continue
+            enriched_artists = []
+            for artist in event.artists:
+                try:
+                    enriched_artists.append(
+                        await asyncio.to_thread(self._lookup_artist, artist)
+                    )
+                except Exception as exc:
+                    errors.append(f"artist='{artist.name}': {exc}")
+                    enriched_artists.append(artist)
+            enriched_events[i].artists = enriched_artists
+
         return AgentResult(
             agent_name=self.name,
             prompt_name=self.prompt_name,
@@ -164,4 +251,59 @@ class FeatureAlignmentAgent(BaseAgent):
             token_usage=total_tokens,
             errors=errors,
             duration_seconds=time.monotonic() - start,
+        )
+
+    # -------------------------------------------------------------------------
+    # Internal helpers
+    # -------------------------------------------------------------------------
+
+    def _lookup_artist(self, artist: ArtistInfo) -> ArtistInfo:
+        """
+        Synchronous MusicBrainz lookup — intended to run via asyncio.to_thread.
+
+        Returns the original ArtistInfo unchanged if the lookup fails or the
+        match confidence is below _CONFIDENCE_THRESHOLD.
+        """
+        try:
+            resp = requests.get(
+                _MUSICBRAINZ_API,
+                params={"query": artist.name, "fmt": "json", "limit": 1},
+                headers=_MUSICBRAINZ_HEADERS,
+                timeout=self._timeout,
+            )
+            resp.raise_for_status()
+        except requests.RequestException as exc:
+            logger.debug("MusicBrainz request failed for '%s': %s", artist.name, exc)
+            return artist
+
+        data = resp.json()
+        artists_found = data.get("artists") or []
+        if not artists_found:
+            return artist
+
+        mb_artist = artists_found[0]
+        score = int(mb_artist.get("score", 0))
+        if score < _CONFIDENCE_THRESHOLD:
+            logger.debug(
+                "Low MusicBrainz confidence (%d) for '%s', skipping enrichment",
+                score,
+                artist.name,
+            )
+            return artist
+
+        # Derive genre from the highest-count tag — normalize to single word
+        genre = artist.genre
+        tags = mb_artist.get("tags") or []
+        if tags and not genre:
+            top_tag = max(tags, key=lambda t: t.get("count", 0))
+            raw = top_tag.get("name") or ""
+            if raw:
+                genre = _normalize_genre(raw)
+
+        return ArtistInfo(
+            name=artist.name,
+            genre=genre,
+            soundcloud_url=artist.soundcloud_url,
+            spotify_url=artist.spotify_url,
+            instagram_url=artist.instagram_url,
         )

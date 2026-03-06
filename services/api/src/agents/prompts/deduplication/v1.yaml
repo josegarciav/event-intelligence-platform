@@ -59,5 +59,6 @@ user_prompt: |
   - member_event_ids: all source_event_ids in this group (including primary), list format
   - confidence: 0.0-1.0
   - reason: one sentence explaining why these are grouped (e.g., Same show/location/title/source, different times, type "recurring")
+  - recurrence_pattern: (recurring groups only) one of "intraday" | "daily" | "weekly" | "monthly" | "annual". Omit or set null for non-recurring groups.
 
   Only include groups with confidence >= 0.8. Ignore singleton events.

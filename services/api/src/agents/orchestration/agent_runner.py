@@ -2,10 +2,11 @@
 BatchEnrichmentRunner — runs the enrichment agent chain on a list of events.
 
 Agent chain (ordered):
-  1. feature_alignment   → event_type, tags, event_format
+  1. feature_alignment   → event_type, tags, event_format, artists.genre (via MusicBrainz)
   2. taxonomy_classifier → primary_category, subcategory, behavioral dimensions
   3. emotion_mapper      → emotional_output, cost_level, environment, etc.
   4. data_quality        → quality_score, normalization_errors
+  5. deduplication       → duplicate_group_id, group_type
 
 Each agent receives the events output by the previous agent (pipeline pattern).
 """

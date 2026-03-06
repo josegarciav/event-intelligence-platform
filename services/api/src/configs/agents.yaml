@@ -4,8 +4,8 @@
 # Loaded by: src/agents/orchestration/pipeline_triggers.py::load_agents_config()
 # Used by:   BatchEnrichmentRunner to instantiate and configure each agent.
 #
-# Agent chain order: feature_alignment → taxonomy_classifier →
-#                    emotion_mapper → data_quality → deduplication
+# Agent chain order: feature_alignment (+ MusicBrainz artist genre) →
+#                    taxonomy_classifier → emotion_mapper → data_quality → deduplication
 #
 # Provider options:
 #   anthropic — Claude via Anthropic SDK (requires ANTHROPIC_API_KEY)
@@ -31,6 +31,7 @@ agents:
     model: "llama3.2:1b"
     temperature: 0.1
     batch_size: 8      # events per LLM call (reduce for smaller/slower models)
+    timeout_seconds: 5.0  # MusicBrainz HTTP timeout
     target_fields:
       - "event_type"
       - "tags"
@@ -42,6 +43,7 @@ agents:
       - "price.early_bird_price"
       - "price.standard_price"
       - "price.vip_price"
+      - "artists.genre"
 
   # ---------------------------------------------------------------------------
   # TAXONOMY CLASSIFIER — full taxonomy: primary_category, subcategory, all
@@ -132,20 +134,9 @@ agents:
       - "duplicate_of"
       - "similarity_score"
       - "reason"
+      - "is_recurring"
+      - "recurrence_pattern"
 
-  # ---------------------------------------------------------------------------
-  # ARTIST ENRICHER — enriches artist genre via MusicBrainz API (no auth required)
-  # ---------------------------------------------------------------------------
-  artist_enricher:
-    enabled: true
-    prompt_name: "artist_enrichment"
-    prompt_version: "active"
-    provider: "ollama"
-    model: "llama3.2:1b"
-    temperature: 0.1
-    timeout_seconds: 5.0
-    target_fields:
-      - "artists"
 
 # =============================================================================
 # GLOBAL SETTINGS

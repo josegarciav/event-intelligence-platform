@@ -22,6 +22,11 @@ Output written to event.custom_fields (consumed by the persistence layer to writ
   similarity_score     — confidence score (0–1), maps to event_groups.similarity_score
   reason               — short LLM explanation, maps to event_groups.reason
 
+Output written directly to EventSchema fields:
+  is_recurring         — True when group_type == "recurring"
+  recurrence_pattern   — "daily" | "intraday" | "weekly" | "monthly" | "annual"
+                         (fill-null-only; LLM-provided for recurring groups)
+
 The persistence layer (not this agent) is responsible for:
   - Inserting rows into event_groups
   - Setting events.duplicate_group_id FK on all member events
@@ -57,6 +62,10 @@ class DuplicateGroup(BaseModel):
         ge=0, le=1, description="Confidence this is a valid group"
     )
     reason: str = Field(description="Brief explanation")
+    recurrence_pattern: str | None = Field(
+        default=None,
+        description="Only for recurring groups: daily | intraday | weekly | monthly | annual",
+    )
 
 
 class DeduplicationOutput(BaseModel):
@@ -334,6 +343,11 @@ class DeduplicationAgent(BaseAgent):
 
             if not is_primary:
                 event.custom_fields["duplicate_of"] = group.primary_event_id
+
+            if group.group_type == "recurring":
+                event.is_recurring = True
+                if group.recurrence_pattern and not event.recurrence_pattern:
+                    event.recurrence_pattern = group.recurrence_pattern
 
         return events
 

@@ -6,7 +6,7 @@ Architecture:
   llm/           — BaseLLMClient, AnthropicLLMClient, OpenAILLMClient, provider_router
   mcp/           — MCPClient (DirectMCPClient in-memory; LocalMCPClient/ServerMCPClient FastMCP)
   enrichment/    — FeatureAlignmentAgent, TaxonomyClassifierAgent, EmotionMapperAgent,
-                   DataQualityAgent, DeduplicationAgent, ArtistEnricherAgent
+                   DataQualityAgent, DeduplicationAgent
   validation/    — SchemaValidator, confidence scoring
   orchestration/ — BatchEnrichmentRunner, PostIngestionTrigger
   prompts/       — Versioned Jinja2 prompt templates (manifest.yaml + vN.yaml)
